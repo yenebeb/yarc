@@ -15,6 +15,7 @@ Open-source Arc-browser replacement (Electron 45 / Chromium 156, React 19, TypeS
 - Window = UI webContents (sidebar) under per-tab `WebContentsView`s, plus a transparent overlay view on top for the command bar/panels (`src/main/window.ts`).
 - One session partition per profile (`persist:profile-<id>`): extensions (`extensions.ts`), ad blocking (`adblock.ts`), history (`history.ts`, `node:sqlite`). Spaces map to profiles; favorites belong to profiles.
 - Incognito windows (⇧⌘N, Dock, File menu, link context menu) are a second `Browser` per window, constructed with `main`: in-memory `Store` and `History`, non-persistent `incognito-<id>` partitions, no extensions, the main ad blocker and updater; disposed when the window closes. IPC is registered once and routed to the controller that owns `e.sender`.
+- History sync (`src/main/sync/`, `docs/history-sync.md`): encrypted per-device logs in a folder the user already syncs (iCloud Drive, Dropbox, OneDrive); no server. Only the main controller has a `HistorySync`, so incognito never syncs. The derived key uses `safeStorage` on Windows/Linux but not macOS (keychain prompt per update).
 - Shortcuts are matched in `before-input-event` on every webContents (`src/shared/keymap.ts`, physical key codes). Playwright's synthetic keys bypass this — e2e tests use `wc.sendInputEvent`.
 - Research notes in `docs/`: Arc behavior & shortcuts (`arc-reference.md`), Arc's `StorableSidebar.json` format (`arc-data-format.md`), Electron/Google sign-in/packaging gotchas (`electron-notes.md`).
 

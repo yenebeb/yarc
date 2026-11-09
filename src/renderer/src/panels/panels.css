@@ -462,3 +462,18 @@
 .contents {
   display: contents;
 }
+
+/* Sync */
+.sheet .sync-folder {
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: rtl;
+  text-align: left;
+}
+
+.sheet .note ul {
+  margin: 6px 0;
+  padding-left: 20px;
+}

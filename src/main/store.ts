@@ -21,7 +21,9 @@ export const DEFAULT_SETTINGS: Settings = {
   adblock: true,
   adblockAllowlist: [],
   autoUpdate: true,
-  theme: 'system'
+  theme: 'system',
+  syncHistory: false,
+  syncFolder: ''
 }
 
 export function defaultState(): PersistedState {

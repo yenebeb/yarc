@@ -33,6 +33,8 @@ function originOf(url: string): string {
 
 export class Profiles {
   private runtimes = new Map<ID, ProfileRuntime>()
+  /** Opened on their own too: history sync reads every profile's history without starting its session. */
+  private histories = new Map<ID, History>()
   private decisions = new Map<string, boolean>()
 
   /** Incognito profiles keep nothing on disk: an in-memory session and history. */
@@ -60,10 +62,19 @@ export class Profiles {
     })
     ses.setSpellCheckerLanguages(app.getPreferredSystemLanguages().slice(0, 3).filter((l) => ses.availableSpellCheckerLanguages.includes(l)))
     this.permissions(ses)
-    rt = { id, session: ses, history: new History(this.incognito ? undefined : this.dir(id)) }
+    rt = { id, session: ses, history: this.history(id) }
     this.runtimes.set(id, rt)
     this.onCreated(rt)
     return rt
+  }
+
+  history(id: ID): History {
+    let h = this.histories.get(id)
+    if (!h) {
+      h = new History(this.incognito ? undefined : this.dir(id))
+      this.histories.set(id, h)
+    }
+    return h
   }
 
   all(): ProfileRuntime[] {
@@ -71,15 +82,16 @@ export class Profiles {
   }
 
   async remove(id: ID): Promise<void> {
+    this.histories.get(id)?.close()
+    this.histories.delete(id)
     const rt = this.runtimes.get(id)
     if (!rt) return
-    rt.history.close()
     await rt.session.clearData()
     this.runtimes.delete(id)
   }
 
   closeAll(): void {
-    for (const rt of this.runtimes.values()) rt.history.close()
+    for (const h of this.histories.values()) h.close()
   }
 
   private permissions(ses: Session): void {

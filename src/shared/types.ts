@@ -1,5 +1,6 @@
 // State shared between the main process and the UI renderers.
 // The main process owns the truth; renderers receive full snapshots.
+import type { HistorySyncStatus } from './sync'
 
 export type ID = string
 
@@ -35,6 +36,10 @@ export interface Profile {
   name: string
   /** Favorites belong to a profile, so every space using this profile shares them. */
   favorites: TabItem[]
+  /** Random ID naming this profile's history in the sync folder, the same on every device that syncs it. */
+  syncKey?: string
+  /** Whether this profile's history syncs while sync is on; unset means it does. */
+  syncHistory?: boolean
 }
 
 export interface Split {
@@ -95,6 +100,9 @@ export interface Settings {
   adblockAllowlist: string[]
   /** Check for new versions at startup and every few hours (installed app only). */
   autoUpdate: boolean
+  /** History sync through `syncFolder` (see src/main/sync). */
+  syncHistory: boolean
+  syncFolder: string
 }
 
 export interface PersistedState {
@@ -166,6 +174,7 @@ export interface AppState extends PersistedState {
   /** Where web pages currently sit in the window, so the UI can draw split handles and focus rings. */
   layout: { content: Rect; views: { id: ID; rect: Rect }[]; splitId?: ID }
   update: UpdateStatus
+  historySync: HistorySyncStatus
 }
 
 /**

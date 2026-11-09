@@ -45,6 +45,7 @@ import { Peek, sameSite } from './peek'
 import { buildContextMenu, buildFolderMenu, buildItemMenu, buildSpaceMenu } from './menus'
 import { Profiles, type ProfileRuntime } from './profiles'
 import { search, suggest } from './search'
+import { HistorySync } from './sync'
 import { incognitoState, newId, SPACE_COLORS, Store } from './store'
 import { LiveTab, type OpenDisposition, type TabHost } from './tab'
 import { Updater } from './updater'
@@ -72,6 +73,8 @@ export class Browser implements TabHost {
   readonly extensions: Extensions
   readonly adblock: AdBlock
   readonly updater: Updater
+  /** History sync; only the main controller has it, so incognito windows never sync. */
+  readonly historySync: HistorySync | undefined
   /** Set on an incognito window's controller: the main one, whose ad blocker and updater it shares. */
   readonly main: Browser | undefined
   window!: MainWindow
@@ -103,13 +106,25 @@ export class Browser implements TabHost {
       this.store = new Store(undefined, incognitoState(main.state.settings))
       this.adblock = main.adblock
       this.updater = main.updater
+      this.historySync = undefined
       return
     }
     const userData = app.getPath('userData')
-    this.store = new Store(join(userData, 'state.json'))
+    const store = new Store(join(userData, 'state.json'))
+    this.store = store
     this.windowFile = join(userData, 'window.json')
     this.adblock = new AdBlock(join(userData, 'adblock', 'engine.bin'), () => this.emitSoon())
     this.updater = new Updater(this)
+    this.historySync = new HistorySync({
+      get profileList() {
+        return store.state.profiles
+      },
+      history: (id) => this.profiles.history(id),
+      settings: this.store.state.settings,
+      saveState: () => this.store.save(),
+      emitSoon: () => this.emitSoon(),
+      window: () => (this.window?.win.isDestroyed() === false ? this.window.win : undefined)
+    })
     this.syncAdblock()
     void this.adblock.load()
     nativeTheme.themeSource = this.store.state.settings.theme
@@ -146,6 +161,7 @@ export class Browser implements TabHost {
     setInterval(() => this.autoArchive(), 5 * 60_000)
     this.autoArchive()
     this.updater.sync()
+    this.historySync?.start()
   }
 
   openWindow(): void {
@@ -270,7 +286,8 @@ export class Browser implements TabHost {
       newTabOpen: this.newTabOpen(),
       peek: this.peek && !this.peek.tab.destroyed ? this.peek.tab.info() : undefined,
       layout: this.currentLayout,
-      update: this.updater.status
+      update: this.updater.status,
+      historySync: (this.main ?? this).historySync?.status ?? { state: 'off' }
     }
   }
 
@@ -821,6 +838,7 @@ export class Browser implements TabHost {
       for (const f of profile?.favorites ?? []) this.dropLive(f.id)
       this.state.profiles = this.state.profiles.filter((p) => p.id !== space.profileId)
       void this.profiles.remove(space.profileId)
+      this.historySync?.profilesChanged()
     }
     if (this.state.activeSpaceId === id) this.switchSpace(this.state.spaces[0].id)
     else this.changed()
@@ -1102,7 +1120,8 @@ export class Browser implements TabHost {
       }
       case 'createSpace':
         this.setOverlay({ kind: 'none' }, false)
-        return this.createSpace(a)
+        this.createSpace(a)
+        return this.historySync?.profilesChanged()
       case 'updateSpace': {
         const s = this.store.space(a.id)
         if (!s) return
@@ -1123,6 +1142,7 @@ export class Browser implements TabHost {
       case 'renameProfile': {
         const p = this.store.profile(a.id)
         if (p) p.name = a.name
+        this.historySync?.profilesChanged()
         return this.changed()
       }
       case 'splitWith':
@@ -1213,6 +1233,18 @@ export class Browser implements TabHost {
         this.newTab(entry.url, { spaceId: this.store.space(entry.spaceId) ? entry.spaceId : undefined })
         return
       }
+      case 'syncPickFolder':
+        return (this.main ?? this).historySync?.pickFolder()
+      case 'syncConnect':
+        return (this.main ?? this).historySync?.connect(a.password)
+      case 'syncChangePassword':
+        return (this.main ?? this).historySync?.changePassword(a.password)
+      case 'syncProfile':
+        return (this.main ?? this).historySync?.setProfileSync(a.id, a.on)
+      case 'syncCancel':
+        return (this.main ?? this).historySync?.cancelSetup()
+      case 'syncOff':
+        return (this.main ?? this).historySync?.turnOff()
       case 'archiveClear':
         this.state.archive = []
         return this.changed()
@@ -1221,6 +1253,7 @@ export class Browser implements TabHost {
         try {
           const summary = await runImport(this, a.source, a.path)
           if (summary) this.toast(summary)
+          this.historySync?.profilesChanged()
         } catch (err) {
           console.error('[import]', err)
           this.toast(`Import failed: ${(err as Error).message}`)
@@ -1487,6 +1520,7 @@ export class Browser implements TabHost {
 
   shutdown(): void {
     this.quitting = true
+    this.historySync?.shutdown()
     this.store.flush()
     this.profiles.closeAll()
   }

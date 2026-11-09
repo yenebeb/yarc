@@ -812,6 +812,9 @@ fine (only new names are involved), but **never rename the app on macOS once the
 there, unless the old item is migrated. Windows keeps the key in `Local State`, so the rename (and
 the fuse being on already) is safe there.
 
+**`safeStorage` has the same problem:** it uses the same `<app name> Safe Storage` item, so history
+sync keeps its derived key with `safeStorage` on Windows and Linux only (`history-sync.md`).
+
 ### Self-signed certificate and TCC (camera, microphone) [tested]
 
 TCC (privacy permissions) checks the designated requirement, not the keychain partition, so a

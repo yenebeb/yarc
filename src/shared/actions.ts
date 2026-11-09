@@ -64,6 +64,13 @@ export type Action =
   | { type: 'downloadsClear' }
   | { type: 'archiveRestore'; id: ID }
   | { type: 'archiveClear' }
+  // history sync
+  | { type: 'syncPickFolder' }
+  | { type: 'syncConnect'; password: string }
+  | { type: 'syncChangePassword'; password: string }
+  | { type: 'syncCancel' }
+  | { type: 'syncProfile'; id: ID; on: boolean }
+  | { type: 'syncOff' }
   | { type: 'import'; source: 'arc' | 'zen' | 'chrome'; path?: string }
   | { type: 'command'; id: string }
   | { type: 'itemMenu'; id: ID }

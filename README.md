@@ -122,6 +122,14 @@ Install extensions straight from the **Chrome Web Store** by visiting it and cli
 
 The source browser's files are never changed: YARC copies them first and reads the copy.
 
+### History sync between your computers
+
+Your history can follow you between computers, like Chrome's sync, without an account or a YARC server: it goes through a folder you already sync, in **iCloud Drive, Dropbox or OneDrive**. In **Settings → Sync**, choose a folder and a sync password. On your other computers, choose the same folder and type the same password; that's all. Profiles are matched by name (renaming one later keeps the link), and each profile has its own on/off switch. Incognito windows never sync.
+
+**YARC never sees your data.** Everything it writes to the folder is encrypted on your computer with a key made from your sync password (scrypt, then AES-256-GCM): no URL, title, profile name or device name is readable there, and even the file names are random IDs. Your cloud provider carries only encrypted files. A wrong password is refused and syncs nothing. If you change the password, your other computers ask for the new one. The password itself is never stored; each computer keeps the key it derived (protected by Windows' DPAPI or the Linux keyring; on macOS in YARC's profile folder, see [Where your data lives](#where-your-data-lives)).
+
+You can leave the password empty, but then anyone who can open the folder can read your history: Settings lists exactly what's exposed. There's no way to recover a forgotten password; turn sync off and start over with a new folder. Details: [docs/history-sync.md](docs/history-sync.md).
+
 ### The rest
 
 - **Find in page** (`Ctrl/⌘+F`) shows a match counter.
@@ -253,7 +261,7 @@ Not yet. Each install keeps its own data. Syncing is on the [roadmap](#roadmap-a
 Electron is real Chromium, so sites behave as they do in Chrome, and Chrome extensions work. It also let a small project build a fully custom interface without maintaining a fork of Chromium. The trade-off is memory use roughly on par with Chrome. Arc itself was Chromium too.
 
 **Is it private?**
-YARC has no account and no telemetry, and sends no data anywhere. Its own network requests are search suggestions (sent to the search engine you chose), Chrome Web Store update checks for installed extensions, a daily download of the ad-blocking filter lists from GitHub, and update checks for YARC itself against its GitHub releases (which you can turn off in Settings).
+YARC has no account and no telemetry, and sends no data anywhere. Its own network requests are search suggestions (sent to the search engine you chose), Chrome Web Store update checks for installed extensions, a daily download of the ad-blocking filter lists from GitHub, and update checks for YARC itself against its GitHub releases (which you can turn off in Settings). History sync, if you turn it on, only writes encrypted files to a folder you pick; your own cloud service carries them, and YARC has no server that could see them.
 
 **Do I need an ad-blocker extension?**
 No. Blocking is built in (see [Built-in ad and tracker blocking](#built-in-ad-and-tracker-blocking)). Ad-blocker *extensions* built on Manifest V3's `declarativeNetRequest`, such as uBlock Origin Lite, install but can't block, because Electron doesn't support that API.
@@ -267,6 +275,7 @@ No. Blocking is built in (see [Built-in ad and tracker blocking](#built-in-ad-an
 | Per-profile history | `Profiles/<id>/history.sqlite` | same |
 | Per-profile extensions | `Profiles/<id>/Extensions` | same |
 | Ad-blocking filter cache | `adblock/engine.bin` | same |
+| History sync: this computer's random ID, and the key derived from your sync password | `Sync/device.json`, `Sync/key.json` (DPAPI-protected) | same (not encrypted, like the cookies and history) |
 | Cookies, site storage, cache | `Partitions/profile-<id>` | same |
 
 ## Building from source
@@ -344,9 +353,10 @@ Details and gaps are in [docs/electron-notes.md](docs/electron-notes.md#6-securi
 | `src/main/little.ts` | Little Arc windows |
 | `src/main/peek.ts` | Peek: pages from pinned tabs and favorites floating over the current tab |
 | `src/main/importers/` | Arc, Zen and Chromium importers |
+| `src/main/sync/` | Encrypted history sync through a cloud folder (`docs/history-sync.md`) |
 | `src/shared/` | State types, actions, keymap, URL helpers (unit tested) |
 | `src/renderer/` | React UI: `index` (sidebar), `overlay` (command bar and panels), `little` |
-| `docs/` | Research notes: Arc's behavior and shortcuts, Arc's data format, Electron notes |
+| `docs/` | Research notes: Arc's behavior and shortcuts, Arc's data format, Electron notes, history sync |
 
 ## Roadmap and known limitations
 
@@ -357,7 +367,8 @@ Planned or open for contributions:
 - [ ] Peek (a preview window for links from pinned tabs)
 - [ ] Boosts (custom CSS/JS per site)
 - [ ] Multiple main windows
-- [ ] Sync between your own devices
+- [x] History sync between your own computers, through a folder you already sync
+- [ ] Syncing more than history (spaces, pinned tabs, favorites)
 - [ ] Notes / Easels
 - [ ] Code signing and notarization, to remove the install warnings (and keep macOS camera, microphone and screen permissions across updates)
 
