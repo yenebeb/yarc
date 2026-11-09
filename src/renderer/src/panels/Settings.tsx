@@ -3,6 +3,7 @@ import logo from '../../../../build/icon.svg'
 import { cleanMatch } from '../../../shared/link-routes'
 import { permissionLabel, siteName, type SitePermissionRow } from '../../../shared/permissions'
 import { SIDEBAR_WIDTH, type AppState, type Profile, type SearchEngine, type Settings as SettingsT, type SettingsSection as Section } from '../../../shared/types'
+import { syncExposure, type HistorySyncStatus } from '../../../shared/sync'
 import { SEARCH_ENGINES } from '../../../shared/url'
 import { activeSpace, dispatch } from '../api'
 import { Icon, type IconName } from '../icons'
@@ -15,6 +16,7 @@ const SECTIONS: { id: Section; label: string; icon?: IconName }[] = [
   { id: 'general', label: 'General', icon: 'settings' },
   { id: 'traffic', label: 'Traffic Control', icon: 'link' },
   { id: 'profiles', label: 'Profiles', icon: 'profile' },
+  { id: 'sync', label: 'Sync', icon: 'reload' },
   { id: 'sites', label: 'Site Permissions', icon: 'lock' },
   { id: 'import', label: 'Import & Export', icon: 'download' },
   { id: 'extensions', label: 'Extensions', icon: 'puzzle' },
@@ -84,6 +86,7 @@ export function Settings({ state, section: initial = 'general', close }: { state
           {section === 'general' && <General state={state} />}
           {section === 'traffic' && <TrafficControl state={state} />}
           {section === 'profiles' && <Profiles state={state} />}
+          {section === 'sync' && <Sync state={state} />}
           {section === 'sites' && <SitePermissions state={state} />}
           {section === 'import' && <Import />}
           {section === 'extensions' && <Extensions state={state} />}
@@ -315,6 +318,193 @@ function ProfileRow({ profile, state }: { profile: Profile; state: AppState }) {
         ))}
       </div>
     </div>
+  )
+}
+
+function Sync({ state }: { state: AppState }) {
+  const s = state.historySync
+  return (
+    <>
+      <p className="set-note">
+        Sync history between your computers through a folder you already sync: iCloud Drive, Dropbox or OneDrive. Everything YARC puts there is encrypted
+        with your sync password. There is no YARC server or account: YARC never sees your data, and only your cloud service carries the encrypted files.
+        Incognito windows never sync.
+      </p>
+      {s.state === 'off' && (
+        <Group>
+          <Row title="Sync folder" hint="On your other computers, pick the same folder and type the same password.">
+            <button className="btn primary" onClick={() => dispatch({ type: 'syncPickFolder' })}>
+              Choose Folder…
+            </button>
+          </Row>
+        </Group>
+      )}
+      {s.state === 'setup' && <SyncSetup status={s} />}
+      {s.state === 'working' && (
+        <Group>
+          <FolderRow folder={s.folder} />
+          <div className="set-empty">{s.message}</div>
+        </Group>
+      )}
+      {s.state === 'locked' && <SyncLocked status={s} />}
+      {s.state === 'on' && <SyncOn status={s} profiles={state.profiles} />}
+    </>
+  )
+}
+
+function FolderRow({ folder }: { folder: string }) {
+  return (
+    <Row title="Sync folder">
+      <code className="set-sync-folder" title={folder}>
+        {folder}
+      </code>
+    </Row>
+  )
+}
+
+/** Lists exactly what the sync writes (src/shared/sync.ts), for an empty password. */
+function Exposure() {
+  return (
+    <div className="set-note warn" role="alert">
+      <strong>With an empty password, anyone who can open this folder can read:</strong>
+      <ul>
+        {syncExposure().map((line) => (
+          <li key={line}>{line}</li>
+        ))}
+      </ul>
+      The files are still encrypted, but the key comes from the empty password, so it protects nothing. Anyone you share the folder with, and your cloud
+      provider, can read them.
+    </div>
+  )
+}
+
+function PasswordFields({ confirm, submitLabel, onSubmit }: { confirm: boolean; submitLabel: string; onSubmit: (password: string) => void }) {
+  const [password, setPassword] = useState('')
+  const [again, setAgain] = useState('')
+  const mismatch = confirm && password !== again
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault()
+        if (!mismatch) onSubmit(password)
+      }}
+    >
+      <Group>
+        <Row title="Sync password" hint={confirm ? 'You type it once on each computer. It can’t be recovered: if you forget it, turn sync off and start over.' : undefined}>
+          <input className="set-input" type="password" aria-label="Sync password" value={password} onChange={(e) => setPassword(e.target.value)} autoFocus />
+        </Row>
+        {confirm && (
+          <Row title="Type it again" hint={mismatch && again !== '' ? 'The passwords don’t match.' : undefined}>
+            <input className="set-input" type="password" aria-label="Sync password again" value={again} onChange={(e) => setAgain(e.target.value)} />
+          </Row>
+        )}
+        <div className="set-row set-actions">
+          <button className="btn primary" type="submit" disabled={mismatch}>
+            {submitLabel}
+          </button>
+        </div>
+      </Group>
+      {password === '' && <Exposure />}
+    </form>
+  )
+}
+
+function SyncSetup({ status }: { status: Extract<HistorySyncStatus, { state: 'setup' }> }) {
+  return (
+    <>
+      <Group>
+        <FolderRow folder={status.folder} />
+      </Group>
+      <p className="set-note">
+        {status.existing
+          ? 'Another computer already syncs here. Type the sync password you chose there.'
+          : 'This folder doesn’t have a YARC sync yet. Choose a password to start one; you’ll type it on your other computers.'}
+      </p>
+      {status.error && <p className="set-note warn">{status.error}</p>}
+      <PasswordFields
+        confirm={!status.existing}
+        submitLabel={status.existing ? 'Join and Sync' : 'Turn On Sync'}
+        onSubmit={(password) => dispatch({ type: 'syncConnect', password })}
+      />
+      <div className="set-buttons">
+        <button className="btn" onClick={() => dispatch({ type: 'syncCancel' })}>
+          Cancel
+        </button>
+      </div>
+    </>
+  )
+}
+
+const LOCKED_REASON: Record<Extract<HistorySyncStatus, { state: 'locked' }>['reason'], string> = {
+  'password-changed': 'The sync password was changed on another computer. Type the new password to keep syncing.',
+  'no-saved-key': 'Type the sync password to keep syncing.',
+  'missing-folder': 'The sync folder isn’t there. Is the drive or cloud service connected? Sync resumes once it’s back.'
+}
+
+function SyncLocked({ status }: { status: Extract<HistorySyncStatus, { state: 'locked' }> }) {
+  return (
+    <>
+      <Group>
+        <FolderRow folder={status.folder} />
+      </Group>
+      <p className="set-note warn">{LOCKED_REASON[status.reason]}</p>
+      {status.error && <p className="set-note warn">{status.error}</p>}
+      {status.reason !== 'missing-folder' && (
+        <PasswordFields confirm={false} submitLabel="Unlock" onSubmit={(password) => dispatch({ type: 'syncConnect', password })} />
+      )}
+      <div className="set-buttons">
+        <button className="btn" onClick={() => dispatch({ type: 'syncOff' })}>
+          Turn Off Sync
+        </button>
+      </div>
+    </>
+  )
+}
+
+function SyncOn({ status, profiles }: { status: Extract<HistorySyncStatus, { state: 'on' }>; profiles: Profile[] }) {
+  const [changing, setChanging] = useState(false)
+  return (
+    <>
+      <Group>
+        <ToggleRow
+          title="Sync history"
+          hint={status.lastSync ? `Last synced ${new Date(status.lastSync).toLocaleTimeString()}` : 'Starting…'}
+          checked
+          onChange={(on) => !on && dispatch({ type: 'syncOff' })}
+        />
+        <FolderRow folder={status.folder} />
+      </Group>
+      {status.error && <p className="set-note warn">{status.error}</p>}
+      {status.emptyPassword && <Exposure />}
+      <Group title="Profiles">
+        {profiles.map((p) => (
+          <ToggleRow key={p.id} title={p.name} checked={p.syncHistory !== false} onChange={(on) => dispatch({ type: 'syncProfile', id: p.id, on })} />
+        ))}
+      </Group>
+      <p className="set-note">
+        A profile syncs with the profile of the same name on your other computers; one without a match starts its own synced history. Renaming a profile
+        later keeps it linked.
+      </p>
+      {changing ? (
+        <PasswordFields
+          confirm
+          submitLabel="Change Password"
+          onSubmit={(password) => {
+            setChanging(false)
+            void dispatch({ type: 'syncChangePassword', password })
+          }}
+        />
+      ) : (
+        <Group title="Password">
+          <Row title="Sync password" hint="Your other computers will ask for the new one.">
+            <button className="btn" onClick={() => setChanging(true)}>
+              Change Password…
+            </button>
+          </Row>
+        </Group>
+      )}
+      <p className="set-note">Turning sync off leaves the folder as it is. This computer forgets the key; your history here stays.</p>
+    </>
   )
 }
 

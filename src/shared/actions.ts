@@ -85,6 +85,13 @@ export type Action =
   | { type: 'importChoices'; ids: string[] }
   | { type: 'command'; id: string; keepOverlay?: boolean }
   | { type: 'relaunchUpdate' }
+  // history sync
+  | { type: 'syncPickFolder' }
+  | { type: 'syncConnect'; password: string }
+  | { type: 'syncChangePassword'; password: string }
+  | { type: 'syncCancel' }
+  | { type: 'syncProfile'; id: ID; on: boolean }
+  | { type: 'syncOff' }
   | { type: 'itemMenu'; id: ID }
   | { type: 'folderMenu'; id: ID }
   | { type: 'spaceMenu'; id: ID }

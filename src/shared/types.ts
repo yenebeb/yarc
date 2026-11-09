@@ -3,6 +3,7 @@ import type { LinkRoute } from './link-routes'
 import type { SitePermissionRow } from './permissions'
 import type { Side } from './split'
 import type { TourStep } from './tour'
+import type { HistorySyncStatus } from './sync'
 
 export type ID = string
 
@@ -52,6 +53,10 @@ export interface Profile {
   id: ID
   name: string
   favorites: TabItem[]
+  /** Random ID naming this profile's history in the sync folder, the same on every device that syncs it. */
+  syncKey?: string
+  /** Whether this profile's history syncs while sync is on; unset means it does. */
+  syncHistory?: boolean
 }
 
 export interface SplitPane {
@@ -103,7 +108,7 @@ export type SearchEngine = 'google' | 'duckduckgo' | 'bing' | 'kagi' | 'brave'
 
 export const SIDEBAR_WIDTH = { min: 200, max: 480 }
 
-export type SettingsSection = 'general' | 'traffic' | 'profiles' | 'sites' | 'import' | 'extensions' | 'shortcuts' | 'about'
+export type SettingsSection = 'general' | 'traffic' | 'profiles' | 'sync' | 'sites' | 'import' | 'extensions' | 'shortcuts' | 'about'
 
 export interface Settings {
   sidebarVisible: boolean
@@ -127,6 +132,9 @@ export interface Settings {
   autoUpdate: boolean
   floatVideos: boolean
   shortcuts: Shortcuts
+  /** History sync through `syncFolder` (see src/main/sync). */
+  syncHistory: boolean
+  syncFolder: string
 }
 
 export interface PersistedState {
@@ -250,6 +258,7 @@ export interface AppState extends PersistedState {
   importChoices?: ImportChoice[]
   /** Tabs playing out of sight. `cards`: oldest first. `videos`: cards whose video can float again. */
   media: { cards: ID[]; floating?: ID; videos: ID[] }
+  historySync: HistorySyncStatus
 }
 
 /** 'available': Linux, or a Mac that can't replace its app, downloads it by hand. */

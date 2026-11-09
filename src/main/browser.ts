@@ -71,6 +71,7 @@ import { search, suggest } from './search'
 import { SharePicker } from './share-picker'
 import { setSwipeStage } from './swipe-nav'
 import { incognitoState, MAX_ARCHIVE, newId, SPACE_COLORS, Store } from './store'
+import { HistorySync } from './sync'
 import { LiveTab, type OpenDisposition, type TabHost } from './tab'
 import { handleUi, onUi } from './ui-origin'
 import { Updater } from './updater'
@@ -158,6 +159,8 @@ export class Browser implements TabHost {
   readonly extensions: Extensions
   readonly adblock: AdBlock
   readonly updater: Updater
+  /** History sync; only the main controller has it, so incognito windows never sync. */
+  readonly historySync: HistorySync | undefined
   readonly main: Browser | undefined
   private wins: WindowSession[] = []
   /** The window commands act on; after the last window closes on macOS it stays, closed. */
@@ -204,15 +207,27 @@ export class Browser implements TabHost {
       this.store = new Store(undefined, incognitoState(main.state.settings))
       this.adblock = main.adblock
       this.updater = main.updater
+      this.historySync = undefined
       return
     }
     const userData = app.getPath('userData')
-    this.store = new Store(join(userData, 'state.json'))
+    const store = new Store(join(userData, 'state.json'))
+    this.store = store
     this.legacyWindowFile = join(userData, 'window.json')
     // engine.bin was built from Ghostery's stale copies of the lists.
     void rm(join(userData, 'adblock', 'engine.bin'), { force: true })
     this.adblock = new AdBlock(join(userData, 'adblock', 'lists.bin'), () => this.emitSlowly())
     this.updater = new Updater(this)
+    this.historySync = new HistorySync({
+      get profileList() {
+        return store.state.profiles
+      },
+      history: (id) => this.profiles.history(id),
+      settings: this.store.state.settings,
+      saveState: () => this.store.save(),
+      emitSoon: () => this.emitSoon(),
+      window: () => (this.window?.win.isDestroyed() === false ? this.window.win : undefined)
+    })
     this.adblock.sync(this.state.settings)
     void this.adblock.load()
     nativeTheme.themeSource = this.store.state.settings.theme
@@ -271,6 +286,7 @@ export class Browser implements TabHost {
     this.liveFolders.start()
     this.updater.sync()
     this.showStartupScreen()
+    this.historySync?.start()
   }
 
   private showStartupScreen(): void {
@@ -574,7 +590,8 @@ export class Browser implements TabHost {
       update: this.updater.status,
       archive: [],
       sitePermissions: {},
-      media: this.media.snapshot()
+      media: this.media.snapshot(),
+      historySync: (this.main ?? this).historySync?.status ?? { state: 'off' }
     }
   }
 
@@ -1397,6 +1414,7 @@ export class Browser implements TabHost {
       for (const favorite of profile?.favorites ?? []) this.dropLive(favorite.id)
       this.state.profiles = this.state.profiles.filter((other) => other.id !== space.profileId)
       void this.profiles.remove(space.profileId)
+      this.historySync?.profilesChanged()
     }
     if (this.state.activeSpaceId === id) this.switchSpace(this.state.spaces[0].id)
     else this.changed()
@@ -1631,9 +1649,12 @@ export class Browser implements TabHost {
         if (next) this.switchSpace(next.id)
         return
       }
-      case 'createSpace':
+      case 'createSpace': {
         this.setOverlay({ kind: 'none' }, false)
-        return this.createSpace(action)
+        const created = this.createSpace(action)
+        this.historySync?.profilesChanged()
+        return created
+      }
       case 'updateSpace':
         return this.updateSpace(action)
       case 'deleteSpace':
@@ -1641,6 +1662,7 @@ export class Browser implements TabHost {
       case 'renameProfile': {
         const profile = this.store.profile(action.id)
         if (profile) profile.name = action.name
+        this.historySync?.profilesChanged()
         return this.changed()
       }
       case 'splitWith':
@@ -1709,12 +1731,25 @@ export class Browser implements TabHost {
         return this.downloads.clearFinished()
       case 'archiveRestore':
         return this.restoreArchived(action.id)
+      case 'syncPickFolder':
+        return (this.main ?? this).historySync?.pickFolder()
+      case 'syncConnect':
+        return (this.main ?? this).historySync?.connect(action.password)
+      case 'syncChangePassword':
+        return (this.main ?? this).historySync?.changePassword(action.password)
+      case 'syncProfile':
+        return (this.main ?? this).historySync?.setProfileSync(action.id, action.on)
+      case 'syncCancel':
+        return (this.main ?? this).historySync?.cancelSetup()
+      case 'syncOff':
+        return (this.main ?? this).historySync?.turnOff()
       case 'archiveClear':
         this.state.archive = []
         return this.changed()
       case 'import': {
         if (!action.keepOverlay) this.setOverlay({ kind: 'none' }, false)
         const summary = await runImport(this, action.source, action.path)
+        this.historySync?.profilesChanged()
         return summary ? this.toast(summary) : undefined
       }
       case 'exportBookmarks':
@@ -1723,6 +1758,7 @@ export class Browser implements TabHost {
       case 'importChoices': {
         const summary = await importChoices(this, this.imports.chosen(action.ids))
         if (summary) this.toast(summary)
+        this.historySync?.profilesChanged()
         if (this.tour === 'import') this.setOverlay({ kind: 'tour', step: nextStep('import')! }, false)
         return
       }
@@ -2106,6 +2142,7 @@ export class Browser implements TabHost {
 
   shutdown(): void {
     this.quitting = true
+    this.historySync?.shutdown()
     this.store.flush()
     this.profiles.closeAll()
   }
