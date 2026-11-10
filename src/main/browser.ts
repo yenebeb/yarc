@@ -1173,6 +1173,20 @@ export class Browser implements TabHost {
     this.tourEvent('split')
   }
 
+  /**
+   * After a key-down the browser handles (every shortcut, Ctrl+Tab included), Chromium drops that
+   * view's key-ups until its next key-down. The overlay has the keyboard while the switcher shows,
+   * and once it had handled one shortcut, releasing Ctrl never reached handleInput: the switcher
+   * stayed open. A Ctrl key-down, sent once this Ctrl+Tab is done, lets the release through.
+   */
+  private letSwitcherSeeRelease(): void {
+    const w = this.cur
+    const overlay = w.main.overlay.webContents
+    setImmediate(() => {
+      if (w.switcher && !overlay.isDestroyed()) overlay.sendInputEvent({ type: 'keyDown', keyCode: 'Control', modifiers: ['control'] })
+    })
+  }
+
   /** A sidebar tab drag starts (`id`) or ends: the page area shows split drop zones meanwhile. */
   setTabDrag(id: ID | undefined): void {
     if (id === this.cur.tabDrag) return
@@ -1339,6 +1353,7 @@ export class Browser implements TabHost {
         const sw = this.cur.switcher
         this.setOverlay({ kind: 'switcher', order: sw.order, index: sw.index })
         this.cur.switcher = sw
+        this.letSwitcherSeeRelease()
         return
       }
       case 'nextSpace':
