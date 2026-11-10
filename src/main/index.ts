@@ -103,9 +103,12 @@ if (!app.requestSingleInstanceLock()) {
     else pendingUrl = url
   })
 
-  app.whenReady().then(() => {
+  app.whenReady().then(async () => {
     Extensions.prepareUiSession()
-    browser = new Browser()
+    const b = new Browser()
+    await b.restoreSessions()
+    // Links and tasks that arrive meanwhile wait in pendingUrl / pendingTask.
+    browser = b
     // End-to-end tests drive the controller directly.
     if (process.env.YARC_TEST) Object.assign(globalThis, { arcBrowser: browser })
     installAppMenu(browser)

@@ -189,6 +189,15 @@ export class Browser implements TabHost {
 
   // ---------------------------------------------------------------- startup
 
+  /**
+   * Last run's session cookies, set again before start() loads any page (src/main/session-cookies.ts).
+   * Never holds the launch up for long: after a second the windows open anyway.
+   */
+  async restoreSessions(): Promise<void> {
+    const restored = this.profiles.restoreSessionCookies(this.state.profiles.map((p) => p.id))
+    await Promise.race([restored, new Promise((resolve) => setTimeout(resolve, 1000))])
+  }
+
   start(): void {
     Browser.all.add(this)
     if (Browser.all.size === 1) this.registerIpc()
