@@ -676,8 +676,11 @@ are what catch them.
    `release:skip` label and ship with the next real change. Majors wait for a person, because CI
    doesn't run the e2e tests. Against
    supply-chain attacks, Dependabot only proposes a new version of any other package once it has
-   been out for 3 days (`cooldown` in `.github/dependabot.yml`; security updates skip it). Needs
-   the repo setting `allow_auto_merge`.
+   been out for 3 days (`cooldown` in `.github/dependabot.yml`; security updates skip it). pnpm
+   also refuses any package published less than a day ago (its default `minimumReleaseAge`), so
+   `electron` is excluded there too (`minimumReleaseAgeExclude` in `pnpm-workspace.yaml`);
+   otherwise a new Electron's PR fails `check` with `ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION`
+   for its first day and the auto-merge job gives up. Needs the repo setting `allow_auto_merge`.
 5. **Release**: GitHub starts no workflows for a push made with `GITHUB_TOKEN`, so the auto-merge
    doesn't trigger `release.yml` on its own. The auto-merge job waits for the merge and then runs
    `gh workflow run release.yml -f bump=patch` (dispatch is the exception to that rule). The
