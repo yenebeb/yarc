@@ -7,9 +7,13 @@ name: release
 # The tag is created on the merge commit, the three platforms build into a draft release,
 # and the release is published once all of them succeed. A failed build leaves the draft.
 # Run it manually from the Actions tab to release main with a chosen bump.
+# Pull requests run it too, as a dry run: the same three builds, tests and packaging, without a
+# tag, a draft, signing secrets or an upload, so a change that would break the release fails on
+# the PR instead of after the merge.
 on:
   push:
     branches: [main]
+  pull_request:
   workflow_dispatch:
     inputs:
       bump:
@@ -23,9 +27,10 @@ permissions:
   pull-requests: read # labels of the merged PR
 
 # One release at a time, in merge order: each run reads the tag the previous one created.
+# A pull request's dry run only replaces its own previous run.
 concurrency:
-  group: release
-  cancel-in-progress: false
+  group: ${{ github.event_name == 'pull_request' && format('release-pr-{0}', github.event.number) || 'release' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   version:
@@ -45,6 +50,11 @@ jobs:
           INPUT_BUMP: ${{ inputs.bump }}
           MESSAGE: ${{ github.event.head_commit.message }}
         run: |
+          if [ "$EVENT" = "pull_request" ]; then
+            echo "Dry run for a pull request: no tag, no draft."
+            echo "version=0.0.0" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           if [ "$GITHUB_REF" != "refs/heads/main" ]; then
             echo "::error::Releases are made from main only."
             exit 1
@@ -128,7 +138,8 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: v${{ needs.version.outputs.version }}
+          # A pull request's dry run builds the PR itself.
+          ref: ${{ github.event_name != 'pull_request' && format('v{0}', needs.version.outputs.version) || '' }}
       - uses: pnpm/action-setup@v6 # version from package.json "packageManager"
       - uses: actions/setup-node@v7
         with:
@@ -147,8 +158,9 @@ jobs:
       - run: pnpm build
       # One self-signed certificate for every release, so macOS keeps camera and microphone
       # permissions across updates (scripts/mac-sign.mjs, docs/electron-notes.md section 9).
+      # Not for a pull request: its code mustn't run with the signing secrets. It signs ad-hoc.
       - name: Import the macOS code-signing certificate
-        if: runner.os == 'macOS'
+        if: runner.os == 'macOS' && github.event_name != 'pull_request'
         env:
           MAC_CODESIGN_P12: ${{ secrets.MAC_CODESIGN_P12 }}
           MAC_CODESIGN_P12_PASSWORD: ${{ secrets.MAC_CODESIGN_P12_PASSWORD }}
@@ -168,10 +180,15 @@ jobs:
       # worth a sooner restart prompt) from a normal one: src/main/update-escalation.ts.
       - name: Write release.json
         if: runner.os == 'Linux'
-        run: node -e 'require("fs").writeFileSync("release/release.json", JSON.stringify({ electron: require("electron/package.json").version }) + "\n")'
+        # A block scalar: on one line, YAML reads the ": " inside the script as a mapping and
+        # rejects the whole workflow, so no job runs at all.
+        run: |
+          node -e 'require("fs").writeFileSync("release/release.json", JSON.stringify({ electron: require("electron/package.json").version }) + "\n")'
       # What mac-update.ts checks before installing, plus: signed with the certificate if there is one.
+      # Not for a pull request: without the secrets it signs ad-hoc, which --strict rejects
+      # ("code has no resources but signature indicates they must be present").
       - name: Check the macOS code signatures
-        if: runner.os == 'macOS'
+        if: runner.os == 'macOS' && github.event_name != 'pull_request'
         run: |
           shopt -s nullglob
           apps=(release/mac*/*.app)
@@ -191,11 +208,12 @@ jobs:
       # Installed Macs only install an update zip whose Ed25519 signature matches the public key
       # in src/main/update-signature.ts (see scripts/sign-update.mts for making the key pair).
       - name: Sign the macOS update zips
-        if: runner.os == 'macOS'
+        if: runner.os == 'macOS' && github.event_name != 'pull_request'
         env:
           MAC_UPDATE_SIGNING_KEY: ${{ secrets.MAC_UPDATE_SIGNING_KEY }}
         run: node --experimental-strip-types scripts/sign-update.mts release/*-mac.zip
       - name: Upload to the draft release
+        if: github.event_name != 'pull_request'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -209,6 +227,7 @@ jobs:
 
   publish:
     needs: [version, build]
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - name: Publish the release

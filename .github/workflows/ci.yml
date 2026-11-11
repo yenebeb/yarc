@@ -19,6 +19,20 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
+      # GitHub only reads a workflow file when it runs, so a mistake in release.yml used to show up
+      # after the merge, as a release that never started. actionlint reads every workflow here.
+      # Pinned and checked against the release's published checksum.
+      - name: Lint the workflow files
+        env:
+          ACTIONLINT: 1.7.12
+          ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+        run: |
+          cd "$RUNNER_TEMP"
+          curl -fsSL -o actionlint.tar.gz "https://github.com/rhysd/actionlint/releases/download/v$ACTIONLINT/actionlint_${ACTIONLINT}_linux_amd64.tar.gz"
+          echo "$ACTIONLINT_SHA256  actionlint.tar.gz" | sha256sum -c -
+          tar -xzf actionlint.tar.gz actionlint
+          cd "$GITHUB_WORKSPACE"
+          "$RUNNER_TEMP/actionlint" -color -shellcheck= -pyflakes=
       - uses: pnpm/action-setup@v6 # version from package.json "packageManager"
       - uses: actions/setup-node@v7
         with:

@@ -311,6 +311,8 @@ Releases are automatic: every pull request merged into `main` becomes a release.
 2. It builds Windows, macOS and Linux from that tag and uploads them to the release, with a `release.json` that names the Electron version, so installed copies can tell a security update from a normal one.
 3. Once all three builds succeed, the release is published. If one fails, the release stays a draft.
 
+So a release can't break unnoticed after a merge, every pull request runs the same workflow as a dry run: the three builds, tests and packaging, without a tag, a draft, the signing secrets or an upload. CI's required `check` job also lints every workflow file with [actionlint](https://github.com/rhysd/actionlint), because GitHub only reads a workflow file when it runs.
+
 The PR titles are also the app's **What's New**: before the builds, [`scripts/changelog.mjs`](scripts/changelog.mjs) collects the titles of the PRs merged for each release tag into `build/changelog.json`, which the build bakes into the app, so it shows offline. Dependabot PRs and PRs labeled `release:skip` are left out, so write titles as user-facing sentences. Local builds have an empty changelog; run `node scripts/changelog.mjs` (needs `gh`) to build one.
 
 The version lives in git tags; `package.json` says `0.0.0-dev` and CI stamps the tag's version into it at build time. To release by hand, run the workflow from the Actions tab and pick the bump.
