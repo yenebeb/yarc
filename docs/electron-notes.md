@@ -903,6 +903,51 @@ microphone again, once. The first signed release does that once too (existing gr
 old cdhash). Whether macOS minds an expired self-signed certificate wasn't tested; 7300 days
 (20 years) keeps that question away.
 
+## 10. Logins across a restart: session cookies **[tested 2026-11-10, macOS 26.5.1 arm64, Electron 45.2.3]**
+
+Users were logged out of many sites after every restart. Cause: **Electron never writes session
+cookies (no `Expires`/`Max-Age`) to the Cookies database**, and drops them at quit. Chrome and Arc
+keep them when they reopen the previous tabs (Chromium's `persist_session_cookies` and
+`restore_old_session_cookies` network-context options); Electron has no API for either. Many
+logins depend on them: Microsoft/Entra (`ESTSAUTH` without "Stay signed in", so Teams, Outlook,
+Azure), most company portals and SSO pages, banks.
+
+Found with the built app, a temporary `YARC_USER_DATA` and a local page that sets a session cookie
+(`HttpOnly`), a persistent one (`Max-Age`), a `__Host-` cookie and a `sessionStorage` token:
+
+| End of the run | Session cookie | Persistent cookie | `sessionStorage` |
+|---|---|---|---|
+| Before the fix, `app.quit()` | lost | kept | lost |
+| After, `app.quit()`, Quit menu / ⌘Q (`terminate:`), last window closed then quit | kept | kept | lost |
+| After, `SIGKILL` 3 s after login | kept | **lost** | lost |
+| After, login in an incognito window | not saved | not saved | lost |
+
+The Cookies file had no row at all for the session cookie. Ruled out: the cookie store isn't
+wiped at quit (persistent cookies of the user's real profile go back to the first day), the UA
+doesn't change between launches, and incognito's `dispose()` clears only its own `incognito-<id>`
+partitions. The persistent cookie lost on `SIGKILL` is Chromium's own write delay (it flushes the
+Cookies database about every 30 s and at a normal quit); Chrome does the same.
+
+**Fix (`src/main/session-cookies.ts`):** per profile, a mirror of the session cookies kept from
+`session.cookies` `changed` events, written to `Profiles/<id>/session-cookies.json` (mode 600)
+2 s after a change and at quit (`Profiles.closeAll()`, synchronous, from `before-quit`). At launch
+`Browser.restoreSessions()` sets them again with `cookies.set` before `start()` opens any window
+(at most 1 s, so a broken file never holds the launch up). Host-only cookies are set without a
+`domain` (so `__Host-` cookies stay valid); `HttpOnly`, `Secure` and `SameSite` are kept. Each
+restored cookie is a session cookie again, so a site's sign-out removes it from the file too.
+Not for incognito profiles. The file is encrypted with `safeStorage` where the Cookies database
+is (Windows, Linux); plain text on macOS like the Cookies database (section 8: the Keychain would
+ask for the password after every update). Cookie partitions (CHIPS) aren't in Electron's `Cookie`
+object, so a partitioned session cookie comes back unpartitioned; logins don't use those.
+
+**`sessionStorage` is not restored.** It belongs to a tab (a session-storage namespace), and
+Chromium only restores it through its own session restore, which Electron doesn't have. Doing it
+ourselves would mean reading every frame's storage at quit (async, so holding up the quit, which
+also runs the macOS update swap) and writing it back before the page's scripts run (a preload or
+`Page.addScriptToEvaluateOnNewDocument` through the debugger in every tab). Not worth it for
+logins: apps that keep tokens there, like MSAL's default `sessionStorage` cache, sign in again
+silently from the identity provider's cookies, which are now kept.
+
 ---
 
 ## Summary of choices
@@ -919,3 +964,4 @@ old cdhash). Whether macOS minds an expired self-signed certificate wasn't teste
 | Packaging | NSIS oneClick per-user + `installer.nsh` browser registration; mac dmg + zip arm64+x64, `identity: "-"` + `mac.sign` hook (self-signed certificate from CI, else ad-hoc), `hardenedRuntime: false` |
 | macOS updates | Own updater (`mac-update.ts`): Node download (no quarantine), Ed25519-signed zip, swap at quit; not Squirrel.Mac |
 | Cookie encryption | `EnableCookieEncryption` fuse on Windows and Linux (`scripts/after-pack.mjs`); off on macOS until a Developer ID, because the keychain partition is the cdhash and every update would ask for the login password |
+| Session cookies | Saved per profile at change/quit, restored before the first window (`session-cookies.ts`); `sessionStorage` not restored |
