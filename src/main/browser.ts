@@ -1733,8 +1733,10 @@ export class Browser implements TabHost {
         return this.restoreArchived(action.id)
       case 'syncPickFolder':
         return (this.main ?? this).historySync?.pickFolder()
+      case 'syncNearby':
+        return (this.main ?? this).historySync?.setUpNearby()
       case 'syncConnect':
-        return (this.main ?? this).historySync?.connect(action.password)
+        return (this.main ?? this).historySync?.connect(action.password, action.create)
       case 'syncChangePassword':
         return (this.main ?? this).historySync?.changePassword(action.password)
       case 'syncProfile':

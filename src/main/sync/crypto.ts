@@ -30,6 +30,8 @@ export interface SyncHeader {
   check: string
   /** The keyring, sealed with a key derived from the master key, base64. */
   keyring: string
+  /** How many times the password was changed; tells nearby computers which sync.json is newer. Unset means 0. */
+  generation?: number
 }
 
 export interface DataKey {
@@ -197,7 +199,7 @@ export async function changePassword(
   const master = await deriveMasterKey(password, kdf)
   const next: Keyring = { keys: [...keyring.keys, newDataKey()] }
   return {
-    header: { ...header, kdf, check: checkValue(master), keyring: sealKeyring(master, next, header.folderId) },
+    header: { ...header, kdf, check: checkValue(master), keyring: sealKeyring(master, next, header.folderId), generation: (header.generation ?? 0) + 1 },
     master,
     keyring: next
   }

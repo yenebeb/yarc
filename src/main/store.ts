@@ -29,7 +29,8 @@ export const DEFAULT_SETTINGS: Settings = {
   shortcuts: {},
   theme: 'system',
   syncHistory: false,
-  syncFolder: ''
+  syncFolder: '',
+  syncNearby: false
 }
 
 export function defaultState(): PersistedState {

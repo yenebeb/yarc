@@ -1,5 +1,7 @@
-// History sync through a folder the user already syncs (iCloud Drive, Dropbox, OneDrive).
-// YARC has no server: the folder's own sync service carries the encrypted files between devices.
+// History sync through a folder the user already syncs (iCloud Drive, Dropbox, OneDrive), or
+// directly between computers on the same network (nearby.ts, a proof of concept), where each
+// computer keeps a private copy of the folder and the computers copy the encrypted files themselves.
+// YARC has no server either way.
 // Only the main controller syncs; incognito windows have their own Profiles and never reach here.
 import { app, dialog, safeStorage, type BrowserWindow } from 'electron'
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, watch, writeFileSync, type FSWatcher } from 'node:fs'
@@ -10,12 +12,13 @@ import type { Profile } from '../../shared/types'
 import type { History } from '../history'
 import { changePassword, createHeader, openKeyring, SyncCryptoError, unlockHeader, type Keyring, type SyncHeader } from './crypto'
 import { HEADER_FILE, newSyncId, readHeader, SyncEngine, writeHeader, type SyncedProfileInfo } from './engine'
+import { derivePairingKey, NearbySync } from './nearby'
 
 /** What the main controller lends to sync. */
 export interface SyncHost {
   readonly profileList: Profile[]
   history(profileId: string): History
-  settings: { syncHistory: boolean; syncFolder: string }
+  settings: { syncHistory: boolean; syncFolder: string; syncNearby: boolean }
   saveState(): void
   emitSoon(): void
   window(): BrowserWindow | undefined
@@ -27,6 +30,8 @@ interface SavedKey {
   check: string
   master: string
   emptyPassword: boolean
+  /** Nearby sync: pairing keys, base64, the current one first (see nearby.ts). */
+  pairing?: string[]
 }
 
 const SEND_DELAY = 10_000
@@ -35,6 +40,8 @@ const FOCUS_INTERVAL = 30_000
 const POLL_INTERVAL = 5 * 60_000
 /** The folder created inside a non-empty folder the user picks, so YARC's files stay together. */
 const SUBFOLDER = 'YARC Sync'
+/** How long joining looks for a computer with the same password on the network. */
+const NEARBY_SEARCH = 20_000
 
 export class HistorySync {
   status: HistorySyncStatus = { state: 'off' }
@@ -51,6 +58,10 @@ export class HistorySync {
   private queue: Promise<unknown> = Promise.resolve()
   private passQueued = false
   private readonly dir = join(app.getPath('userData'), 'Sync')
+  /** Nearby sync's private copy of the sync folder. */
+  private readonly nearbyDir = join(this.dir, 'Nearby')
+  private mode: 'folder' | 'nearby' = 'folder'
+  private nearby: NearbySync | undefined
 
   constructor(private host: SyncHost) {}
 
@@ -58,11 +69,18 @@ export class HistorySync {
 
   /** At launch: resumes sync with the saved key, or asks for the password. */
   start(): void {
-    const { syncHistory, syncFolder } = this.host.settings
+    const { syncHistory, syncFolder, syncNearby } = this.host.settings
     if (!syncHistory || !syncFolder) return
+    this.mode = syncNearby ? 'nearby' : 'folder'
     void this.serial(async () => {
-      if (!existsSync(syncFolder)) return this.setStatus({ state: 'locked', folder: syncFolder, reason: 'missing-folder' })
       const saved = this.loadKey()
+      if (this.mode === 'nearby') {
+        mkdirSync(syncFolder, { recursive: true })
+        if (saved?.pairing?.length) {
+          await this.startNearby(saved.pairing.map((k) => Buffer.from(k, 'base64'))).catch((err) => console.warn('[sync] nearby:', err))
+        }
+      }
+      if (!existsSync(syncFolder)) return this.setStatus({ state: 'locked', folder: syncFolder, reason: 'missing-folder' })
       const header = await readHeader(syncFolder).catch(() => undefined)
       if (!saved || !header || header.folderId !== saved.folderId) return this.setStatus({ state: 'locked', folder: syncFolder, reason: 'no-saved-key' })
       try {
@@ -77,6 +95,7 @@ export class HistorySync {
   /** At quit: writes what's still waiting, synchronously. */
   shutdown(): void {
     this.stopWatching()
+    this.stopNearby()
     if (!this.engine) return
     for (const p of this.syncedProfiles()) {
       try {
@@ -102,14 +121,28 @@ export class HistorySync {
     const picked = res.filePaths[0]
     if (res.canceled || !picked) return
     const root = syncRoot(picked)
+    this.stopNearby()
+    this.mode = 'folder'
     this.setStatus({ state: 'setup', folder: root, existing: existsSync(join(root, HEADER_FILE)) })
   }
 
-  /** Turns sync on with the picked folder: joins its sync when it has one, else starts one protected by `password`. */
-  connect(password: string): Promise<void> {
+  /** Nearby sync instead of a folder: asks for the password next. */
+  setUpNearby(): void {
+    this.stopNearby()
+    this.mode = 'nearby'
+    this.setStatus({ state: 'setup', folder: this.nearbyDir, existing: false })
+  }
+
+  /**
+   * Turns sync on with the picked folder: joins its sync when it has one, else starts one protected
+   * by `password`. With nearby sync, joins a computer on the network with the same password, or
+   * starts a new sync when `create` is set.
+   */
+  connect(password: string, create = false): Promise<void> {
     const s = this.status
     const folder = s.state === 'setup' || s.state === 'locked' ? s.folder : undefined
     if (!folder) return Promise.resolve()
+    if (this.mode === 'nearby') return this.connectNearby(folder, password, create)
     const existing = s.state === 'locked' || (s.state === 'setup' && s.existing)
     return this.serial(async () => {
       this.setStatus({ state: 'working', folder, message: existing ? 'Checking the password…' : 'Setting up the sync folder…' })
@@ -124,16 +157,85 @@ export class HistorySync {
           ;({ header, master, keyring } = await createHeader(password))
           writeHeader(folder, header)
         }
-        this.saveKey({ folderId: header.folderId, check: header.check, master: master.toString('base64'), emptyPassword: password === '' })
-        Object.assign(this.host.settings, { syncHistory: true, syncFolder: folder })
-        this.host.saveState()
-        this.resume(folder, header, master, keyring, password === '')
-        await this.matchProfiles()
+        await this.begin(folder, header, master, keyring, password)
       } catch (err) {
         const message = err instanceof SyncCryptoError && err.code === 'wrong-password' ? 'Wrong password. Nothing was synced.' : (err as Error).message
         this.setStatus(s.state === 'locked' ? { ...s, error: message } : { state: 'setup', folder, existing, error: message })
       }
     }).then(() => this.passSoon())
+  }
+
+  /**
+   * Nearby sync: starts looking for computers with the same password, then waits for a sync.json
+   * the password opens (this computer's own, or one a nearby computer sends). With `create` and
+   * no sync.json, starts a new sync instead of waiting.
+   */
+  private connectNearby(folder: string, password: string, create: boolean): Promise<void> {
+    const s = this.status
+    const fail = (error: string, searched = false) =>
+      this.setStatus(s.state === 'locked' ? { ...s, error } : { state: 'setup', folder, existing: false, searched, error })
+    if (password === '') {
+      fail('Nearby sync needs a password: without one, anyone on your network could join it.')
+      return Promise.resolve()
+    }
+    return this.serial(async () => {
+      this.setStatus({ state: 'working', folder, message: create ? 'Starting a new sync…' : 'Looking for a computer with this password on your network…' })
+      try {
+        mkdirSync(folder, { recursive: true })
+        const pairing = await derivePairingKey(password)
+        await this.startNearby([pairing])
+        const deadline = Date.now() + (create ? 0 : NEARBY_SEARCH)
+        let tried: string | undefined
+        let unlocked: { header: SyncHeader; master: Buffer; keyring: Keyring } | undefined
+        for (;;) {
+          const header = await readHeader(folder).catch(() => undefined)
+          if (header && header.check !== tried) {
+            tried = header.check
+            try {
+              unlocked = { header, ...(await unlockHeader(header, password)) }
+              break
+            } catch (err) {
+              if (!(err instanceof SyncCryptoError && err.code === 'wrong-password')) throw err
+            }
+          }
+          if (Date.now() >= deadline) break
+          await new Promise((resolve) => setTimeout(resolve, 1_000))
+        }
+        if (!unlocked) {
+          const header = await readHeader(folder).catch(() => undefined)
+          if (!create || header) {
+            this.stopNearby()
+            return fail(
+              header
+                ? 'Wrong password. Nothing was synced.'
+                : 'No computer with this password found on your network. Open YARC on your other computer with nearby sync on, or start a new sync here.',
+              !header
+            )
+          }
+          unlocked = await createHeader(password)
+          writeHeader(folder, unlocked.header)
+        }
+        await this.begin(folder, unlocked.header, unlocked.master, unlocked.keyring, password, [pairing])
+      } catch (err) {
+        this.stopNearby()
+        fail((err as Error).message)
+      }
+    }).then(() => this.passSoon())
+  }
+
+  /** Saves the key and settings, then starts syncing. */
+  private async begin(folder: string, header: SyncHeader, master: Buffer, keyring: Keyring, password: string, pairing?: Buffer[]): Promise<void> {
+    this.saveKey({
+      folderId: header.folderId,
+      check: header.check,
+      master: master.toString('base64'),
+      emptyPassword: password === '',
+      pairing: pairing?.map((k) => k.toString('base64'))
+    })
+    Object.assign(this.host.settings, { syncHistory: true, syncFolder: folder, syncNearby: this.mode === 'nearby' })
+    this.host.saveState()
+    this.resume(folder, header, master, keyring, password === '')
+    await this.matchProfiles()
   }
 
   /** Rotates to a new key protected by `password`; other devices ask for it on their next sync. */
@@ -146,8 +248,22 @@ export class HistorySync {
       this.setStatus({ state: 'working', folder, message: 'Changing the password…' })
       try {
         const next = await changePassword(header, engine.keyring, password)
+        // Nearby: the new password meets computers under a new pairing key; the old one stays, so
+        // computers still on the old password get the new sync.json and ask for the new password.
+        let pairing: Buffer[] | undefined
+        if (this.mode === 'nearby') {
+          const old = this.loadKey()?.pairing?.[0]
+          pairing = [await derivePairingKey(password), ...(old ? [Buffer.from(old, 'base64')] : [])]
+        }
         writeHeader(folder, next.header)
-        this.saveKey({ folderId: next.header.folderId, check: next.header.check, master: next.master.toString('base64'), emptyPassword: password === '' })
+        this.saveKey({
+          folderId: next.header.folderId,
+          check: next.header.check,
+          master: next.master.toString('base64'),
+          emptyPassword: password === '',
+          pairing: pairing?.map((k) => k.toString('base64'))
+        })
+        if (pairing) await this.startNearby(pairing)
         this.header = next.header
         this.master = next.master
         this.emptyPassword = password === ''
@@ -165,6 +281,7 @@ export class HistorySync {
   turnOff(): Promise<void> {
     return this.serial(async () => {
       this.stopWatching()
+      this.stopNearby()
       for (const p of this.host.profileList) {
         try {
           this.host.history(p.id).unlink()
@@ -174,15 +291,19 @@ export class HistorySync {
       this.header = undefined
       this.master = undefined
       rmSync(join(this.dir, 'key.json'), { force: true })
-      Object.assign(this.host.settings, { syncHistory: false, syncFolder: '' })
+      Object.assign(this.host.settings, { syncHistory: false, syncFolder: '', syncNearby: false })
       this.host.saveState()
+      this.mode = 'folder'
       this.setStatus({ state: 'off' })
     })
   }
 
   /** Cancels a folder pick that wasn't confirmed with a password. */
   cancelSetup(): void {
-    if (this.status.state === 'setup') this.setStatus({ state: 'off' })
+    if (this.status.state !== 'setup') return
+    this.stopNearby()
+    this.mode = 'folder'
+    this.setStatus({ state: 'off' })
   }
 
   /** The profile's switch in Settings. Off forgets its sync bookkeeping; its key is kept, so on again picks up where it was. */
@@ -378,8 +499,41 @@ export class HistorySync {
   }
 
   private setStatus(status: HistorySyncStatus): void {
+    if (status.state !== 'off' && this.mode === 'nearby') status = { ...status, nearby: true }
+    if (status.state === 'on') status = { ...status, peers: this.nearby?.peerCount }
     this.status = status
     this.host.emitSoon()
+  }
+
+  // ---------------------------------------------------------------- nearby
+
+  private async startNearby(keys: Buffer[]): Promise<void> {
+    this.stopNearby()
+    const nearby = new NearbySync({
+      root: this.nearbyDir,
+      deviceId: this.deviceId(),
+      keys,
+      onPeers: () => {
+        if (this.status.state !== 'off') this.setStatus(this.status)
+      },
+      onReceived: () => this.receiveSoon(),
+      onConflict: (error) => {
+        if (this.status.state === 'on') this.setStatus({ ...this.status, error })
+      }
+    })
+    this.nearby = nearby
+    try {
+      await nearby.start()
+    } catch (err) {
+      nearby.stop()
+      this.nearby = undefined
+      throw err
+    }
+  }
+
+  private stopNearby(): void {
+    this.nearby?.stop()
+    this.nearby = undefined
   }
 
   // ---------------------------------------------------------------- local files

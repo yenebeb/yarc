@@ -87,7 +87,9 @@ export type Action =
   | { type: 'relaunchUpdate' }
   // history sync
   | { type: 'syncPickFolder' }
-  | { type: 'syncConnect'; password: string }
+  | { type: 'syncNearby' }
+  /** `create`: nearby sync found no computer to join; start a new sync with this password. */
+  | { type: 'syncConnect'; password: string; create?: boolean }
   | { type: 'syncChangePassword'; password: string }
   | { type: 'syncCancel' }
   | { type: 'syncProfile'; id: ID; on: boolean }
