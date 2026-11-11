@@ -212,16 +212,30 @@ jobs:
         env:
           MAC_UPDATE_SIGNING_KEY: ${{ secrets.MAC_UPDATE_SIGNING_KEY }}
         run: node --experimental-strip-types scripts/sign-update.mts release/*-mac.zip
+      # A pull request's dry run collects the same files, without uploading them.
       - name: Upload to the draft release
-        if: github.event_name != 'pull_request'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          EVENT: ${{ github.event_name }}
         run: |
           shopt -s nullglob
-          files=(release/*.exe release/*.dmg release/*.zip release/*.zip.sig release/*.AppImage release/*.blockmap release/latest*.yml release/release.json)
+          # Only patterns: nullglob drops one that matches nothing, but keeps a plain path even when
+          # the file isn't there (release.json is only written on Linux), and gh then fails on it.
+          files=(release/*.exe release/*.dmg release/*.zip release/*.zip.sig release/*.AppImage release/*.blockmap release/latest*.yml release/release*.json)
           if [ ${#files[@]} -eq 0 ]; then
             echo "::error::No installers in release/"
             exit 1
+          fi
+          for file in "${files[@]}"; do
+            if [ ! -f "$file" ]; then
+              echo "::error::$file isn't there"
+              exit 1
+            fi
+          done
+          if [ "$EVENT" = "pull_request" ]; then
+            printf 'Dry run, would upload:\n'
+            printf '  %s\n' "${files[@]}"
+            exit 0
           fi
           gh release upload "v$VERSION" "${files[@]}" --clobber
 
