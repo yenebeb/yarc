@@ -103,6 +103,8 @@ export interface Settings {
   /** History sync through `syncFolder` (see src/main/sync). */
   syncHistory: boolean
   syncFolder: string
+  /** `syncFolder` is nearby sync's private copy, kept in step with computers on the same network. */
+  syncNearby: boolean
 }
 
 export interface PersistedState {

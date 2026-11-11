@@ -124,6 +124,41 @@ reach the sync code; `History(undefined)` lives in memory), and anything but his
 - If the folder disappears (a drive unplugged, a cloud app signed out), sync pauses and Settings
   says so.
 
+## Nearby computers (proof of concept)
+
+`src/main/sync/nearby.ts`. Sync without a cloud folder: computers on the same network copy the
+folder between themselves. Each computer keeps a private copy in `<userData>/Sync/Nearby`; the
+engine reads and writes it exactly like a cloud folder, so the encryption, the logs and the
+merge rules above are unchanged. Only the transport differs.
+
+- **Finding each other:** a UDP multicast beacon (`239.255.89.65:47391`, TTL 1, so it never
+  leaves the local network) every 5 s on every IPv4 interface. It carries a group ID (8 bytes of
+  an HMAC of the pairing key), a random per-launch ID and a TCP port; nothing readable, and
+  nothing that stays the same across launches except the group ID.
+- **Pairing key:** scrypt of the password with a fixed salt (`yarc-sync nearby v1`), so a
+  computer that doesn't have `sync.json` yet derives the same key. Because of that, an empty
+  password is refused for nearby sync.
+- **Connection:** the computer with the lower launch ID connects. Both send a fresh X25519 key;
+  the connection keys are HKDF(X25519 secret, salt = pairing key, info = both nonces and keys),
+  one per direction, AES-256-GCM with a counter nonce. A computer without the password can't
+  read or send anything. Limit: someone on the network who actively sits in the middle of a
+  connection can try passwords offline against it (a PAKE such as CPace would fix that); a
+  passive listener can't.
+- **What's copied:** each side sends a list of its files with a content hash, asks for what it
+  lacks, and gets it. A computer is the only source for its own logs and profile list; copies of
+  another computer's files are dropped when their owner no longer lists them (compaction).
+  `sync.json` is taken when this computer has none, or when it's the same sync with a higher
+  `generation` (bumped by every password change).
+- **Password change:** the computer that changes it keeps listening under the old pairing key
+  too, so the others get the new `sync.json`, lock, and ask for the new password.
+- **Two separate syncs with one password** (both computers chose "Start a new sync"): they find
+  each other, see different folder IDs, and Settings says so; nothing is mixed.
+- **Not yet:** syncing over the internet (computers must be on the same network at the same
+  time), a third computer relaying while the owner is offline is fine for logs but its deletions
+  wait for the owner, and the first-launch prompts: macOS asks for **Local Network** access
+  (System Settings → Privacy & Security → Local Network), Windows Defender Firewall asks to allow
+  YARC on private networks.
+
 ## Turning it off
 
 Settings → Sync → off: this device forgets its saved key, cursors and tombstones (which hold

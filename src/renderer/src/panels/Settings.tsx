@@ -221,16 +221,26 @@ function Sync({ state }: { state: AppState }) {
         Incognito windows never sync.
       </p>
       {s.state === 'off' && (
-        <Row title="Sync folder" hint="On your other computers, pick the same folder and type the same password.">
-          <button className="btn primary" onClick={() => dispatch({ type: 'syncPickFolder' })}>
-            Choose folder…
-          </button>
-        </Row>
+        <>
+          <Row title="Sync folder" hint="On your other computers, pick the same folder and type the same password.">
+            <button className="btn primary" onClick={() => dispatch({ type: 'syncPickFolder' })}>
+              Choose folder…
+            </button>
+          </Row>
+          <Row
+            title="Nearby computers (experimental)"
+            hint="No cloud folder: your computers sync directly when they’re on the same network with YARC open. Type the same password on each."
+          >
+            <button className="btn" onClick={() => dispatch({ type: 'syncNearby' })}>
+              Set up…
+            </button>
+          </Row>
+        </>
       )}
       {s.state === 'setup' && <SyncSetup status={s} />}
       {s.state === 'working' && (
         <>
-          <FolderRow folder={s.folder} />
+          <WhereRow status={s} />
           <p className="note">{s.message}</p>
         </>
       )}
@@ -240,11 +250,16 @@ function Sync({ state }: { state: AppState }) {
   )
 }
 
-function FolderRow({ folder }: { folder: string }) {
+/** Where history syncs through: the folder, or computers on the network. */
+function WhereRow({ status }: { status: { folder: string; nearby?: boolean; peers?: number } }) {
+  if (status.nearby) {
+    const connected = status.peers === undefined ? undefined : status.peers === 1 ? '1 computer connected' : `${status.peers} computers connected`
+    return <Row title="Syncs with" hint={connected}>Computers on this network</Row>
+  }
   return (
     <Row title="Sync folder">
-      <code className="sync-folder" title={folder}>
-        {folder}
+      <code className="sync-folder" title={status.folder}>
+        {status.folder}
       </code>
     </Row>
   )
@@ -266,10 +281,24 @@ function Exposure() {
   )
 }
 
-function PasswordFields({ confirm, submitLabel, onSubmit }: { confirm: boolean; submitLabel: string; onSubmit: (password: string) => void }) {
+function PasswordFields({
+  confirm,
+  submitLabel,
+  onSubmit,
+  allowEmpty = true,
+  secondary
+}: {
+  confirm: boolean
+  submitLabel: string
+  onSubmit: (password: string) => void
+  /** Nearby sync refuses an empty password. */
+  allowEmpty?: boolean
+  /** A second button that submits the same password differently. */
+  secondary?: { label: string; onSubmit: (password: string) => void }
+}) {
   const [password, setPassword] = useState('')
   const [again, setAgain] = useState('')
-  const mismatch = confirm && password !== again
+  const mismatch = (confirm && password !== again) || (!allowEmpty && password === '')
   return (
     <form
       onSubmit={(e) => {
@@ -285,9 +314,14 @@ function PasswordFields({ confirm, submitLabel, onSubmit }: { confirm: boolean; 
           <input className="text-input" type="password" aria-label="Sync password again" value={again} onChange={(e) => setAgain(e.target.value)} />
         </Row>
       )}
-      {password === '' && <Exposure />}
+      {password === '' && allowEmpty && <Exposure />}
       <div className="actions">
-        {mismatch && again !== '' && <span className="muted">The passwords don’t match.</span>}
+        {confirm && password !== again && again !== '' && <span className="muted">The passwords don’t match.</span>}
+        {secondary && (
+          <button className="btn" type="button" disabled={mismatch} onClick={() => secondary.onSubmit(password)}>
+            {secondary.label}
+          </button>
+        )}
         <button className="btn primary" type="submit" disabled={mismatch}>
           {submitLabel}
         </button>
@@ -297,9 +331,10 @@ function PasswordFields({ confirm, submitLabel, onSubmit }: { confirm: boolean; 
 }
 
 function SyncSetup({ status }: { status: Extract<HistorySyncStatus, { state: 'setup' }> }) {
+  if (status.nearby) return <NearbySetup status={status} />
   return (
     <>
-      <FolderRow folder={status.folder} />
+      <WhereRow status={status} />
       <p className="note">
         {status.existing
           ? 'Another computer already syncs here. Type the sync password you chose there.'
@@ -320,6 +355,31 @@ function SyncSetup({ status }: { status: Extract<HistorySyncStatus, { state: 'se
   )
 }
 
+function NearbySetup({ status }: { status: Extract<HistorySyncStatus, { state: 'setup' }> }) {
+  return (
+    <>
+      <p className="note">
+        Type the same sync password on each computer, with YARC open on both and both on the same network. On the first computer, choose{' '}
+        <strong>Start a new sync</strong>; on the others, <strong>Join my other computer</strong>. Your computers sync whenever they’re on the same
+        network again; nothing goes through the internet.
+      </p>
+      {status.error && <p className="note warn">{status.error}</p>}
+      <PasswordFields
+        confirm={false}
+        allowEmpty={false}
+        submitLabel="Join my other computer"
+        onSubmit={(password) => dispatch({ type: 'syncConnect', password })}
+        secondary={{ label: 'Start a new sync', onSubmit: (password) => dispatch({ type: 'syncConnect', password, create: true }) }}
+      />
+      <div className="actions">
+        <button className="btn" onClick={() => dispatch({ type: 'syncCancel' })}>
+          Cancel
+        </button>
+      </div>
+    </>
+  )
+}
+
 const LOCKED_REASON: Record<Extract<HistorySyncStatus, { state: 'locked' }>['reason'], string> = {
   'password-changed': 'The sync password was changed on another computer. Type the new password to keep syncing.',
   'no-saved-key': 'Type the sync password to keep syncing.',
@@ -329,11 +389,16 @@ const LOCKED_REASON: Record<Extract<HistorySyncStatus, { state: 'locked' }>['rea
 function SyncLocked({ status }: { status: Extract<HistorySyncStatus, { state: 'locked' }> }) {
   return (
     <>
-      <FolderRow folder={status.folder} />
+      <WhereRow status={status} />
       <p className="note warn">{LOCKED_REASON[status.reason]}</p>
       {status.error && <p className="note warn">{status.error}</p>}
       {status.reason !== 'missing-folder' && (
-        <PasswordFields confirm={false} submitLabel="Unlock" onSubmit={(password) => dispatch({ type: 'syncConnect', password })} />
+        <PasswordFields
+          confirm={false}
+          allowEmpty={!status.nearby}
+          submitLabel="Unlock"
+          onSubmit={(password) => dispatch({ type: 'syncConnect', password })}
+        />
       )}
       <div className="actions">
         <button className="btn" onClick={() => dispatch({ type: 'syncOff' })}>
@@ -351,7 +416,7 @@ function SyncOn({ status, profiles }: { status: Extract<HistorySyncStatus, { sta
       <Row title="Sync history" hint={status.lastSync ? `Last synced ${new Date(status.lastSync).toLocaleTimeString()}` : 'Starting…'}>
         <Toggle label="Sync history" checked onChange={(v) => !v && dispatch({ type: 'syncOff' })} />
       </Row>
-      <FolderRow folder={status.folder} />
+      <WhereRow status={status} />
       {status.error && <p className="note warn">{status.error}</p>}
       {status.emptyPassword && <Exposure />}
       <div className="section-label">Profiles</div>
@@ -368,6 +433,7 @@ function SyncOn({ status, profiles }: { status: Extract<HistorySyncStatus, { sta
       {changing ? (
         <PasswordFields
           confirm
+          allowEmpty={!status.nearby}
           submitLabel="Change password"
           onSubmit={(password) => {
             setChanging(false)
@@ -381,7 +447,11 @@ function SyncOn({ status, profiles }: { status: Extract<HistorySyncStatus, { sta
           </button>
         </Row>
       )}
-      <p className="note muted">Turning sync off leaves the folder as it is. This computer forgets the key; your history here stays.</p>
+      <p className="note muted">
+        {status.nearby
+          ? 'Turning sync off stops syncing with your other computers. This computer forgets the key; your history here stays.'
+          : 'Turning sync off leaves the folder as it is. This computer forgets the key; your history here stays.'}
+      </p>
     </>
   )
 }

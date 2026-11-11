@@ -39,9 +39,13 @@ export function syncExposure(): string[] {
 /** Runtime state of history sync, sent to the UI with every snapshot. */
 export type HistorySyncStatus =
   | { state: 'off' }
-  /** A folder was picked; waiting for the password. `existing` = another device already syncs there. */
-  | { state: 'setup'; folder: string; existing: boolean; error?: string }
-  | { state: 'working'; folder: string; message: string }
-  | { state: 'on'; folder: string; emptyPassword: boolean; lastSync?: number; error?: string }
+  /**
+   * A folder was picked (or nearby sync chosen); waiting for the password. `existing` = another
+   * device already syncs there. `searched` = nearby sync looked and found no computer with that password.
+   */
+  | { state: 'setup'; folder: string; existing: boolean; nearby?: boolean; searched?: boolean; error?: string }
+  | { state: 'working'; folder: string; nearby?: boolean; message: string }
+  /** `peers`: with nearby sync, how many computers are connected right now. */
+  | { state: 'on'; folder: string; nearby?: boolean; peers?: number; emptyPassword: boolean; lastSync?: number; error?: string }
   /** Sync is on but can't run until the password is typed again. */
-  | { state: 'locked'; folder: string; reason: 'password-changed' | 'no-saved-key' | 'missing-folder'; error?: string }
+  | { state: 'locked'; folder: string; nearby?: boolean; reason: 'password-changed' | 'no-saved-key' | 'missing-folder'; error?: string }

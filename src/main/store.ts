@@ -23,7 +23,8 @@ export const DEFAULT_SETTINGS: Settings = {
   autoUpdate: true,
   theme: 'system',
   syncHistory: false,
-  syncFolder: ''
+  syncFolder: '',
+  syncNearby: false
 }
 
 export function defaultState(): PersistedState {

@@ -1235,8 +1235,10 @@ export class Browser implements TabHost {
       }
       case 'syncPickFolder':
         return (this.main ?? this).historySync?.pickFolder()
+      case 'syncNearby':
+        return (this.main ?? this).historySync?.setUpNearby()
       case 'syncConnect':
-        return (this.main ?? this).historySync?.connect(a.password)
+        return (this.main ?? this).historySync?.connect(a.password, a.create)
       case 'syncChangePassword':
         return (this.main ?? this).historySync?.changePassword(a.password)
       case 'syncProfile':
