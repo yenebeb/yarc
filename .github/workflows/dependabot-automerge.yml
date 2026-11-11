@@ -6,7 +6,7 @@ name: dependabot-automerge
 # aren't asked to update for a dev dependency; they ship with the next release of a real change.
 # Majors wait for a person: CI doesn't run the e2e tests, and a major can break the app at runtime.
 # Supply-chain risk is limited by Dependabot's cooldown (.github/dependabot.yml): a new version of
-# any package but electron is only proposed after it has been out for a few days.
+# any package, electron included, is only proposed after it has been out for a day.
 on: pull_request
 
 permissions:
