@@ -1,5 +1,6 @@
 // State shared between the main process and the UI renderers.
 // The main process owns the truth; renderers receive full snapshots.
+import type { SitePermissionRow } from './permissions'
 import type { TourStep } from './tour'
 
 export type ID = string
@@ -225,6 +226,8 @@ export interface AppState extends PersistedState {
    */
   layout: { content: Rect; views: { id: ID; rect: Rect; elsewhere?: boolean }[]; splitId?: ID }
   update: UpdateStatus
+  /** Each profile's answers to site permission prompts, for Settings. */
+  sitePermissions: Record<ID, SitePermissionRow[]>
 }
 
 /**

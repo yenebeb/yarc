@@ -81,3 +81,5 @@ export type Action =
   | { type: 'spaceMenu'; id: ID }
   | { type: 'extensionsStore' }
   | { type: 'adblockToggleSite'; id?: ID }
+  /** Settings > Site Permissions: allow or block a site's permission, or forget it so the site asks again. */
+  | { type: 'sitePermission'; profileId: ID; origin: string; key: string; setting: 'allow' | 'block' | 'reset' }

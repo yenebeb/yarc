@@ -2,6 +2,7 @@
 import { useState, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react'
 import logo from '../../../../build/icon.svg'
 import { BINDINGS, bindingLabel } from '../../../shared/keymap'
+import { permissionLabel, siteName, type SitePermissionRow } from '../../../shared/permissions'
 import { SIDEBAR_WIDTH, type AppState, type Profile, type SearchEngine, type Settings as SettingsT } from '../../../shared/types'
 import { SEARCH_ENGINES } from '../../../shared/url'
 import { activeSpace, dispatch, isMac } from '../api'
@@ -9,11 +10,12 @@ import { Icon, type IconName } from '../icons'
 import './panels.css'
 import './settings.css'
 
-type Section = 'general' | 'profiles' | 'import' | 'extensions' | 'shortcuts' | 'about'
+type Section = 'general' | 'profiles' | 'sites' | 'import' | 'extensions' | 'shortcuts' | 'about'
 
 const SECTIONS: { id: Section; label: string; icon?: IconName }[] = [
   { id: 'general', label: 'General', icon: 'settings' },
   { id: 'profiles', label: 'Profiles', icon: 'profile' },
+  { id: 'sites', label: 'Site Permissions', icon: 'lock' },
   { id: 'import', label: 'Import', icon: 'download' },
   { id: 'extensions', label: 'Extensions', icon: 'puzzle' },
   { id: 'shortcuts', label: 'Keyboard Shortcuts', icon: 'command' },
@@ -77,6 +79,7 @@ export function Settings({ state, close }: { state: AppState; close: () => void 
         <div className="set-body" key={section}>
           {section === 'general' && <General state={state} />}
           {section === 'profiles' && <Profiles state={state} />}
+          {section === 'sites' && <SitePermissions state={state} />}
           {section === 'import' && <Import />}
           {section === 'extensions' && <Extensions state={state} />}
           {section === 'shortcuts' && <Shortcuts />}
@@ -291,6 +294,51 @@ function ProfileRow({ profile, state }: { profile: Profile; state: AppState }) {
         ))}
       </div>
     </div>
+  )
+}
+
+function SitePermissions({ state }: { state: AppState }) {
+  const groups = state.profiles.map((p) => ({ profile: p, rows: state.sitePermissions?.[p.id] ?? [] }))
+  const any = groups.some((g) => g.rows.length)
+  return (
+    <>
+      <p className="set-note">
+        What you told sites that asked for notifications, your camera, microphone or location. Each profile keeps its own answers. After three Not
+        Nows a site isn't asked again for a week. Forget an answer to be asked again.
+      </p>
+      {!any && (
+        <Group>
+          <div className="set-empty">No site has asked yet.</div>
+        </Group>
+      )}
+      {groups.map(({ profile, rows }) =>
+        rows.length ? (
+          <Group key={profile.id} title={state.profiles.length > 1 ? profile.name : undefined}>
+            {rows.map((row) => (
+              <SitePermissionLine key={`${row.origin}|${row.key}`} profileId={profile.id} row={row} />
+            ))}
+          </Group>
+        ) : null
+      )}
+    </>
+  )
+}
+
+function SitePermissionLine({ profileId, row }: { profileId: string; row: SitePermissionRow }) {
+  const send = (setting: 'allow' | 'block' | 'reset') => dispatch({ type: 'sitePermission', profileId, origin: row.origin, key: row.key, setting })
+  const until = row.until ? new Date(row.until).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : ''
+  const label = `${permissionLabel(row.key)} for ${siteName(row.origin)}`
+  return (
+    <Row title={siteName(row.origin)} hint={row.setting === 'quiet' ? `${permissionLabel(row.key)} · not asking until ${until}` : permissionLabel(row.key)}>
+      <Select label={label} value={row.setting} onChange={(v) => send(v as 'allow' | 'block')}>
+        {row.setting === 'quiet' && <option value="quiet">Blocked for now</option>}
+        <option value="allow">Allow</option>
+        <option value="block">Block</option>
+      </Select>
+      <button className="btn" title="Forget this answer: the site asks again next time" onClick={() => send('reset')}>
+        Forget
+      </button>
+    </Row>
   )
 }
 

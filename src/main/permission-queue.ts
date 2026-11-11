@@ -1,13 +1,19 @@
-// Site permission requests waiting for an answer, and the answers given this run.
-// Kept free of Electron so unit tests can import it; profiles.ts feeds it and the browser shows it.
+// Site permission requests waiting for an answer. Kept free of Electron so unit tests can import it;
+// profiles.ts feeds it, the browser shows it, and each profile's SiteDecisions keeps the answers.
+import { keysFor, type MediaType, type SiteDecisions } from './site-permissions.ts'
 
-/** Allow and Not Now are remembered for the site until YARC quits; dismissing (Escape) answers only this request. */
+export type { MediaType } from './site-permissions.ts'
+
+/**
+ * Allow sticks across restarts. Not Now (also Escape) refuses the site for the rest of the run and
+ * counts toward a quiet week. 'dismiss' is no answer at all: a page with nowhere to show the prompt.
+ */
 export type PromptAnswer = 'allow' | 'deny' | 'dismiss'
-
-export type MediaType = 'video' | 'audio'
 
 export interface PermissionRequest {
   id: string
+  /** Answers belong to the profile the page is signed in with. */
+  profileId: string
   /** The webContents of the page that asked: its prompt shows only while that page is on screen. */
   wcId: number
   /** "https://meet.google.com" */
@@ -22,23 +28,27 @@ interface Pending extends PermissionRequest {
 }
 
 export class PermissionQueue {
-  private decisions = new Map<string, boolean>()
   private pending: Pending[] = []
   private nextId = 1
   private onChange: () => void
+  private decisionsFor: (profileId: string) => SiteDecisions
 
-  /** `onChange` runs whenever the set of waiting requests changes, so the prompt can be redrawn. */
-  constructor(onChange: () => void = () => {}) {
+  /**
+   * `decisionsFor` gives a profile's stored answers. `onChange` runs whenever the set of waiting
+   * requests changes, so the prompt can be redrawn.
+   */
+  constructor(decisionsFor: (profileId: string) => SiteDecisions, onChange: () => void = () => {}) {
+    this.decisionsFor = decisionsFor
     this.onChange = onChange
   }
 
   /**
-   * The remembered answer for a site: true once every part was allowed, false once any part was
-   * refused, undefined while something is still unanswered. Camera and microphone count separately,
-   * so allowing the microphone doesn't give away the camera.
+   * The answer for a site: true once every part was allowed, false once any part was refused,
+   * undefined while something still needs asking.
    */
-  decided(origin: string, permission: string, mediaTypes?: MediaType[]): boolean | undefined {
-    const answers = keysFor(origin, permission, mediaTypes).map((k) => this.decisions.get(k))
+  decided(profileId: string, origin: string, permission: string, mediaTypes?: MediaType[]): boolean | undefined {
+    const decisions = this.decisionsFor(profileId)
+    const answers = keysFor(permission, mediaTypes).map((k) => decisions.answer(origin, k))
     if (answers.includes(false)) return false
     if (answers.every((a) => a === true)) return true
     return undefined
@@ -46,7 +56,7 @@ export class PermissionQueue {
 
   /** Answers at once when the site already has an answer; otherwise waits for the user. */
   request(req: Omit<PermissionRequest, 'id'>, callback: (allowed: boolean) => void): void {
-    const known = this.decided(req.origin, req.permission, req.mediaTypes)
+    const known = this.decided(req.profileId, req.origin, req.permission, req.mediaTypes)
     if (known !== undefined) return callback(known)
     // A page asking again before the first prompt is answered gets the same prompt, not a second one.
     const same = this.pending.find(
@@ -75,12 +85,22 @@ export class PermissionQueue {
     const req = this.pending.find((p) => p.id === id)
     if (!req) return
     this.pending = this.pending.filter((p) => p !== req)
-    const allowed = answer === 'allow'
-    if (answer !== 'dismiss') for (const key of keysFor(req.origin, req.permission, req.mediaTypes)) this.decisions.set(key, allowed)
-    for (const cb of req.callbacks) cb(allowed)
-    // The same question from the site's other tabs is answered too.
+    const decisions = this.decisionsFor(req.profileId)
+    for (const key of keysFor(req.permission, req.mediaTypes)) {
+      if (answer === 'allow') decisions.set(req.origin, key, 'allow')
+      else if (answer === 'deny') decisions.notNow(req.origin, key)
+    }
+    for (const cb of req.callbacks) cb(answer === 'allow')
+    this.settle()
+  }
+
+  /**
+   * Answers waiting requests that now have an answer: the same question from the site's other
+   * tabs, or one just changed in Settings.
+   */
+  settle(): void {
     for (const other of [...this.pending]) {
-      const known = this.decided(other.origin, other.permission, other.mediaTypes)
+      const known = this.decided(other.profileId, other.origin, other.permission, other.mediaTypes)
       if (known === undefined) continue
       this.pending = this.pending.filter((p) => p !== other)
       for (const cb of other.callbacks) cb(known)
@@ -96,12 +116,6 @@ export class PermissionQueue {
     for (const req of gone) for (const cb of req.callbacks) cb(false)
     this.onChange()
   }
-}
-
-function keysFor(origin: string, permission: string, mediaTypes?: MediaType[]): string[] {
-  if (permission !== 'media') return [`${origin}|${permission}`]
-  const types = mediaTypes?.length ? mediaTypes : (['video', 'audio'] as const)
-  return types.map((t) => `${origin}|media:${t}`)
 }
 
 function sameMedia(a: MediaType[] = [], b: MediaType[] = []): boolean {

@@ -1,9 +1,9 @@
-// The site permission prompt, like Arc's: "Allow https://meet.google.com to access your camera?"
+// The site permission prompt, like Arc's: "Allow meet.google.com to access your camera?"
 // with Not Now / Allow, in a popover pointing at the URL field. The main process sizes and places
 // this view (prompt-view.ts); the page only draws the popover and reports how tall it came out.
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
-import { promptText, type PermissionPrompt } from '../../shared/permissions'
+import { promptText, siteName, type PermissionPrompt } from '../../shared/permissions'
 import { arc } from './api'
 import { Icon } from './icons'
 import './styles.css'
@@ -33,7 +33,8 @@ function App() {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return
       e.preventDefault()
-      void arc.prompt({ kind: 'answer', id: prompt.id, answer: 'dismiss' })
+      // Escape is Not Now, so a site that asks on every page load doesn't come straight back.
+      void arc.prompt({ kind: 'answer', id: prompt.id, answer: 'deny' })
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -42,7 +43,7 @@ function App() {
   if (!prompt) return null
   const { icon, wants } = promptText(prompt.permission, prompt.mediaTypes)
   const answer = (a: 'allow' | 'deny') => void arc.prompt({ kind: 'answer', id: prompt.id, answer: a })
-  const [scheme, rest] = prompt.origin.includes('://') ? prompt.origin.split('://') : ['', prompt.origin]
+  const site = siteName(prompt.origin)
   const arrow = prompt.arrowX !== undefined
 
   return (
@@ -51,7 +52,7 @@ function App() {
       ref={box}
       className="perm"
       role="alertdialog"
-      aria-label={`Allow ${prompt.origin} to ${wants}?`}
+      aria-label={`Allow ${site} to ${wants}?`}
       tabIndex={-1}
       style={{ transformOrigin: arrow ? `${prompt.arrowX! - MARGIN}px 0` : '0 0' }}
     >
@@ -66,14 +67,7 @@ function App() {
           <Icon name={icon} size={19} stroke={1.8} />
         </span>
         <p className="perm-text">
-          Allow{' '}
-          {scheme ? (
-            <>
-              {scheme}://
-              <wbr />
-            </>
-          ) : null}
-          {rest} to {wants}?
+          Allow {site} to {wants}?
         </p>
       </div>
       <div className="perm-buttons">

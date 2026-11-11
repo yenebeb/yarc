@@ -306,6 +306,36 @@ test('favorites live at the top and belong to the profile', async () => {
   await expect(ui.locator('.favorite')).toHaveCount(1)
 })
 
+test('switching tabs ends a rename started by a double-click, and the row stays clickable', async () => {
+  // The double-click's second click used to give the keyboard to the page, which doesn't blur the
+  // sidebar's field: after a tab switch the rename stayed open and swallowed clicks on its row.
+  await dispatch({ type: 'open', url: `${base}/fav-target`, where: 'tab' })
+  await dispatch({ type: 'addFavorite', id: (await space()).today[0].id })
+  await dispatch({ type: 'open', url: `${base}/rename-me`, where: 'tab' })
+  const sp = await space()
+  const tab = sp.today.find((t) => t.url.endsWith('/rename-me'))!
+  const favorite = (await state()).profiles.find((p) => p.id === sp.profileId)!.favorites[0]
+  const ui = await pageWithUrl('index.html')
+  const row = ui.locator('.row', { hasText: 'Page rename-me' })
+  const box = (await row.boundingBox())!
+  await app.evaluate((_e, at) => {
+    const wc = (globalThis as any).arcBrowser.window.ui
+    for (const clickCount of [1, 2]) for (const type of ['mouseDown', 'mouseUp']) wc.sendInputEvent({ type, ...at, button: 'left', clickCount })
+  }, { x: Math.round(box.x + 60), y: Math.round(box.y + box.height / 2) })
+  await expect(ui.locator('input.rename')).toBeFocused()
+  await expect.poll(() => app.evaluate(() => (globalThis as any).arcBrowser.window.ui.isFocused())).toBe(true)
+
+  // Cmd/Ctrl+1, typed in the sidebar, selects the first favorite.
+  await app.evaluate((_e, m) => (globalThis as any).arcBrowser.window.ui.sendInputEvent({ type: 'keyDown', keyCode: '1', modifiers: m }), [mod])
+  await expect.poll(async () => (await space()).activeItemId).toBe(favorite.id)
+  await expect(ui.locator('input.rename')).toHaveCount(0)
+  // Left untouched, the rename saved nothing: the title still follows the page.
+  expect((await space()).today.find((t) => t.id === tab.id)!.savedTitle).toBeUndefined()
+
+  await row.click()
+  await expect.poll(async () => (await space()).activeItemId).toBe(tab.id)
+})
+
 test('split view shows two pages side by side and can be closed', async () => {
   await dispatch({ type: 'open', url: `${base}/left`, where: 'tab' })
   await dispatch({ type: 'open', url: `${base}/right`, where: 'split' })

@@ -22,7 +22,9 @@ export const IPC = {
   historyDelete: 'arc:history-delete',
   littleOp: 'arc:little-op',
   prompt: 'arc:prompt',
-  promptOp: 'arc:prompt-op'
+  promptOp: 'arc:prompt-op',
+  focus: 'arc:focus',
+  blur: 'arc:blur'
 } as const
 
 /** Main asks the sidebar to start inline editing (after a native context menu choice). */
@@ -84,4 +86,11 @@ export interface ArcApi {
   /** The site permission prompt (prompt.html): what to ask, or null for nothing. */
   onPrompt(cb: (p: PermissionPrompt | null) => void): () => void
   prompt(op: PromptOp): Promise<void>
+  /** Gives this view the keyboard; a page may have it, even after a click here. */
+  focus(): Promise<void>
+  /**
+   * This view lost the keyboard to another view (a page, the overlay). The document itself isn't
+   * told: its focused element stays focused and gets no blur event.
+   */
+  onBlur(cb: () => void): () => void
 }

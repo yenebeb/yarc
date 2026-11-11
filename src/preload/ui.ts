@@ -27,7 +27,9 @@ const api: ArcApi = {
   deleteHistory: (url) => ipcRenderer.invoke(IPC.historyDelete, url),
   little: (op, at) => ipcRenderer.invoke(IPC.littleOp, op, at),
   onPrompt: (cb) => listen(IPC.prompt, cb),
-  prompt: (op) => ipcRenderer.invoke(IPC.promptOp, op)
+  prompt: (op) => ipcRenderer.invoke(IPC.promptOp, op),
+  focus: () => ipcRenderer.invoke(IPC.focus),
+  onBlur: (cb) => listen(IPC.blur, cb)
 }
 
 contextBridge.exposeInMainWorld('arc', api)

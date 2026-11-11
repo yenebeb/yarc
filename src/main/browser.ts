@@ -313,6 +313,8 @@ export class Browser implements TabHost {
     })
     win.on('closed', () => this.onWindowClosed(w))
     win.webContents.once('did-finish-load', () => this.emit())
+    // A page taking the keyboard doesn't blur the sidebar's focused element (a rename field), so tell it.
+    for (const wc of [win.webContents, w.main.overlay.webContents]) wc.on('blur', () => !wc.isDestroyed() && wc.send(IPC.blur))
     w.main.overlay.webContents.on('blur', () => {
       // Closing the window blurs the overlay too, after the window is gone.
       if (!w.open) return
@@ -516,7 +518,8 @@ export class Browser implements TabHost {
       newTabOpen: mode.kind === 'command' && (mode.target ?? 'tab') === 'tab',
       peek: w.peek && !w.peek.tab.destroyed ? w.peek.tab.info() : undefined,
       layout: w.layout,
-      update: this.updater.status
+      update: this.updater.status,
+      sitePermissions: Object.fromEntries(this.state.profiles.map((p) => [p.id, this.profiles.decisions(p.id).list()]))
     }
   }
 
@@ -1672,6 +1675,14 @@ export class Browser implements TabHost {
         this.reloadSoon(t!)
         return this.changed()
       }
+      case 'sitePermission': {
+        const decisions = this.profiles.decisions(a.profileId)
+        if (a.setting === 'reset') decisions.reset(a.origin, a.key)
+        else decisions.set(a.origin, a.key, a.setting)
+        // A question waiting on this site may be answered now.
+        this.profiles.permissionQueue.settle()
+        return this.emitSoon()
+      }
       case 'itemMenu':
         return buildItemMenu(this, a.id)?.popup({ window: this.window.win })
       case 'folderMenu':
@@ -1896,6 +1907,7 @@ export class Browser implements TabHost {
       const b = of(e)
       return b.profiles.get(b.space.profileId).history.deleteUrl(url)
     })
+    ipcMain.handle(IPC.focus, (e) => e.sender.focus())
     ipcMain.handle(IPC.littleOp, (e, op: LittleOp, at?: LittleAnchor) => {
       for (const l of of(e).littles) if (l.win.webContents === e.sender) return l.op(op, at)
     })

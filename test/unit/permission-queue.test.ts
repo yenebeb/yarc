@@ -1,20 +1,25 @@
 import assert from 'node:assert/strict'
 import { describe, test } from 'node:test'
 import { PermissionQueue } from '../../src/main/permission-queue.ts'
-import { promptText } from '../../src/shared/permissions.ts'
+import { SiteDecisions } from '../../src/main/site-permissions.ts'
+import { promptText, siteName } from '../../src/shared/permissions.ts'
 
 const MEET = 'https://meet.google.com'
 const SLACK = 'https://app.slack.com'
 const meetTab = 1
 const secondMeetTab = 2
 const slackTab = 3
+const WORK = 'work'
+const PERSONAL = 'personal'
 
 /** A queue plus what each site was told, in order. */
 function setup() {
-  const queue = new PermissionQueue()
+  const profiles = new Map<string, SiteDecisions>()
+  const decisionsFor = (id: string) => profiles.get(id) ?? profiles.set(id, new SiteDecisions()).get(id)!
+  const queue = new PermissionQueue(decisionsFor)
   const told: string[] = []
-  const ask = (wcId: number, origin: string, permission: string, mediaTypes?: ('video' | 'audio')[]) =>
-    queue.request({ wcId, origin, permission, mediaTypes }, (allowed) => told.push(`${origin} ${permission}${mediaTypes ? ` ${mediaTypes.join('+')}` : ''}: ${allowed ? 'allowed' : 'refused'}`))
+  const ask = (wcId: number, origin: string, permission: string, mediaTypes?: ('video' | 'audio')[], profileId = WORK) =>
+    queue.request({ profileId, wcId, origin, permission, mediaTypes }, (allowed) => told.push(`${origin} ${permission}${mediaTypes ? ` ${mediaTypes.join('+')}` : ''}: ${allowed ? 'allowed' : 'refused'}`))
   return { queue, told, ask }
 }
 
@@ -64,14 +69,14 @@ describe('a site asking for a permission waits for the user', () => {
 
   test('the queue reports each change so the prompt can be redrawn', () => {
     let changes = 0
-    const queue = new PermissionQueue(() => changes++)
-    queue.request({ wcId: meetTab, origin: MEET, permission: 'notifications' }, () => {})
+    const queue = new PermissionQueue(() => new SiteDecisions(), () => changes++)
+    queue.request({ profileId: WORK, wcId: meetTab, origin: MEET, permission: 'notifications' }, () => {})
     queue.answer(queue.next([meetTab])!.id, 'allow')
     assert.equal(changes, 2)
   })
 })
 
-describe('answers are remembered for the site until YARC quits', () => {
+describe('answers are remembered for the site', () => {
   test('Allow is remembered: the next request is allowed without asking', () => {
     const { queue, told, ask } = setup()
     ask(meetTab, MEET, 'notifications')
@@ -79,10 +84,10 @@ describe('answers are remembered for the site until YARC quits', () => {
     ask(meetTab, MEET, 'notifications')
     assert.equal(queue.next([meetTab]), undefined)
     assert.deepEqual(told, [`${MEET} notifications: allowed`, `${MEET} notifications: allowed`])
-    assert.equal(queue.decided(MEET, 'notifications'), true)
+    assert.equal(queue.decided(WORK, MEET, 'notifications'), true)
   })
 
-  test('Not Now is remembered too, so the site can not keep asking', () => {
+  test('Not Now refuses the site for the rest of the run, so it can not keep asking', () => {
     const { queue, told, ask } = setup()
     ask(meetTab, MEET, 'geolocation')
     queue.answer(queue.next([meetTab])!.id, 'deny')
@@ -90,14 +95,22 @@ describe('answers are remembered for the site until YARC quits', () => {
     assert.deepEqual(told, [`${MEET} geolocation: refused`, `${MEET} geolocation: refused`])
   })
 
-  test('dismissing (Escape) refuses this request only: the site may ask again', () => {
+  test('a request with nowhere to ask (dismissed) is refused without remembering anything', () => {
     const { queue, told, ask } = setup()
     ask(meetTab, MEET, 'notifications')
     queue.answer(queue.next([meetTab])!.id, 'dismiss')
-    assert.equal(queue.decided(MEET, 'notifications'), undefined)
+    assert.equal(queue.decided(WORK, MEET, 'notifications'), undefined)
     ask(meetTab, MEET, 'notifications')
     assert.equal(queue.next([meetTab])?.permission, 'notifications')
     assert.deepEqual(told, [`${MEET} notifications: refused`])
+  })
+
+  test('answers belong to a profile: the same site asks again in another profile', () => {
+    const { queue, ask } = setup()
+    ask(meetTab, MEET, 'notifications')
+    queue.answer(queue.next([meetTab])!.id, 'allow')
+    ask(secondMeetTab, MEET, 'notifications', undefined, PERSONAL)
+    assert.equal(queue.next([secondMeetTab])?.origin, MEET)
   })
 
   test('an answer is per site: another site still gets asked', () => {
@@ -123,8 +136,8 @@ describe('camera and microphone are separate permissions', () => {
     const { queue, ask } = setup()
     ask(meetTab, MEET, 'media', ['audio'])
     queue.answer(queue.next([meetTab])!.id, 'allow')
-    assert.equal(queue.decided(MEET, 'media', ['audio']), true)
-    assert.equal(queue.decided(MEET, 'media', ['video']), undefined)
+    assert.equal(queue.decided(WORK, MEET, 'media', ['audio']), true)
+    assert.equal(queue.decided(WORK, MEET, 'media', ['video']), undefined)
     ask(meetTab, MEET, 'media', ['video', 'audio'])
     assert.deepEqual(queue.next([meetTab])?.mediaTypes, ['video', 'audio'])
   })
@@ -141,9 +154,9 @@ describe('camera and microphone are separate permissions', () => {
     const { queue, ask } = setup()
     ask(meetTab, MEET, 'media', ['video'])
     queue.answer(queue.next([meetTab])!.id, 'deny')
-    assert.equal(queue.decided(MEET, 'media', ['video', 'audio']), false)
+    assert.equal(queue.decided(WORK, MEET, 'media', ['video', 'audio']), false)
     // A permission check that doesn't say which device covers both.
-    assert.equal(queue.decided(MEET, 'media'), false)
+    assert.equal(queue.decided(WORK, MEET, 'media'), false)
   })
 })
 
@@ -155,7 +168,7 @@ describe('a page that goes away takes its questions with it', () => {
     queue.cancel(meetTab)
     assert.deepEqual(told, [`${MEET} notifications: refused`])
     assert.deepEqual(queue.waitingPages(), [slackTab])
-    assert.equal(queue.decided(MEET, 'notifications'), undefined)
+    assert.equal(queue.decided(WORK, MEET, 'notifications'), undefined)
   })
 
   test('answering a prompt that is already gone does nothing', () => {
@@ -165,12 +178,18 @@ describe('a page that goes away takes its questions with it', () => {
     queue.cancel(meetTab)
     queue.answer(id, 'allow')
     assert.deepEqual(told, [`${MEET} notifications: refused`])
-    assert.equal(queue.decided(MEET, 'notifications'), undefined)
+    assert.equal(queue.decided(WORK, MEET, 'notifications'), undefined)
   })
 })
 
-describe("the prompt asks in Arc's words", () => {
-  test('notifications, camera, microphone and location', () => {
+describe('the prompt names the site and asks in plain words', () => {
+  test('the site is its host, without https://', () => {
+    assert.equal(siteName(MEET), 'meet.google.com')
+    assert.equal(siteName('http://localhost:8765'), 'localhost:8765')
+    assert.equal(siteName('file://'), 'file://')
+  })
+
+  test("notifications, camera, microphone and location, in Arc's words", () => {
     assert.deepEqual(promptText('notifications'), { icon: 'bell', wants: 'send you notifications' })
     assert.deepEqual(promptText('media', ['video', 'audio']), { icon: 'camera', wants: 'access your camera, microphone' })
     assert.deepEqual(promptText('media', ['video']), { icon: 'camera', wants: 'access your camera' })

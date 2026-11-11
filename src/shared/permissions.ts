@@ -1,4 +1,5 @@
-// What a site permission prompt says, in Arc's words ("Allow https://meet.google.com to access your camera?").
+// What a site permission prompt says ("Allow meet.google.com to access your camera?"), and how
+// Settings lists a profile's answers.
 
 export type PromptIcon = 'bell' | 'camera' | 'mic' | 'location' | 'clipboard' | 'screen' | 'device'
 
@@ -17,6 +18,44 @@ export type PromptOp =
   | { kind: 'sync' }
   | { kind: 'size'; id: string; height: number }
   | { kind: 'answer'; id: string; answer: 'allow' | 'deny' | 'dismiss' }
+
+/** A site's answer, as Settings lists it. `quiet` = refused for a while after several Not Nows, until `until`. */
+export interface SitePermissionRow {
+  origin: string
+  /** 'notifications', 'geolocation', 'media:video' (camera), 'media:audio' (microphone), … */
+  key: string
+  setting: 'allow' | 'block' | 'quiet'
+  until?: number
+}
+
+/** The site as people know it: "meet.google.com", "localhost:8765"; other origins as they are. */
+export function siteName(origin: string): string {
+  try {
+    const u = new URL(origin)
+    return /^https?:$/.test(u.protocol) && u.host ? u.host : origin
+  } catch {
+    return origin
+  }
+}
+
+/** What Settings calls a stored permission key. */
+export function permissionLabel(key: string): string {
+  const labels: Record<string, string> = {
+    notifications: 'Notifications',
+    'media:video': 'Camera',
+    'media:audio': 'Microphone',
+    geolocation: 'Location',
+    'clipboard-read': 'Clipboard',
+    'display-capture': 'Screen sharing',
+    midi: 'MIDI devices',
+    midiSysex: 'MIDI device control',
+    'idle-detection': 'Idle detection',
+    hid: 'HID devices',
+    serial: 'Serial ports',
+    usb: 'USB devices'
+  }
+  return labels[key] ?? key
+}
 
 export function promptText(permission: string, mediaTypes?: ('video' | 'audio')[]): { icon: PromptIcon; wants: string } {
   switch (permission) {

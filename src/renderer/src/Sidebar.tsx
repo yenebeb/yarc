@@ -383,12 +383,25 @@ function SplitPreview({ state, target, dragged, side }: { state: AppState; targe
   )
 }
 
+/** Inline rename. Enter or leaving the field saves; Escape, or no change, keeps the title as it was. */
 function RenameInput({ initial, onDone }: { initial: string; onDone: (value: string | undefined) => void }) {
   const ref = useRef<HTMLInputElement>(null)
   useEffect(() => {
     ref.current?.focus()
     ref.current?.select()
+    // Typing must reach this field, not the page that has the keyboard. Once it's ours, losing it
+    // (to a page, a tab switch, the command bar) ends the rename like a click elsewhere does.
+    let stopListening: (() => void) | undefined
+    let mounted = true
+    void arc.focus().then(() => {
+      if (mounted) stopListening = arc.onBlur(() => ref.current?.blur())
+    })
+    return () => {
+      mounted = false
+      stopListening?.()
+    }
   }, [])
+  const finish = (value: string | undefined) => onDone(value === initial ? undefined : value)
   return (
     <input
       ref={ref}
@@ -396,10 +409,10 @@ function RenameInput({ initial, onDone }: { initial: string; onDone: (value: str
       defaultValue={initial}
       onClick={(e) => e.stopPropagation()}
       onKeyDown={(e) => {
-        if (e.key === 'Enter') onDone(e.currentTarget.value)
-        if (e.key === 'Escape') onDone(undefined)
+        if (e.key === 'Enter') finish(e.currentTarget.value)
+        if (e.key === 'Escape') finish(undefined)
       }}
-      onBlur={(e) => onDone(e.currentTarget.value)}
+      onBlur={(e) => finish(e.currentTarget.value)}
     />
   )
 }
@@ -515,6 +528,9 @@ function TabRow({
         onDrop(e, section === 'pinned' ? { section, folderId, index: pos === 'after' ? index + 1 : index } : { section, index: pos === 'after' ? index + 1 : index })
       }}
       onClick={(e: MouseEvent) => {
+        // A double-click's first click selects the tab and its second starts a rename: selecting
+        // again would hand the keyboard back to the page.
+        if (e.detail > 1) return
         if (e.shiftKey && !active) dispatch({ type: 'splitWith', id: item.id })
         else dispatch({ type: 'activate', id: item.id })
       }}

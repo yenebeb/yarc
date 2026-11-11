@@ -433,9 +433,14 @@ Triggered from a local test page (`Notification.requestPermission()`, `getUserMe
 - **Later:** decisions can be changed in the Site Control Center (the sliders button).
 - **YARC (2026-11-09):** a prompt view of its own above the page (`src/main/prompt-view.ts`, `src/renderer/src/prompt.tsx`), fed by `PermissionQueue` (`src/main/permission-queue.ts`):
   - **Position and look:** it points 22 px in from the right end of the sidebar's URL field, where Arc's Site Control Center button is. YARC has no such button yet. With the sidebar hidden or a full-screen page, it sits at the page's top-left corner without an arrow. In Little Arc, it hangs under the toolbar's URL pill. It follows YARC's theme (system / light / dark), like Arc's follows the system.
-  - **Answers:** Allow and Not Now are remembered for the site until quit. Escape refuses only that request. Camera and microphone are remembered separately.
+  - **Words:** the host ("Allow meet.google.com to …"), not Arc's full origin: users asked for it (2026-11-10).
+  - **Answers (2026-11-10), per profile, in `Profiles/<id>/permissions.json` (`src/main/site-permissions.ts`); incognito keeps them in memory:**
+    - Allow sticks across restarts. Camera and microphone are separate answers.
+    - Not Now (and Escape) refuses the site for the rest of the run. After three Not Nows across launches, the site isn't asked for a week and is refused meanwhile, like Chrome's embargo.
+    - Settings > Site Permissions lists each site's answers. You can switch Allow / Block there, or Forget an answer so the site asks again.
+  - **Frames:** like Chrome, a frame from another site can't ask for notifications. Meet inside Gmail used to ask on every launch.
   - **Background tabs:** a request from a tab that isn't on screen waits until the tab is shown.
-  - **Hidden for now:** full-window panels (command bar, settings, library) hide the prompt until they close. YARC has no site-settings control yet for changing an answer before quitting.
+  - **Hidden for now:** full-window panels (command bar, settings, library) hide the prompt until they close. There's no site-info button by the URL field yet; answers are changed in Settings.
 
 ---
 
