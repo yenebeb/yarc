@@ -168,7 +168,10 @@ jobs:
       # worth a sooner restart prompt) from a normal one: src/main/update-escalation.ts.
       - name: Write release.json
         if: runner.os == 'Linux'
-        run: node -e 'require("fs").writeFileSync("release/release.json", JSON.stringify({ electron: require("electron/package.json").version }) + "\n")'
+        # A block scalar: on one line, YAML reads the ": " inside the script as a mapping and
+        # rejects the whole workflow, so no job runs at all.
+        run: |
+          node -e 'require("fs").writeFileSync("release/release.json", JSON.stringify({ electron: require("electron/package.json").version }) + "\n")'
       # What mac-update.ts checks before installing, plus: signed with the certificate if there is one.
       - name: Check the macOS code signatures
         if: runner.os == 'macOS'
