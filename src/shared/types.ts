@@ -1,6 +1,7 @@
 // State shared between the main process and the UI renderers.
 // The main process owns the truth; renderers receive full snapshots.
 import type { SitePermissionRow } from './permissions'
+import type { Side } from './split'
 import type { TourStep } from './tour'
 
 export type ID = string
@@ -186,6 +187,8 @@ export interface LiveInfo {
   blocked: number
   /** Blocking is on for this page (globally enabled and the site isn't allowlisted). */
   shielded: boolean
+  /** The color along the top of the page, for its bar in a split view (Arc tints it like the page). */
+  barColor?: string
 }
 
 export interface DownloadItemInfo {
@@ -223,8 +226,9 @@ export interface AppState extends PersistedState {
   /**
    * Where web pages currently sit in the window, so the UI can draw split handles and focus rings.
    * `elsewhere`: the page is shown in another window, which has it live; this one shows a still of it.
+   * `bar`: in a split view, the pane's bar above the page (back, forward, host, close).
    */
-  layout: { content: Rect; views: { id: ID; rect: Rect; elsewhere?: boolean }[]; splitId?: ID }
+  layout: { content: Rect; views: { id: ID; rect: Rect; bar?: Rect; elsewhere?: boolean }[]; splitId?: ID }
   update: UpdateStatus
   /** Each profile's answers to site permission prompts, for Settings. */
   sitePermissions: Record<ID, SitePermissionRow[]>
@@ -241,6 +245,12 @@ export type UpdateStatus =
   | { state: 'ready'; version: string; /** Every version since the running one, newest first, for the relaunch card. */ notes?: ReleaseNotes[] }
   | { state: 'available'; version: string }
 
+/** Where a tab opened from a pane's split menu goes. */
+export interface SplitAt {
+  target: ID
+  side: Side
+}
+
 export interface Rect {
   x: number
   y: number
@@ -250,7 +260,8 @@ export interface Rect {
 
 export type OverlayMode =
   | { kind: 'none' }
-  | { kind: 'command'; initial?: string; editCurrent?: boolean; target?: 'tab' | 'split' | 'current' }
+  /** `splitAt`: from a pane's split menu (Add Right Split…), the new tab goes on `side` of `target`. */
+  | { kind: 'command'; initial?: string; editCurrent?: boolean; target?: 'tab' | 'split' | 'current'; splitAt?: SplitAt }
   | { kind: 'find' }
   | { kind: 'settings' }
   | { kind: 'library'; tab?: 'archive' | 'history' | 'downloads' | 'spaces' }

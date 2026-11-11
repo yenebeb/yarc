@@ -141,8 +141,9 @@ function SplitDropZones({ state, origin }: { state: AppState; origin: { x: numbe
     if (!dragged || views.length === 0) return undefined
     const x = clientX + origin.x
     const y = clientY + origin.y
-    // The nearest pane, so the gaps between panes don't flicker.
-    const pane = views.reduce((a, b) => (distance(b.rect, x, y) < distance(a.rect, x, y) ? b : a))
+    // A split pane with its bar on top; the nearest one, so the gaps between panes don't flicker.
+    const panes = views.map((v) => ({ id: v.id, rect: v.bar ? { ...v.bar, height: v.bar.height + v.rect.height } : v.rect }))
+    const pane = panes.reduce((a, b) => (distance(b.rect, x, y) < distance(a.rect, x, y) ? b : a))
     const side = sideAt(pane.rect, x, y)
     const root = split && paneIds(split.root).includes(pane.id) ? split.root : undefined
     if (!placePane(root, pane.id, dragged.id, side)) return undefined
@@ -302,12 +303,12 @@ function CommandBar({ state, mode }: { state: AppState; mode: Extract<OverlayMod
     if (!r) {
       // Enter with no query in Tab to Search goes to the site itself, like Chromium's keyword mode.
       const url = site ? `https://${site.site.keyword}` : query.trim() ? query : ''
-      if (url) dispatch({ type: 'open', url, where: target === 'split' ? 'split' : target === 'current' ? 'current' : 'tab' })
+      if (url) dispatch({ type: 'open', url, where: target === 'split' ? 'split' : target === 'current' ? 'current' : 'tab', splitAt: mode.splitAt })
       return
     }
     if ((r.kind === 'tab' || r.kind === 'favorite' || r.kind === 'pinned') && r.target) {
       close()
-      dispatch(target === 'split' || alt ? { type: 'splitWith', id: r.target } : { type: 'activate', id: r.target })
+      dispatch(target === 'split' || alt ? { type: 'splitWith', id: r.target, at: target === 'split' ? mode.splitAt : undefined } : { type: 'activate', id: r.target })
       return
     }
     if (r.kind === 'command' && r.target) {
@@ -319,7 +320,7 @@ function CommandBar({ state, mode }: { state: AppState; mode: Extract<OverlayMod
     }
     if (r.kind === 'archive' && r.target) return dispatch({ type: 'archiveRestore', id: r.target })
     const where = alt || target === 'split' ? 'split' : target === 'current' ? 'current' : 'tab'
-    dispatch({ type: 'open', url: r.url ?? r.title, where })
+    dispatch({ type: 'open', url: r.url ?? r.title, where, splitAt: where === 'split' && target === 'split' ? mode.splitAt : undefined })
   }
 
   const placeholder = site

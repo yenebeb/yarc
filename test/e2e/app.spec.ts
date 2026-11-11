@@ -448,17 +448,42 @@ test('dragging a sidebar tab onto the page or onto another tab makes a split, an
   await expect.poll(dropLayerShown).toBe(false)
   expect(await splitTitles()).toEqual(['row(drag-a, drag-b)'])
 
-  // Onto the middle-right of a sidebar row: the tab joins as the pane right of that tab.
+  // The split is one sidebar row, a half per tab. Onto the middle of drag-a's half, right of its
+  // center: the tab joins as the pane right of drag-a.
   await dragRow(ui, 'Page drag-c', 'dragstart')
   await expect(async () => {
-    await dragRow(ui, 'Page drag-a', 'dragover', 0.75, 0.5)
+    await dragRow(ui, 'Page drag-a', 'dragover', 0.4, 0.5)
     await expect(ui.locator('.split-preview')).toBeVisible({ timeout: 200 })
   }).toPass()
-  await dragRow(ui, 'Page drag-a', 'drop', 0.75, 0.5)
+  await dragRow(ui, 'Page drag-a', 'drop', 0.4, 0.5)
   await dragRow(ui, 'Page drag-c', 'dragend')
   await expect.poll(splitTitles).toEqual(['row(drag-a, drag-c, drag-b)'])
   await expect.poll(dropLayerShown).toBe(false)
   await dispatch({ type: 'unsplit' })
+})
+
+test('a split is one sidebar row, and each pane has its own bar that closes just that tab', async () => {
+  for (const n of ['bar-a', 'bar-b']) await dispatch({ type: 'open', url: `${base}/${n}`, where: 'tab' })
+  const sp = await space()
+  const [a, b] = ['bar-a', 'bar-b'].map((n) => sp.today.find((t) => t.url.endsWith(`/${n}`))!)
+  await dispatch({ type: 'activate', id: a.id })
+  await dispatch({ type: 'placeInSplit', id: b.id, target: a.id, side: 'right' })
+  const ui = await pageWithUrl('index.html')
+  await expect(ui.locator('.split-row .half .title')).toHaveText(['Page bar-a', 'Page bar-b'])
+  await expect(ui.locator('.row:not(.split-row) .title', { hasText: /^Page bar-/ })).toHaveCount(0)
+
+  // Each page sits under its pane's bar.
+  const views = (await state()).layout.views
+  expect(views.map((v) => v.rect.y - v.bar!.y)).toEqual([32, 32])
+  await expect(ui.locator('.pane-bar')).toHaveCount(2)
+
+  // The left half of the row focuses bar-a; the right pane's close button closes bar-b only.
+  await ui.locator('.split-row .half').first().click()
+  await expect.poll(async () => (await space()).activeItemId).toBe(a.id)
+  await ui.locator('.pane-bar').nth(1).locator('button[title="Close tab"]').click()
+  await expect.poll(async () => (await space()).today.some((t) => t.id === b.id)).toBe(false)
+  expect((await space()).splits).toEqual([])
+  await expect(ui.locator('.pane-bar')).toHaveCount(0)
 })
 
 test('closing a Today tab archives it and it can be reopened', async () => {

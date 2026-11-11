@@ -23,7 +23,7 @@ import { join } from 'node:path'
 import type { Action, DropTarget } from '../shared/actions'
 import { IPC, type LittleAnchor, type LittleOp } from '../shared/ipc'
 import { commandForInput, type CommandId } from '../shared/keymap'
-import { containsNode, findFolder, findInPinned, findItem, profileOfItem, spaceItems } from '../shared/tree'
+import { containsNode, findFolder, findInPinned, findItem, profileOfItem, spaceItems, walkPinned } from '../shared/tree'
 import type {
   AppState,
   DownloadItemInfo,
@@ -35,10 +35,11 @@ import type {
   Rect,
   Space,
   Split,
+  SplitAt,
   TabItem,
   WindowView
 } from '../shared/types'
-import { appendPane, groupAt, layoutPanes, newSplitRoot, paneIds, placePane, removePane, type Side } from '../shared/split'
+import { appendPane, flipSplit, gather, groupAt, layoutPanes, movePane, newSplitRoot, PANE_BAR, paneIds, placePane, removePane, type Side } from '../shared/split'
 import { isFloating, stepAfter, type TourEvent, type TourStep } from '../shared/tour'
 import { resolveInput } from '../shared/url'
 import { AdBlock, hostOf } from './adblock'
@@ -48,7 +49,7 @@ import { Extensions } from './extensions'
 import { runImport } from './importers'
 import { LittleWindow } from './little'
 import { Peek, sameSite } from './peek'
-import { buildContextMenu, buildFolderMenu, buildItemMenu, buildSpaceMenu } from './menus'
+import { buildContextMenu, buildFolderMenu, buildItemMenu, buildSpaceMenu, buildSplitMenu } from './menus'
 import { Profiles, type ProfileRuntime } from './profiles'
 import { PROMPT_WIDTH, PromptView, type PromptAnchor } from './prompt-view'
 import { search, suggest } from './search'
@@ -644,8 +645,18 @@ export class Browser implements TabHost {
           if (!item) continue
           const tab = this.liveFor(item)
           tab.view.setBorderRadius(8)
-          slots.push({ view: tab.view, rect: pane.rect })
-          views.push(pane)
+          if (split) {
+            // Each pane of a split has its own bar on top, drawn by the UI under the page (Arc).
+            const r = pane.rect
+            const bar = { x: r.x, y: r.y, width: r.width, height: PANE_BAR }
+            const rect = { x: r.x, y: r.y + PANE_BAR, width: r.width, height: Math.max(0, r.height - PANE_BAR) }
+            slots.push({ view: tab.view, rect })
+            views.push({ id: pane.id, rect, bar })
+            tab.sampleBarColor()
+          } else {
+            slots.push({ view: tab.view, rect: pane.rect })
+            views.push(pane)
+          }
         }
         this.show(slots)
       }
@@ -916,7 +927,7 @@ export class Browser implements TabHost {
     return item
   }
 
-  open(input: string, where: 'tab' | 'current' | 'split' | 'background' | 'little' = 'tab'): void {
+  open(input: string, where: 'tab' | 'current' | 'split' | 'background' | 'little' = 'tab', splitAt?: SplitAt): void {
     const url = resolveInput(input, this.state.settings.searchEngine)
     if (where === 'little') return void this.openLittle(url)
     if (where === 'current') {
@@ -926,7 +937,7 @@ export class Browser implements TabHost {
     }
     if (where === 'split') {
       const item = this.newTab(url, { activate: false })
-      return this.splitWith(item.id)
+      return this.splitWith(item.id, splitAt)
     }
     this.newTab(url, { activate: where === 'tab' })
   }
@@ -1064,21 +1075,17 @@ export class Browser implements TabHost {
   move(id: ID, to: DropTarget): void {
     const space = this.space
     const profile = this.store.profile(space.profileId)!
-    const beforeProfile = profileOfItem(this.state, id)
     let node: PinnedNode | TabItem | undefined
-    let fromList: unknown[] | undefined
-    let fromIndex = -1
+    let fromList: (PinnedNode | TabItem)[] | undefined
     const pinnedHit = findInPinned(space.pinned, id)
     if (pinnedHit) {
       node = pinnedHit.list[pinnedHit.index]
       fromList = pinnedHit.list
-      fromIndex = pinnedHit.index
     } else {
       const found = findItem(this.state, id)
       if (!found) return
       node = found.item
       fromList = found.loc.list
-      fromIndex = found.loc.index
     }
     const isFolder = 'kind' in node && node.kind === 'folder'
     let target: unknown[]
@@ -1090,20 +1097,28 @@ export class Browser implements TabHost {
       target = folder ? folder.children : space.pinned
     }
     if (isFolder && to.section !== 'pinned') return
-    fromList.splice(fromIndex, 1)
+    // A split is one row in the sidebar, so its tabs in this list move together (not into Favorites).
+    const split = isFolder || to.section === 'favorites' ? undefined : this.splitOf(space, id)
+    const ids = split ? paneIds(split.root) : [id]
+    const group = fromList.filter((n) => ids.includes(n.id))
+    const profileBefore = new Map(group.map((n) => [n.id, profileOfItem(this.state, n.id)]))
     let index = to.index
-    if (fromList === target && fromIndex < index) index--
-    let moved: unknown = node
-    if (!isFolder) {
-      const item = stripKind(node as TabItem)
+    if (fromList === target) index -= group.filter((n) => fromList.indexOf(n) < to.index).length
+    for (const n of group) fromList.splice(fromList.indexOf(n), 1)
+    const moved = group.map((n) => {
+      if (isFolder) return n
+      const item = stripKind(n as TabItem)
       if (to.section === 'today') delete item.savedUrl
       else item.savedUrl ??= item.url
-      moved = to.section === 'pinned' ? ({ ...item, kind: 'tab' } satisfies PinnedTab) : item
-    }
-    target.splice(Math.max(0, Math.min(index, target.length)), 0, moved)
-    if (!isFolder && profileOfItem(this.state, id) !== beforeProfile) {
-      this.dropLive(id)
-      if (space.activeItemId === id) this.activate(id)
+      return to.section === 'pinned' ? ({ ...item, kind: 'tab' } satisfies PinnedTab) : item
+    })
+    target.splice(Math.max(0, Math.min(index, target.length)), 0, ...moved)
+    if (!isFolder) {
+      for (const n of group) {
+        if (profileOfItem(this.state, n.id) === profileBefore.get(n.id)) continue
+        this.dropLive(n.id)
+        if (space.activeItemId === n.id) this.activate(n.id)
+      }
     }
     this.layout()
     this.changed()
@@ -1130,12 +1145,13 @@ export class Browser implements TabHost {
     }
   }
 
-  splitWith(id: ID): void {
+  splitWith(id: ID, at?: SplitAt): void {
     const space = this.space
     const active = space.activeItemId
     const found = findItem(this.state, id)
     if (!found) return
     if (found.loc.kind !== 'favorite' && found.loc.spaceId !== space.id) this.moveToSpace(id, space.id)
+    if (at && findItem(this.state, at.target) && at.target !== id) return this.placeInSplit(id, at.target, at.side)
     if (!active || active === id || !findItem(this.state, active)) return this.activate(id)
     this.removeFromSplits(space, id)
     const split = this.splitOf(space, active)
@@ -1145,6 +1161,7 @@ export class Browser implements TabHost {
       const root = appendPane(split.root, id)
       if (root) split.root = root
     }
+    this.gatherSplit(space, id)
     this.activate(id)
     this.tourEvent('split')
   }
@@ -1169,6 +1186,7 @@ export class Browser implements TabHost {
     })
     if (split) split.root = root
     else space.splits.push({ id: newId(), root })
+    this.gatherSplit(space, id)
     this.activate(id)
     this.tourEvent('split')
   }
@@ -1185,6 +1203,46 @@ export class Browser implements TabHost {
     setImmediate(() => {
       if (w.switcher && !overlay.isDestroyed()) overlay.sendInputEvent({ type: 'keyDown', keyCode: 'Control', modifiers: ['control'] })
     })
+  }
+
+  /**
+   * Puts the tabs of the split holding `id` next to each other in each sidebar list, where the
+   * first of them is: the sidebar shows them as one row, like Arc.
+   */
+  private gatherSplit(space: Space, id: ID): void {
+    const split = this.splitOf(space, id)
+    if (!split) return
+    const ids = paneIds(split.root)
+    space.today = gather(space.today, ids)
+    space.pinned = gather(space.pinned, ids)
+    for (const node of walkPinned(space.pinned)) if (node.kind === 'folder') node.children = gather(node.children, ids)
+  }
+
+  /** Move Left/Right (or Up/Down) on a pane's split menu. */
+  moveInSplit(id: ID, delta: -1 | 1): void {
+    const split = this.splitOf(this.space, id)
+    const root = split && movePane(split.root, id, delta)
+    if (!split || !root) return
+    split.root = root
+    this.layout()
+    this.changed()
+  }
+
+  /** Convert to Vertical / Horizontal Split View on a pane's split menu. */
+  flipSplit(id: ID): void {
+    const split = this.splitOf(this.space, id)
+    if (!split) return
+    split.root = flipSplit(split.root)
+    this.layout()
+    this.changed()
+  }
+
+  /** Separate Tab from Split: the tab shows on its own; the others stay a split (if two or more are left). */
+  separateFromSplit(id: ID): void {
+    const space = this.space
+    if (!this.splitOf(space, id)) return
+    this.removeFromSplits(space, id)
+    this.activate(id)
   }
 
   /** A sidebar tab drag starts (`id`) or ends: the page area shows split drop zones meanwhile. */
@@ -1430,7 +1488,8 @@ export class Browser implements TabHost {
   // ---------------------------------------------------------------- actions
 
   async dispatch(a: Action): Promise<void> {
-    const tab = this.activeTab()
+    // A split pane's bar acts on its own tab; everything else on the active one.
+    const tab = 'id' in a && a.id && (a.type === 'back' || a.type === 'forward' || a.type === 'reload' || a.type === 'stop' || a.type === 'copyUrl') ? this.live.get(a.id) : this.activeTab()
     const space = this.space
     switch (a.type) {
       case 'activate':
@@ -1439,7 +1498,7 @@ export class Browser implements TabHost {
         return this.close(a.id)
       case 'open':
         this.setOverlay({ kind: 'none' }, false)
-        return this.open(a.url, a.where)
+        return this.open(a.url, a.where, a.splitAt)
       case 'reopenClosed':
         return this.reopenClosed()
       case 'togglePin':
@@ -1485,9 +1544,9 @@ export class Browser implements TabHost {
         return this.emitSoon()
       }
       case 'back':
-        return this.runCommand('back')
+        return void (tab?.wc.navigationHistory.canGoBack() && tab.wc.navigationHistory.goBack())
       case 'forward':
-        return this.runCommand('forward')
+        return void (tab?.wc.navigationHistory.canGoForward() && tab.wc.navigationHistory.goForward())
       case 'reload':
         if (!tab) return
         return a.hard ? tab.wc.reloadIgnoringCache() : tab.wc.reload()
@@ -1569,7 +1628,18 @@ export class Browser implements TabHost {
         return this.changed()
       }
       case 'splitWith':
-        return this.splitWith(a.id)
+        return this.splitWith(a.id, a.at)
+      case 'splitMenu':
+        return buildSplitMenu(this, a.id)?.popup({ window: this.window.win, x: Math.round(a.x), y: Math.round(a.y) })
+      case 'moveInSplit':
+        return this.moveInSplit(a.id, a.delta)
+      case 'addSplit':
+        if (!this.splitOf(space, a.id)) return
+        return this.setOverlay({ kind: 'command', target: 'split', splitAt: { target: a.id, side: a.side } })
+      case 'separateFromSplit':
+        return this.separateFromSplit(a.id)
+      case 'flipSplit':
+        return this.flipSplit(a.id)
       case 'unsplit':
         return this.unsplit(a.id)
       case 'placeInSplit':

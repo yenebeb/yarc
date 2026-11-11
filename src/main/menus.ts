@@ -1,7 +1,7 @@
 // Native menus: the page context menu and the macOS application menu.
 import { app, clipboard, dialog, Menu, type ContextMenuParams, type MenuItemConstructorOptions } from 'electron'
 import { IPC, type EditRequest } from '../shared/ipc'
-import { paneIds } from '../shared/split'
+import { paneIds, splitMenuModel } from '../shared/split'
 import { findFolder, findItem, isAwayFromSaved } from '../shared/tree'
 import { SEARCH_ENGINES, searchUrl } from '../shared/url'
 import type { CommandId } from '../shared/keymap'
@@ -233,6 +233,27 @@ export function buildItemMenu(browser: Browser, id: string): Menu | undefined {
   if (loc.kind !== 'today' && live) items.push({ label: 'Unload Tab', click: d({ type: 'unload', id }) })
   items.push({ label: loc.kind === 'today' ? 'Close Tab' : 'Close (keep in sidebar)', click: d({ type: 'close', id }) })
   return Menu.buildFromTemplate(items)
+}
+
+/** The menu of a split pane's split view button, in Arc's order and wording. */
+export function buildSplitMenu(browser: Browser, id: string): Menu | undefined {
+  const split = browser.store.activeSpace.splits.find((sp) => paneIds(sp.root).includes(id))
+  if (!split) return undefined
+  const m = splitMenuModel(split.root, id)
+  const d = (a: Parameters<Browser['dispatch']>[0]) => () => void browser.dispatch(a)
+  return Menu.buildFromTemplate([
+    { label: m.moveBack.label, enabled: m.moveBack.enabled, click: d({ type: 'moveInSplit', id, delta: -1 }) },
+    { label: m.moveForward.label, enabled: m.moveForward.enabled, click: d({ type: 'moveInSplit', id, delta: 1 }) },
+    { type: 'separator' },
+    { label: m.addAfter.label, enabled: m.canAdd, click: d({ type: 'addSplit', id, side: m.addAfter.side }) },
+    { label: m.addBefore.label, enabled: m.canAdd, click: d({ type: 'addSplit', id, side: m.addBefore.side }) },
+    { type: 'separator' },
+    { label: 'Separate Tab from Split', click: d({ type: 'separateFromSplit', id }) },
+    { label: m.convert, click: d({ type: 'flipSplit', id }) },
+    { type: 'separator' },
+    // Arc shares a split as a link on its servers; YARC has nothing to share it to.
+    { label: 'Share Split View…', enabled: false }
+  ])
 }
 
 export function buildFolderMenu(browser: Browser, id: string): Menu | undefined {

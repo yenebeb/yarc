@@ -239,6 +239,90 @@ export function previewRect(rect: Rect, side: Side, gap = SPLIT_GAP): Rect {
   }
 }
 
+/** Height of the bar on top of each pane of a split (back, forward, the host, close), as in Arc. */
+export const PANE_BAR = 32
+
+/** The group holding pane `id`, its index there and the path to the group (child indexes from the root). */
+export function parentOf(root: SplitGroup, id: ID): { group: SplitGroup; index: number; path: number[] } | undefined {
+  const visit = (group: SplitGroup, path: number[]): ReturnType<typeof parentOf> => {
+    for (const [i, c] of group.children.entries()) {
+      if (isPane(c)) {
+        if (c.itemId === id) return { group, index: i, path }
+      } else {
+        const hit = visit(c, [...path, i])
+        if (hit) return hit
+      }
+    }
+    return undefined
+  }
+  return visit(root, [])
+}
+
+/** The split with the group at `path` replaced by `change(group)`. */
+function updateGroup(root: SplitGroup, path: number[], change: (g: SplitGroup) => SplitGroup): SplitGroup {
+  if (path.length === 0) return change(root)
+  const [i, ...rest] = path
+  const children = root.children.map((c, j) => (j === i && !isPane(c) ? updateGroup(c, rest, change) : c))
+  return { ...root, children }
+}
+
+/**
+ * Pane `id` swapped with its neighbour in its group, keeping its size: -1 is left (or up in a
+ * stacked group), +1 right (or down). Undefined when it's already at that edge.
+ */
+export function movePane(root: SplitGroup, id: ID, delta: -1 | 1): SplitGroup | undefined {
+  const at = parentOf(root, id)
+  if (!at) return undefined
+  const j = at.index + delta
+  if (j < 0 || j >= at.group.children.length) return undefined
+  return updateGroup(root, at.path, (g) => {
+    const children = [...g.children]
+    const sizes = [...g.sizes]
+    ;[children[at.index], children[j]] = [children[j], children[at.index]]
+    ;[sizes[at.index], sizes[j]] = [sizes[j], sizes[at.index]]
+    return { ...g, children, sizes }
+  })
+}
+
+/** The split turned the other way: side-by-side panes stacked, stacked ones side by side. */
+export function flipSplit(root: SplitGroup): SplitGroup {
+  return {
+    dir: root.dir === 'row' ? 'column' : 'row',
+    children: root.children.map((c) => (isPane(c) ? c : flipSplit(c))),
+    sizes: [...root.sizes]
+  }
+}
+
+/** What the split menu of pane `id` offers, worded for the way its group runs (Arc's menu). */
+export function splitMenuModel(root: SplitGroup, id: ID) {
+  const at = parentOf(root, id)
+  const row = (at?.group.dir ?? root.dir) === 'row'
+  const count = at?.group.children.length ?? 0
+  return {
+    moveBack: { label: row ? 'Move Left' : 'Move Up', enabled: !!at && at.index > 0 },
+    moveForward: { label: row ? 'Move Right' : 'Move Down', enabled: !!at && at.index < count - 1 },
+    addAfter: { label: row ? 'Add Right Split' : 'Add Bottom Split', side: (row ? 'right' : 'bottom') as Side },
+    addBefore: { label: row ? 'Add Left Split' : 'Add Top Split', side: (row ? 'left' : 'top') as Side },
+    canAdd: paneIds(root).length < MAX_PANES,
+    convert: root.dir === 'row' ? 'Convert to Vertical Split View' : 'Convert to Horizontal Split View'
+  }
+}
+
+/**
+ * `list` with the entries whose ids are in `ids` brought together where the first of them is,
+ * in list order, so a split's tabs sit side by side in the sidebar as one row.
+ */
+export function gather<T extends { id: ID }>(list: T[], ids: ID[]): T[] {
+  const members = list.filter((x) => ids.includes(x.id))
+  if (members.length < 2) return list
+  const out: T[] = []
+  for (const x of list) {
+    if (!ids.includes(x.id)) out.push(x)
+    else if (x === members[0]) out.push(...members)
+  }
+  return out
+}
+
 /** Reads a split saved by an older version (`itemIds` side by side) or returns it as is. */
 export function upgradeSplit(raw: { id: ID; root?: SplitGroup; itemIds?: ID[]; sizes?: number[] }): { id: ID; root: SplitGroup } | undefined {
   if (raw.root) return { id: raw.id, root: raw.root }

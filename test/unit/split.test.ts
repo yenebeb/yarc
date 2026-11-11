@@ -4,13 +4,17 @@ import {
   appendPane,
   dividers,
   dragBorder,
+  flipSplit,
+  gather,
   layoutPanes,
+  movePane,
   newSplitRoot,
   paneIds,
   placePane,
   previewRect,
   removePane,
   sideAt,
+  splitMenuModel,
   upgradeSplit
 } from '../../src/shared/split.ts'
 import type { SplitGroup, SplitNode } from '../../src/shared/types.ts'
@@ -193,4 +197,94 @@ test('a split saved by an older version becomes a row', () => {
   assert.equal(shape(split.root), 'row(A, B)')
   assert.deepEqual(sizes(split.root), [70, 30])
   assert.equal(upgradeSplit({ id: 's', itemIds: ['A'] }), undefined)
+})
+
+// --------------------------------------------------------------- the split menu on a pane's bar
+
+const abc = () => placePane(newSplitRoot('A', 'B', 'right'), 'B', 'C', 'right')!
+
+test('Move Right swaps a pane with its right neighbour, and it keeps its width', () => {
+  const wideA = { ...newSplitRoot('A', 'B', 'right'), sizes: [0.7, 0.3] }
+  const moved = movePane(wideA, 'A', 1)
+  assert.equal(shape(moved), 'row(B, A)')
+  assert.deepEqual(sizes(moved), [30, 70])
+})
+
+test('Move Left and Move Right stop at the edges', () => {
+  assert.equal(movePane(abc(), 'A', -1), undefined)
+  assert.equal(movePane(abc(), 'C', 1), undefined)
+  assert.equal(shape(movePane(abc(), 'C', -1)), 'row(A, C, B)')
+})
+
+test('a stacked pane moves up and down within its stack', () => {
+  const mixed = placePane(newSplitRoot('A', 'B', 'right'), 'B', 'C', 'bottom')!
+  assert.equal(shape(movePane(mixed, 'C', -1)), 'row(A, column(C, B))')
+})
+
+test('the menu offers Move Left (not at the left edge) and Move Right (not at the right edge)', () => {
+  const left = splitMenuModel(abc(), 'A')
+  assert.deepEqual([left.moveBack, left.moveForward], [
+    { label: 'Move Left', enabled: false },
+    { label: 'Move Right', enabled: true }
+  ])
+  const right = splitMenuModel(abc(), 'C')
+  assert.deepEqual([right.moveBack.enabled, right.moveForward.enabled], [true, false])
+})
+
+test('in a stacked split the menu moves and adds up and down', () => {
+  const m = splitMenuModel(newSplitRoot('A', 'B', 'bottom'), 'A')
+  assert.deepEqual([m.moveBack.label, m.moveForward.label, m.addAfter.label, m.addBefore.label], ['Move Up', 'Move Down', 'Add Bottom Split', 'Add Top Split'])
+  assert.equal(m.convert, 'Convert to Horizontal Split View')
+})
+
+test('Add Right Split puts the new tab right of the pane, taking half of it', () => {
+  const m = splitMenuModel(newSplitRoot('A', 'B', 'right'), 'A')
+  const added = placePane(newSplitRoot('A', 'B', 'right'), 'A', 'N', m.addAfter.side)
+  assert.equal(shape(added), 'row(A, N, B)')
+  assert.deepEqual(sizes(added), [25, 25, 50])
+})
+
+test('Add Left Split puts the new tab left of the pane', () => {
+  const m = splitMenuModel(newSplitRoot('A', 'B', 'right'), 'B')
+  assert.equal(shape(placePane(newSplitRoot('A', 'B', 'right'), 'B', 'N', m.addBefore.side)), 'row(A, N, B)')
+})
+
+test('a split of four tabs offers no Add', () => {
+  const four = placePane(abc(), 'C', 'D', 'right')!
+  assert.equal(splitMenuModel(four, 'A').canAdd, false)
+  assert.equal(splitMenuModel(abc(), 'A').canAdd, true)
+})
+
+test('Separate Tab from Split leaves the others as a split, or ends a split of two', () => {
+  assert.equal(shape(removePane(abc(), 'B')), 'row(A, C)')
+  assert.equal(removePane(newSplitRoot('A', 'B', 'right'), 'B'), undefined)
+})
+
+test('Convert to Vertical Split View stacks side-by-side panes, keeping their sizes', () => {
+  const wideA = { ...newSplitRoot('A', 'B', 'right'), sizes: [0.7, 0.3] }
+  const flipped = flipSplit(wideA)
+  assert.equal(shape(flipped), 'column(A, B)')
+  assert.deepEqual(sizes(flipped), [70, 30])
+  assert.equal(splitMenuModel(wideA, 'A').convert, 'Convert to Vertical Split View')
+})
+
+test('converting a mixed split turns every group', () => {
+  const mixed = placePane(newSplitRoot('A', 'B', 'right'), 'B', 'C', 'bottom')!
+  assert.equal(shape(flipSplit(mixed)), 'column(A, row(B, C))')
+  assert.equal(shape(flipSplit(flipSplit(mixed))), shape(mixed))
+})
+
+// --------------------------------------------------------------- the split's row in the sidebar
+
+const tabs = (...ids: string[]) => ids.map((id) => ({ id }))
+const order = (list: { id: string }[]) => list.map((x) => x.id).join('')
+
+test("a split's tabs are brought together where the first of them is", () => {
+  assert.equal(order(gather(tabs('A', 'X', 'B', 'Y'), ['B', 'A'])), 'ABXY')
+  assert.equal(order(gather(tabs('X', 'A', 'Y', 'Z', 'B'), ['A', 'B'])), 'XABYZ')
+})
+
+test('a list with fewer than two of the split\'s tabs stays as it is', () => {
+  const list = tabs('A', 'X', 'Y')
+  assert.equal(gather(list, ['A', 'B']), list)
 })

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type DragEvent, type MouseEvent, type ReactNode } from 'react'
 import type { DropTarget } from '../../shared/actions'
 import type { EditRequest } from '../../shared/ipc'
-import { paneIds } from '../../shared/split'
+import { MAX_PANES, paneIds } from '../../shared/split'
 import { isAwayFromSaved } from '../../shared/tree'
 import { SIDEBAR_WIDTH, type AppState, type ID, type PinnedNode, type Space, type TabItem, type UpdateStatus } from '../../shared/types'
 import { activeSpace, arc, dispatch, displayHost, isMac } from './api'
@@ -12,7 +12,8 @@ const DRAG_TYPE = 'application/x-arc-item'
 /** Where a dragged item would land: between rows, into a folder, or beside a tab as a split view. */
 type RowDrop = 'before' | 'after' | 'into' | 'split-left' | 'split-right'
 
-type DropHint = { id: string; pos: RowDrop } | { section: 'favorites' | 'pinned' | 'today' | `space:${string}` }
+/** `target`: over a split row, the tab whose half the dragged tab would go beside. */
+type DropHint = { id: string; pos: RowDrop; target?: ID } | { section: 'favorites' | 'pinned' | 'today' | `space:${string}` }
 
 interface Ctx {
   state: AppState
@@ -192,9 +193,7 @@ export function Sidebar({ state, floating }: { state: AppState; floating?: boole
           onDragOver={(e) => e.preventDefault()}
           onDrop={(e) => onDrop(e, { section: 'today', index: space.today.length })}
         >
-          {space.today.map((t, i) => (
-            <TabRow key={t.id} item={t} ctx={ctx} section="today" index={i} onDrop={onDrop} />
-          ))}
+          <SidebarList list={space.today} ctx={ctx} section="today" onDrop={onDrop} />
         </div>
       </div>
 
@@ -329,15 +328,52 @@ function FavoriteTile({ item, index, ctx, onDrop }: { item: TabItem; index: numb
 }
 
 function PinnedList({ nodes, ctx, onDrop, folderId }: { nodes: PinnedNode[]; ctx: Ctx; onDrop: (e: DragEvent, to: DropTarget) => void; folderId?: ID }) {
+  return <SidebarList list={nodes} ctx={ctx} section="pinned" folderId={folderId} onDrop={onDrop} />
+}
+
+/**
+ * The tabs of each split in a sidebar list, shown as one row where the first of them is (Arc):
+ * `rows` maps that first tab to the split's tabs in this list, left to right; `hidden` are the rest.
+ */
+function splitRows(space: Space, list: { id: ID }[]): { rows: Map<ID, ID[]>; hidden: Set<ID> } {
+  const rows = new Map<ID, ID[]>()
+  const hidden = new Set<ID>()
+  const inList = new Set(list.map((x) => x.id))
+  for (const sp of space.splits) {
+    const ids = paneIds(sp.root).filter((id) => inList.has(id))
+    if (ids.length < 2) continue
+    const first = list.find((x) => ids.includes(x.id))!.id
+    rows.set(first, ids)
+    for (const id of ids) if (id !== first) hidden.add(id)
+  }
+  return { rows, hidden }
+}
+
+/** A list of Today tabs, or of pinned tabs and folders, with each split as one row. */
+function SidebarList({
+  list,
+  ctx,
+  section,
+  folderId,
+  onDrop
+}: {
+  list: (PinnedNode | TabItem)[]
+  ctx: Ctx
+  section: 'pinned' | 'today'
+  folderId?: ID
+  onDrop: (e: DragEvent, to: DropTarget) => void
+}) {
+  const { rows, hidden } = splitRows(ctx.space, list)
   return (
     <>
-      {nodes.map((n, i) =>
-        n.kind === 'folder' ? (
-          <FolderRow key={n.id} node={n} ctx={ctx} index={i} parentId={folderId} onDrop={onDrop} />
-        ) : (
-          <TabRow key={n.id} item={n} ctx={ctx} section="pinned" folderId={folderId} index={i} onDrop={onDrop} />
-        )
-      )}
+      {list.map((n, i) => {
+        if ('kind' in n && n.kind === 'folder') return <FolderRow key={n.id} node={n} ctx={ctx} index={i} parentId={folderId} onDrop={onDrop} />
+        if (hidden.has(n.id)) return null
+        const ids = rows.get(n.id)
+        if (!ids) return <TabRow key={n.id} item={n} ctx={ctx} section={section} folderId={folderId} index={i} onDrop={onDrop} />
+        const last = Math.max(...ids.map((id) => list.findIndex((x) => x.id === id)))
+        return <SplitRow key={`split-${n.id}`} ids={ids} ctx={ctx} section={section} folderId={folderId} index={i} after={last + 1} onDrop={onDrop} />
+      })}
     </>
   )
 }
@@ -366,20 +402,111 @@ function useRowDrop(ctx: Ctx, id: ID, middle: 'into' | 'split' | undefined) {
   return { pos, onDragOver, cls }
 }
 
-/** Over a tab row: the row as the split it would become, the dragged tab on its side (like Arc's split rows). */
-function SplitPreview({ state, target, dragged, side }: { state: AppState; target: TabItem; dragged: TabItem; side: 'left' | 'right' }) {
-  const half = (item: TabItem, incoming: boolean) => (
-    <span className={`half${incoming ? ' incoming' : ''}`}>
-      <Favicon url={item.url} favicon={state.live[item.id]?.favicon ?? item.favicon} />
-      <span className="title">{itemTitle(state, item)}</span>
-    </span>
-  )
+/** Over a tab or split row: the row as the split it would become, the dragged tab beside `target` (like Arc's split rows). */
+function SplitPreview({ state, items, target, dragged, side }: { state: AppState; items: TabItem[]; target: ID; dragged: TabItem; side: 'left' | 'right' }) {
+  const shown = items.filter((x) => x.id !== dragged.id)
+  const at = shown.findIndex((x) => x.id === target) + (side === 'right' ? 1 : 0)
+  shown.splice(at, 0, dragged)
   return (
     <span className="split-preview">
-      {side === 'left' ? half(dragged, true) : half(target, false)}
-      <span className="split-divider" />
-      {side === 'left' ? half(target, false) : half(dragged, true)}
+      {shown.map((item, i) => (
+        <span key={item.id} className="half-wrap">
+          {i > 0 ? <span className="split-divider" /> : null}
+          <span className={`half${item === dragged ? ' incoming' : ''}`}>
+            <Favicon url={item.url} favicon={state.live[item.id]?.favicon ?? item.favicon} />
+            <span className="title">{itemTitle(state, item)}</span>
+          </span>
+        </span>
+      ))}
     </span>
+  )
+}
+
+/**
+ * A split view as one sidebar row, like Arc: a half per tab, favicon and title, the focused one
+ * brighter. Clicking a half shows the split with that pane focused; dragging one moves the split
+ * (in the sidebar) or that tab (onto the page). Dropping a tab on a half's middle adds it beside it.
+ */
+function SplitRow({
+  ids,
+  ctx,
+  section,
+  folderId,
+  index,
+  after,
+  onDrop
+}: {
+  ids: ID[]
+  ctx: Ctx
+  section: 'pinned' | 'today'
+  folderId?: ID
+  index: number
+  after: number
+  onDrop: (e: DragEvent, to: DropTarget) => void
+}) {
+  const { state, space, hint, setHint, dragTab } = ctx
+  const items = ids.map((id) => findTab(state, space, id)).filter((x): x is TabItem => !!x)
+  const key = ids[0]
+  const h = hint && 'id' in hint && hint.id === key ? hint : undefined
+  const active = ids.includes(space.activeItemId ?? '')
+  const canSplit = !!dragTab && (ids.includes(dragTab.id) || ids.length < MAX_PANES)
+  const splitting = (h?.pos === 'split-left' || h?.pos === 'split-right') && h.target && dragTab
+  const cls = h?.pos === 'before' ? ' drop-before' : h?.pos === 'after' ? ' drop-after' : splitting ? ' drop-split' : ''
+
+  return (
+    <div
+      className={`row split-row${active ? ' active' : ''}${cls}`}
+      onDragOver={(e) => {
+        e.preventDefault()
+        e.stopPropagation()
+        const r = e.currentTarget.getBoundingClientRect()
+        const y = e.clientY - r.top
+        let next: DropHint = { id: key, pos: y < r.height / 2 ? 'before' : 'after' }
+        if (canSplit && y > r.height * 0.25 && y < r.height * 0.75) {
+          // The half under the cursor, and which side of its middle.
+          const w = r.width / items.length
+          const i = Math.min(items.length - 1, Math.max(0, Math.floor((e.clientX - r.left) / w)))
+          const left = e.clientX < r.left + w * i + w / 2
+          if (items[i].id !== dragTab?.id) next = { id: key, pos: left ? 'split-left' : 'split-right', target: items[i].id }
+        }
+        if (!h || h.pos !== next.pos || h.target !== ('target' in next ? next.target : undefined)) setHint(next)
+      }}
+      onDrop={(e) => {
+        if (splitting && h?.target && dragTab) {
+          e.preventDefault()
+          e.stopPropagation()
+          setHint(undefined)
+          dispatch({ type: 'placeInSplit', id: dragTab.id, target: h.target, side: h.pos === 'split-left' ? 'left' : 'right' })
+          return
+        }
+        const at = h?.pos === 'after' ? after : index
+        onDrop(e, section === 'pinned' ? { section, folderId, index: at } : { section, index: at })
+      }}
+    >
+      {items.map((item, i) => {
+        const live = state.live[item.id]
+        return (
+          <span key={item.id} className="half-wrap">
+            {i > 0 ? <span className="split-divider" /> : null}
+            <span
+              className={`half${space.activeItemId === item.id ? ' focused' : ''}${live ? '' : ' unloaded'}`}
+              draggable
+              title={live?.url ?? item.url}
+              onDragStart={(e) => startDrag(e, item.id)}
+              onClick={() => dispatch({ type: 'activate', id: item.id })}
+              onAuxClick={(e) => e.button === 1 && dispatch({ type: 'close', id: item.id })}
+              onContextMenu={() => dispatch({ type: 'itemMenu', id: item.id })}
+            >
+              <Favicon url={item.url} favicon={live?.favicon ?? item.favicon} />
+              <span className="title">{itemTitle(state, item)}</span>
+            </span>
+          </span>
+        )
+      })}
+      {splitting && h?.target && dragTab ? (
+        <SplitPreview state={state} items={items} target={h.target} dragged={dragTab} side={h.pos === 'split-left' ? 'left' : 'right'} />
+      ) : null}
+    </div>
   )
 }
 
@@ -570,7 +697,7 @@ function TabRow({
       )}
       {status}
       {(pos === 'split-left' || pos === 'split-right') && ctx.dragTab ? (
-        <SplitPreview state={state} target={item} dragged={ctx.dragTab} side={pos === 'split-left' ? 'left' : 'right'} />
+        <SplitPreview state={state} items={[item]} target={item.id} dragged={ctx.dragTab} side={pos === 'split-left' ? 'left' : 'right'} />
       ) : null}
       <button
         className="icon-btn close"

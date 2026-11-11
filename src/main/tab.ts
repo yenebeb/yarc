@@ -92,11 +92,40 @@ export class LiveTab {
       canGoForward: wc.navigationHistory.canGoForward(),
       zoom: wc.getZoomLevel(),
       blocked: 0,
-      shielded: false
+      shielded: false,
+      barColor: this.barColor
     }
   }
 
   favicon?: string
+  /** The color along the top of the page, for its bar in a split view (Arc tints the bar like the page). */
+  barColor?: string
+  /** The page `barColor` was read from; set once the tab has been in a split, so later loads read it again. */
+  private sampledFor?: string
+
+  /** Reads the color along the top of the page (a strip 2 px tall), once per page unless `again`. */
+  sampleBarColor(again = false): void {
+    const wc = this.wc
+    if (wc.isDestroyed()) return
+    const url = wc.getURL()
+    if (!again && this.sampledFor === url) return
+    this.sampledFor = url
+    // A page just put on screen paints a moment later.
+    setTimeout(() => {
+      const { width } = this.view.getBounds()
+      if (wc.isDestroyed() || width <= 0) return
+      void wc
+        .capturePage({ x: 0, y: 0, width, height: 2 })
+        .then((image) => {
+          if (image.isEmpty() || wc.isDestroyed()) return
+          const color = commonColor(image.toBitmap())
+          if (!color || color === this.barColor) return
+          this.barColor = color
+          this.host.onTabChanged(this, {})
+        })
+        .catch(() => {})
+    }, 200)
+  }
 
   destroy(): void {
     if (!this.wc.isDestroyed()) this.wc.close()
@@ -114,7 +143,11 @@ export class LiveTab {
       this.host.onTabChanged(this, { favicon: icons[0] })
     })
     wc.on('did-start-loading', () => this.host.onTabChanged(this, {}))
-    wc.on('did-stop-loading', () => this.host.onTabChanged(this, {}))
+    wc.on('did-stop-loading', () => {
+      this.host.onTabChanged(this, {})
+      // A tab shown in a split has a bar the color of its page: read it again once the page has painted.
+      if (this.sampledFor !== undefined) this.sampleBarColor(true)
+    })
     wc.on('did-navigate', (_e, url) => this.host.onTabChanged(this, { url, navigated: true }))
     wc.on('did-navigate-in-page', (_e, url, isMainFrame) => {
       if (isMainFrame) this.host.onTabChanged(this, { url })
@@ -175,4 +208,25 @@ export class LiveTab {
       }
     })
   }
+}
+
+/** The most common color in a BGRA bitmap (colors close together count as one), as `rgb(…)`. */
+function commonColor(bgra: Buffer): string | undefined {
+  const buckets = new Map<number, { n: number; r: number; g: number; b: number }>()
+  for (let i = 0; i + 3 < bgra.length; i += 4) {
+    const b = bgra[i]
+    const g = bgra[i + 1]
+    const r = bgra[i + 2]
+    const key = ((r >> 4) << 8) | ((g >> 4) << 4) | (b >> 4)
+    const s = buckets.get(key) ?? { n: 0, r: 0, g: 0, b: 0 }
+    s.n++
+    s.r += r
+    s.g += g
+    s.b += b
+    buckets.set(key, s)
+  }
+  let best: { n: number; r: number; g: number; b: number } | undefined
+  for (const s of buckets.values()) if (!best || s.n > best.n) best = s
+  if (!best) return undefined
+  return `rgb(${Math.round(best.r / best.n)}, ${Math.round(best.g / best.n)}, ${Math.round(best.b / best.n)})`
 }
