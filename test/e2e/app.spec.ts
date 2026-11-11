@@ -386,7 +386,8 @@ test('split view shows two pages side by side and can be closed', async () => {
 const dragRow = (p: Page, title: string, type: string, fx = 0.5, fy = 0.5) =>
   p.evaluate(
     ({ title, type, fx, fy }) => {
-      const row = [...document.querySelectorAll('.row')].find((r) => r.querySelector('.title')?.textContent === title)!
+      // A dropped tab can already be part of another row (a split) when dragend fires; dragend reaches the sidebar either way.
+      const row = [...document.querySelectorAll('.row')].find((r) => r.querySelector('.title')?.textContent === title) ?? (type === 'dragend' ? document.querySelector('.sidebar') : null)!
       const w = window as unknown as { dt?: DataTransfer }
       if (type === 'dragstart') w.dt = new DataTransfer()
       const r = row.getBoundingClientRect()
@@ -424,7 +425,8 @@ test('dragging a sidebar tab onto the page or onto another tab makes a split, an
   await dispatch({ type: 'unsplit' })
   for (const n of ['drag-a', 'drag-b', 'drag-c']) await dispatch({ type: 'open', url: `${base}/${n}`, where: 'tab' })
   const ui = await pageWithUrl('index.html')
-  await expect(ui.locator('.row .title', { hasText: 'Page drag-c' })).toBeVisible()
+  // A row shows the page's title once it has loaded; the drags below find rows by title.
+  for (const n of ['drag-a', 'drag-b', 'drag-c']) await expect(ui.locator('.row .title', { hasText: `Page ${n}` })).toBeVisible()
   const b = (await space()).today.find((t) => t.url.endsWith('/drag-b'))!
   await dispatch({ type: 'activate', id: b.id })
 
@@ -440,6 +442,8 @@ test('dragging a sidebar tab onto the page or onto another tab makes a split, an
   await dragRow(ui, 'Page drag-a', 'dragend')
   await expect.poll(splitTitles).toEqual(['row(drag-a, drag-b)'])
   await expect.poll(dropLayerShown).toBe(false)
+  // The sidebar draws the split as one row a moment after the main process makes it; drag onto that row, not the old one.
+  await expect(ui.locator('.split-row')).toBeVisible()
 
   // A drag that ends without a drop (Escape, or outside the window) changes nothing.
   await dragRow(ui, 'Page drag-c', 'dragstart')
@@ -588,12 +592,13 @@ test('camera and microphone read as askable until blocked, so sites like Meet re
         .wc.executeJavaScript(`Promise.all(['camera', 'microphone'].map((name) => navigator.permissions.query({ name }).then((p) => p.state)))`)
     )
   expect(await query()).toEqual(['granted', 'granted'])
-  // Blocking is remembered per origin and per device (see PermissionQueue): block both.
+  // Blocking is remembered per profile, site and device (SiteDecisions): block both.
   const remember = (allowed: boolean | undefined) =>
     app.evaluate(
       (_e, [origin, allowed]) => {
-        const decisions = (globalThis as any).arcBrowser.profiles.permissionQueue.decisions as Map<string, boolean>
-        for (const key of [`${origin}|media:video`, `${origin}|media:audio`]) allowed === null ? decisions.delete(key) : decisions.set(key, allowed as boolean)
+        const b = (globalThis as any).arcBrowser
+        const decisions = b.profiles.decisions(b.space.profileId)
+        for (const key of ['media:video', 'media:audio']) allowed === null ? decisions.reset(origin, key) : decisions.set(origin, key, allowed ? 'allow' : 'block')
       },
       [base, allowed ?? null] as const
     )
@@ -697,13 +702,18 @@ test('a downloaded update opens the relaunch card only after a week, then at mos
   const kind = () => app.evaluate(() => (globalThis as any).arcBrowser.window.overlayMode.kind)
   await app.evaluate((_e, since) => {
     const b = (globalThis as any).arcBrowser
-    b.updater.status = { state: 'ready', version: '9.0.2', notes: [{ version: '9.0.2', changes: ['Second'] }, { version: '9.0.1', changes: ['First'] }] }
+    // set() also redraws the UI, so the sidebar pill appears.
+    b.updater.set({ state: 'ready', version: '9.0.2', notes: [{ version: '9.0.2', changes: ['Second'] }, { version: '9.0.1', changes: ['First'] }] })
     b.state.waitingUpdate = { from: '0.0.0', since }
   }, since)
+  // The card waits for a visible window; right after launch it can still be hidden.
+  await expect.poll(() => app.evaluate(() => (globalThis as any).arcBrowser.window.win.isVisible())).toBe(true)
   // Six days after the download: only the sidebar pill.
   await offer(new Date(since + 6 * DAY).toISOString())
   expect(await kind()).toBe('none')
   const ui = await pageWithUrl('index.html')
+  // An earlier test dismissed the pill, which lasts until YARC restarts: reload the UI to start clean.
+  await ui.reload()
   await expect(ui.locator('.update-pill')).toContainText('Restart to Update')
   // A week: the card.
   await offer('2026-11-09T09:00:00')
