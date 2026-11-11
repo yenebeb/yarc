@@ -2,8 +2,9 @@
 # releases, often with no advisory on the `electron` npm package, so security alerts alone miss
 # them. Electron has its own group so its PR never waits on another package's. Patch and minor
 # bumps auto-merge once CI passes (.github/workflows/dependabot-automerge.yml). Because they merge
-# unattended, every package but electron waits out a cooldown: a hijacked release is usually
-# caught and pulled within days. Cooldowns don't apply to security updates.
+# unattended, every package, electron included, is only proposed once its version is a day old:
+# a hijacked release is usually caught and pulled within hours, and pnpm refuses packages younger
+# than a day anyway (its default minimumReleaseAge). Cooldowns don't apply to security updates.
 version: 2
 updates:
   - package-ecosystem: npm
@@ -17,12 +18,11 @@ updates:
         patterns: ['*']
         exclude-patterns: [electron]
     cooldown:
-      default-days: 3
-      exclude: [electron]
+      default-days: 1
 
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
     cooldown:
-      default-days: 3
+      default-days: 1

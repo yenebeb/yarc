@@ -323,8 +323,8 @@ The macOS zips are signed with an Ed25519 key, and the app only installs a zip s
 
 Chromium and V8 security fixes reach YARC only through a newer Electron, so they ship without waiting for anyone:
 
-1. [Dependabot](.github/dependabot.yml) checks npm daily and opens a PR when Electron releases a new version.
-2. If that PR is a **patch** or **minor** bump, [dependabot-automerge](.github/workflows/dependabot-automerge.yml) merges it once CI passes and starts the release workflow. Other Dependabot patch and minor bumps merge the same way but get the `release:skip` label and no release of their own: they ship with the next real change, so users aren't asked to update for a dev dependency. Majors wait for a person. Other packages are only proposed once a version has been out for 3 days (Dependabot's cooldown), so a hijacked release is usually pulled before it reaches YARC.
+1. [Dependabot](.github/dependabot.yml) checks npm daily and opens a PR once a new Electron version has been out for a day.
+2. If that PR is a **patch** or **minor** bump, [dependabot-automerge](.github/workflows/dependabot-automerge.yml) merges it once CI passes and starts the release workflow. Other Dependabot patch and minor bumps merge the same way but get the `release:skip` label and no release of their own: they ship with the next real change, so users aren't asked to update for a dev dependency. Majors wait for a person. Every package, Electron included, is only proposed once a version has been out for a day (Dependabot's cooldown), so a hijacked release is usually pulled before it reaches YARC.
 3. Installed copies find the release within the hour. Windows and macOS download it and show *Restart to Update* in the sidebar; because the release's Electron differs from the running one, they ask with the relaunch card if there's no restart within a day. Linux shows *Update Available* with the download.
 
 Details and gaps are in [docs/electron-notes.md](docs/electron-notes.md#6-security-updates-from-an-electron-release-to-users).

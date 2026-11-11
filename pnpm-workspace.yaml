@@ -2,11 +2,6 @@
 allowBuilds:
   electron-winstaller: false
 
-# pnpm holds back packages published less than a day ago. Electron releases carry Chromium
-# security fixes, so they skip that wait, as they skip Dependabot's cooldown (.github/dependabot.yml).
-minimumReleaseAgeExclude:
-  - electron
-
 # Security overrides until upstream bumps these.
 overrides:
   # electron-chrome-web-store unpacks CRX zips with adm-zip ^0.5 (GHSA-c6fg-446q-cg94 and others).
