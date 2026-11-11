@@ -137,7 +137,8 @@ describe('across a restart', () => {
     assert.deepEqual(second.set.map((d) => d.name), ['ESTSAUTH'])
   })
 
-  test('only its owner can read the file', () => {
+  // Windows has no POSIX file modes (statSync reports 0o666 there); the profile folder's ACL protects it.
+  test('only its owner can read the file', { skip: process.platform === 'win32' }, () => {
     const file = tempFile()
     const s = fakeSession()
     const kept = new SessionCookies(s.session, file)
