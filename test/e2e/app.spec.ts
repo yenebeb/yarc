@@ -336,6 +336,42 @@ test('switching tabs ends a rename started by a double-click, and the row stays 
   await expect.poll(async () => (await space()).activeItemId).toBe(tab.id)
 })
 
+test('releasing Ctrl after several Ctrl+Tabs selects the tab the switcher shows', async () => {
+  // Chromium drops a view's key-ups after a key-down the browser handled: once the overlay had
+  // handled a Ctrl+Tab, releasing Ctrl never arrived and the switcher stayed open.
+  await dispatch({ type: 'open', url: `${base}/switch-a`, where: 'tab' })
+  await dispatch({ type: 'open', url: `${base}/switch-b`, where: 'tab' })
+  await dispatch({ type: 'open', url: `${base}/switch-c`, where: 'tab' })
+  // A page that finishes loading takes the keyboard, and in a window in the background that closes the switcher.
+  await expect
+    .poll(async () => {
+      const s = await state()
+      const opened = (await space()).today.filter((t) => /\/switch-[abc]$/.test(t.url))
+      return opened.length === 3 && opened.every((t) => s.live[t.id]?.loading === false)
+    })
+    .toBe(true)
+  const key = (view: 'page' | 'overlay', type: 'keyDown' | 'keyUp', keyCode: string, modifiers: string[]) =>
+    app.evaluate(
+      (_e, [view, type, keyCode, modifiers]) => {
+        const b = (globalThis as any).arcBrowser
+        const wc = view === 'page' ? b.activeTab().wc : b.window.overlay.webContents
+        wc.sendInputEvent({ type, keyCode, modifiers })
+      },
+      [view, type, keyCode, modifiers] as const
+    )
+  const switcher = () => app.evaluate(() => (globalThis as any).arcBrowser.cur.switcher as { order: string[]; index: number } | undefined)
+
+  await key('page', 'keyDown', 'Tab', ['control'])
+  await expect.poll(async () => (await switcher())?.index).toBe(1)
+  // The overlay has the keyboard now: the next Tab is the one it handles.
+  await key('overlay', 'keyDown', 'Tab', ['control'])
+  await expect.poll(async () => (await switcher())?.index).toBe(2)
+  const { order, index } = (await switcher())!
+  await key('overlay', 'keyUp', 'Control', [])
+  await expect.poll(switcher).toBeUndefined()
+  expect((await space()).activeItemId).toBe(order[index])
+})
+
 test('split view shows two pages side by side and can be closed', async () => {
   await dispatch({ type: 'open', url: `${base}/left`, where: 'tab' })
   await dispatch({ type: 'open', url: `${base}/right`, where: 'split' })
