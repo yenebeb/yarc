@@ -2,8 +2,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { dividers, dragBorder, type Divider } from '../../shared/split'
-import type { AppState } from '../../shared/types'
-import { activeSpace, arc, dispatch, isMac, useAppState, useSpaceTheme } from './api'
+import { findItem } from '../../shared/tree'
+import type { AppState, Rect } from '../../shared/types'
+import { activeSpace, arc, dispatch, displayHost, isMac, useAppState, useSpaceTheme } from './api'
+import { Icon } from './icons'
 import { Sidebar } from './Sidebar'
 import './styles.css'
 
@@ -73,7 +75,92 @@ function useStills(): Record<string, string> {
   return stills
 }
 
-/** Empty state, pages shown in another window, split view handles and the focus ring around the active split pane. */
+/** True for a dark `rgb(…)` color, so the bar's buttons and text go light on it. */
+function isDark(color: string | undefined): boolean {
+  const m = color?.match(/(\d+),\s*(\d+),\s*(\d+)/)
+  if (!m) return false
+  const [r, g, b] = [m[1], m[2], m[3]].map(Number)
+  return 0.299 * r + 0.587 * g + 0.114 * b < 140
+}
+
+type PaneView = AppState['layout']['views'][number] & { bar: Rect }
+
+/**
+ * The bar on top of each pane of a split, like Arc's: back and forward on the left, the page's host
+ * in the middle, close on the right. The focused pane also has reload and the split view button; the
+ * others show that button when the pointer comes near close. The bar takes the color of the page's top.
+ */
+function PaneBar({ state, view, active }: { state: AppState; view: PaneView; active: boolean }) {
+  const live = state.live[view.id]
+  const item = findItem(state, view.id)?.item
+  const url = live?.url || item?.url || ''
+  const { bar } = view
+  const color = live?.barColor
+  const focus = () => {
+    if (!active) dispatch({ type: 'activate', id: view.id })
+  }
+  return (
+    <>
+      {/* Behind the page: shows in the page's rounded corners, so the bar and page read as one card. */}
+      <div className="pane-card" style={{ left: bar.x, top: bar.y, width: bar.width, height: bar.height + view.rect.height, background: color }} />
+      <div
+        className={`pane-bar${active ? ' active' : ''}${isDark(color) ? ' dark' : ''}`}
+        style={{ left: bar.x, top: bar.y, width: bar.width, height: bar.height, background: color }}
+        onMouseDown={focus}
+      >
+        <div className="pane-nav">
+          <button className="icon-btn" title="Back" disabled={!live?.canGoBack} onClick={() => dispatch({ type: 'back', id: view.id })}>
+            <Icon name="back" size={15} />
+          </button>
+          <button className="icon-btn" title="Forward" disabled={!live?.canGoForward} onClick={() => dispatch({ type: 'forward', id: view.id })}>
+            <Icon name="forward" size={15} />
+          </button>
+          {active ? (
+            <button
+              className="icon-btn"
+              title={live?.loading ? 'Stop' : 'Reload'}
+              disabled={!live}
+              onClick={(e) => dispatch(live?.loading ? { type: 'stop', id: view.id } : { type: 'reload', id: view.id, hard: e.shiftKey })}
+            >
+              <Icon name={live?.loading ? 'x' : 'reload'} size={14} />
+            </button>
+          ) : null}
+        </div>
+        <div className="pane-host" title={url}>
+          <button className="icon-btn link" title="Copy URL" onClick={() => dispatch({ type: 'copyUrl', id: view.id })}>
+            <Icon name="link" size={13} />
+          </button>
+          <span
+            className="host"
+            onClick={() => {
+              focus()
+              dispatch({ type: 'command', id: 'editUrl' })
+            }}
+          >
+            {url ? displayHost(url) : item?.title}
+          </span>
+        </div>
+        <div className="pane-end">
+          <button
+            className="icon-btn split-menu"
+            title="Split View"
+            onClick={(e) => {
+              const r = e.currentTarget.getBoundingClientRect()
+              dispatch({ type: 'splitMenu', id: view.id, x: r.left, y: r.bottom + 4 })
+            }}
+          >
+            <Icon name="split" size={15} />
+          </button>
+          <button className="icon-btn" title="Close tab" onClick={() => dispatch({ type: 'close', id: view.id })}>
+            <Icon name="x" size={15} />
+          </button>
+        </div>
+      </div>
+    </>
+  )
+}
+
+/** Empty state, pages shown in another window, split view handles, pane bars and the focus ring around the active split pane. */
 function ContentDecor({ state }: { state: AppState }) {
   const { content, views, splitId } = state.layout
   const space = activeSpace(state)
@@ -102,14 +189,21 @@ function ContentDecor({ state }: { state: AppState }) {
     ))
   const split = splitId ? space.splits.find((sp) => sp.id === splitId) : undefined
   if (!split || views.length < 2) return <>{elsewhere}</>
-  const active = views.find((v) => v.id === space.activeItemId)
+  const panes = views.filter((v): v is PaneView => !!v.bar)
+  const active = panes.find((v) => v.id === space.activeItemId)
   const along = (d: Divider, e: { clientX: number; clientY: number }) => (d.dir === 'row' ? e.clientX : e.clientY)
 
   return (
     <>
+      {panes.map((v) => (
+        <PaneBar key={`bar-${v.id}`} state={state} view={v} active={v === active} />
+      ))}
       {elsewhere}
       {active ? (
-        <div className="focus-ring" style={{ left: active.rect.x - 3, top: active.rect.y - 3, width: active.rect.width + 6, height: active.rect.height + 6 }} />
+        <div
+          className="focus-ring"
+          style={{ left: active.bar.x - 3, top: active.bar.y - 3, width: active.bar.width + 6, height: active.bar.height + active.rect.height + 6 }}
+        />
       ) : null}
       {dividers(split.root, content).map((d) => {
         // A handle a little wider than the gap, so it's easy to grab.

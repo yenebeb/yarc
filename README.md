@@ -98,6 +98,8 @@ Show up to four tabs side by side, stacked, or both (for example a grid of four)
 - Shift-click a tab in the sidebar;
 - choose "Open Link in Split View" from a link's context menu.
 
+A split shows as one row in the sidebar, a half per tab; click a half to focus that pane. Each pane has its own bar with back, forward, its address and a close button that closes just that tab. The split view button next to close (on the focused pane, or when you point near close) moves the pane left or right, adds a split on either side, separates the tab from the split, or turns the split from side by side to stacked.
+
 Drag the gap between panes to resize them, and double-click it to make them equal again. The focused pane has a colored outline. `Ctrl+Shift+-` closes the split.
 
 ### Several windows
