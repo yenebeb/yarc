@@ -186,8 +186,8 @@ importers:
         specifier: 6.8.11
         version: 6.8.11(supports-color@7.2.0)
       tldts-experimental:
-        specifier: 7.4.21
-        version: 7.4.21
+        specifier: 7.4.22
+        version: 7.4.22
     devDependencies:
       '@electron/fuses':
         specifier: 2.1.3
@@ -1876,11 +1876,11 @@ packages:
     resolution: {integrity: sha512-wXR/dYpcqKmfWpEdZjiKJOwCNFndD0DMnrW/cYjVGttEkBfVgcLFHoNrlj47mjOVic9yyNu65alsgF4NQyTa2g==}
     engines: {node: '>=12.0.0'}
 
-  tldts-core@7.4.21:
-    resolution: {integrity: sha512-sj8bAOjYu9juPKgsB3A58Uj91ybcnsRzgEUxbEGACP32rfJ5o9EScerRIfX1c6GPCiQlMoy4rCu2qTVIQgL4UA==}
+  tldts-core@7.4.22:
+    resolution: {integrity: sha512-NRyhrlvJcTwvoRibE0dEZvp6C5RwV4RxpsX1zbkI1k7Fk2pzIhmQ+MvswJEd5KKl3VRFRMDTipXse/ejh/ld/w==}
 
-  tldts-experimental@7.4.21:
-    resolution: {integrity: sha512-6Ovct/q2PD8X9AJsSwe0h76D8g5WPOLExrCR8wTtVazxp4W1XupthcfoFqK33V/DvSq3luyB+WzvETsJJhIIXA==}
+  tldts-experimental@7.4.22:
+    resolution: {integrity: sha512-96od5rigjk3ysioksM4NczrzJ2yxAUnG2rXKASu58PNxHt4/QbfFUMjVoeLdGnjtXdLWe8lMqQKitSaVV+X5tw==}
 
   tmp-promise@3.0.3:
     resolution: {integrity: sha512-RwM7MoPojPxsOBYnyd2hy0bxtIlVrihNs9pj5SUvY8Zz1sQcQG2tG1hSr8PDxfgEB8RNKDhqbIlroIarSNDNsQ==}
@@ -2267,7 +2267,7 @@ snapshots:
       '@ghostery/adblocker': 2.20.3
       '@ghostery/adblocker-electron-preload': 2.20.3(electron@45.3.1(supports-color@7.2.0))
       electron: 45.3.1(supports-color@7.2.0)
-      tldts-experimental: 7.4.21
+      tldts-experimental: 7.4.22
 
   '@ghostery/adblocker-extended-selectors@2.20.3': {}
 
@@ -2279,11 +2279,11 @@ snapshots:
       '@remusao/guess-url-type': 2.1.0
       '@remusao/small': 2.1.0
       '@remusao/smaz': 2.2.0
-      tldts-experimental: 7.4.21
+      tldts-experimental: 7.4.22
 
   '@ghostery/url-parser@1.3.1':
     dependencies:
-      tldts-experimental: 7.4.21
+      tldts-experimental: 7.4.22
 
   '@isaacs/fs-minipass@4.0.1':
     dependencies:
@@ -3704,11 +3704,11 @@ snapshots:
       fdir: 6.5.0(picomatch@4.0.7)
       picomatch: 4.0.7
 
-  tldts-core@7.4.21: {}
+  tldts-core@7.4.22: {}
 
-  tldts-experimental@7.4.21:
+  tldts-experimental@7.4.22:
     dependencies:
-      tldts-core: 7.4.21
+      tldts-core: 7.4.22
 
   tmp-promise@3.0.3:
     dependencies:
