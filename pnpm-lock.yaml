@@ -172,10 +172,10 @@ importers:
     dependencies:
       '@ghostery/adblocker-electron':
         specifier: 2.20.3
-        version: 2.20.3(electron@45.3.0(supports-color@7.2.0))
+        version: 2.20.3(electron@45.3.1(supports-color@7.2.0))
       '@ghostery/adblocker-electron-preload':
         specifier: 2.20.3
-        version: 2.20.3(electron@45.3.0(supports-color@7.2.0))
+        version: 2.20.3(electron@45.3.1(supports-color@7.2.0))
       electron-chrome-extensions:
         specifier: 4.10.0
         version: 4.10.0(supports-color@7.2.0)
@@ -211,8 +211,8 @@ importers:
         specifier: 6.3.0
         version: 6.3.0(vite@8.3.8(@types/node@26.6.6)(jiti@2.7.0))
       electron:
-        specifier: 45.3.0
-        version: 45.3.0(supports-color@7.2.0)
+        specifier: 45.3.1
+        version: 45.3.1(supports-color@7.2.0)
       electron-builder:
         specifier: 26.18.0
         version: 26.18.0(electron-builder-squirrel-windows@26.18.0)(supports-color@7.2.0)
@@ -1146,8 +1146,8 @@ packages:
     resolution: {integrity: sha512-bO3y10YikuUwUuDUQRM4KfwNkKhnpVO7IPdbsrejwN9/AABJzzTQ4GeHwyzNSrVO+tEH3/Np255a3sVZpZDjvg==}
     engines: {node: '>=8.0.0'}
 
-  electron@45.3.0:
-    resolution: {integrity: sha512-JpSzTaZkNaai4B3pUSICIfXiKwl+a7XyvHpWmA3O7SZbWDXNgYSyc7cmhNhlAARMzNAh9nOdZq5DgTZ/T9rlfA==}
+  electron@45.3.1:
+    resolution: {integrity: sha512-1oYau2B4RXF27Df2fzvrFDJoy8AOSVlgS6gklo6wkLZ/QWJemJCJHkY4+uuacvSFUtR8IimiLukLNFoYP0fmjA==}
     engines: {node: '>= 22.12.0'}
     hasBin: true
 
@@ -2257,16 +2257,16 @@ snapshots:
     dependencies:
       '@ghostery/adblocker-extended-selectors': 2.20.3
 
-  '@ghostery/adblocker-electron-preload@2.20.3(electron@45.3.0(supports-color@7.2.0))':
+  '@ghostery/adblocker-electron-preload@2.20.3(electron@45.3.1(supports-color@7.2.0))':
     dependencies:
       '@ghostery/adblocker-content': 2.20.3
-      electron: 45.3.0(supports-color@7.2.0)
+      electron: 45.3.1(supports-color@7.2.0)
 
-  '@ghostery/adblocker-electron@2.20.3(electron@45.3.0(supports-color@7.2.0))':
+  '@ghostery/adblocker-electron@2.20.3(electron@45.3.1(supports-color@7.2.0))':
     dependencies:
       '@ghostery/adblocker': 2.20.3
-      '@ghostery/adblocker-electron-preload': 2.20.3(electron@45.3.0(supports-color@7.2.0))
-      electron: 45.3.0(supports-color@7.2.0)
+      '@ghostery/adblocker-electron-preload': 2.20.3(electron@45.3.1(supports-color@7.2.0))
+      electron: 45.3.1(supports-color@7.2.0)
       tldts-experimental: 7.4.21
 
   '@ghostery/adblocker-extended-selectors@2.20.3': {}
@@ -2979,7 +2979,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  electron@45.3.0(supports-color@7.2.0):
+  electron@45.3.1(supports-color@7.2.0):
     dependencies:
       '@electron-internal/extract-zip': 1.0.8
       '@electron/get': 5.1.0(supports-color@7.2.0)
