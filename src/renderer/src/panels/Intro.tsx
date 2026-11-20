@@ -23,7 +23,7 @@ const SHORTCUTS: { id: CommandId; label: string }[] = [
   { id: 'togglePin', label: 'Pin or unpin a tab' },
   { id: 'newIncognitoWindow', label: 'New incognito window' },
   { id: 'switcherNext', label: 'Switch to a recent tab' },
-  { id: 'littleArc', label: 'New Little Arc window' }
+  { id: 'littleArc', label: 'New Little Window' }
 ]
 
 interface StepContent {
@@ -42,7 +42,7 @@ function content(step: TourStep, state: AppState): StepContent {
     case 'welcome':
       return {
         title: 'Welcome to YARC',
-        text: 'Spaces, pinned tabs, a command bar and split view, the way Arc did them. A two-minute tour shows you around.'
+        text: 'Spaces, pinned tabs, a command bar and split view, all in one sidebar. A two-minute tour shows you around.'
       }
     case 'import':
       return {
@@ -65,7 +65,7 @@ function content(step: TourStep, state: AppState): StepContent {
     case 'default':
       return {
         title: 'Make YARC your default browser',
-        text: 'Links from other apps then open in Little Arc, a small window you can keep or turn into a tab.',
+        text: 'Links from other apps then open in a Little Window, a small window you can keep or turn into a tab.',
         body: (
           <div className="intro-buttons centered">
             <button className="btn primary" onClick={() => dispatch({ type: 'command', id: 'setDefaultBrowser', keepOverlay: true })}>
@@ -120,10 +120,10 @@ function content(step: TourStep, state: AppState): StepContent {
       }
     case 'little':
       return {
-        title: 'Little Arc',
+        title: 'Little Window',
         text: 'A small window for a quick look, and where links from other apps open. One click makes it a tab.',
         // Ctrl+Alt+N types ñ on US-International and other AltGr keyboards, so offer the command bar too.
-        tryIt: isMac ? <>Press {key('littleArc')}</> : <>Press {key('littleArc')}, or pick New Little Arc window in the command bar</>
+        tryIt: isMac ? <>Press {key('littleArc')}</> : <>Press {key('littleArc')}, or pick New Little Window in the command bar</>
       }
     case 'incognito':
       return {

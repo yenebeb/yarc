@@ -112,7 +112,7 @@ dmg:
 linux:
   icon: build/icon.png
   category: Network
-  synopsis: Open-source, Arc-style web browser
+  synopsis: Open-source web browser
   target:
     - target: AppImage
       arch: [x64]

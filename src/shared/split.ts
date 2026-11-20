@@ -239,7 +239,7 @@ export function previewRect(rect: Rect, side: Side, gap = SPLIT_GAP): Rect {
   }
 }
 
-/** Height of the bar on top of each pane of a split (back, forward, the host, close), as in Arc. */
+/** Height of the bar on top of each pane of a split (back, forward, the host, close). */
 export const PANE_BAR = 32
 
 /** The group holding pane `id`, its index there and the path to the group (child indexes from the root). */
@@ -293,7 +293,7 @@ export function flipSplit(root: SplitGroup): SplitGroup {
   }
 }
 
-/** What the split menu of pane `id` offers, worded for the way its group runs (Arc's menu). */
+/** What the split menu of pane `id` offers, worded for the way its group runs. */
 export function splitMenuModel(root: SplitGroup, id: ID) {
   const at = parentOf(root, id)
   const row = (at?.group.dir ?? root.dir) === 'row'

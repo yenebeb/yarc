@@ -1,6 +1,6 @@
 # YARC — notes for Claude sessions
 
-Open-source Arc-browser replacement (Electron 45 / Chromium 156, React 19, TypeScript 7, electron-vite 6). Arc shuts down 2026-12-22; the goal is to match Arc's behavior as closely as possible, with **macOS as the main platform** (most Arc users), Windows second.
+Open-source Arc-browser replacement (Electron 45 / Chromium 156, React 19, TypeScript 7, electron-vite 6). Arc shuts down 2026-12-22; the goal is a browser that feels familiar to Arc users, with **macOS as the main platform** (most Arc users), Windows second.
 
 ## Commands
 
@@ -22,7 +22,7 @@ Open-source Arc-browser replacement (Electron 45 / Chromium 156, React 19, TypeS
 
 ## Decisions already made (don't re-litigate)
 
-- Renamed from Arc Shell to YARC (Yet Another Arc Clone) on 2026-11-02. Kept on purpose: the `appId` `org.arcshell.browser`, the Windows registry keys and ProgIDs (`ArcShell*`), and an existing `Arc Shell` profile folder (`src/main/profile-dir.ts`). Cookies aren't encrypted (Electron's cookie-encryption fuse is off), so no Keychain key is tied to the old name. The repo moved from `yenebeb/arc-shell` to `yenebeb/yarc` the same day; GitHub redirects the old name (older installed apps poll it for updates), so never create a new repo called `arc-shell` on that account.
+- Renamed from Arc Shell to YARC on 2026-11-02. Kept on purpose: the `appId` `org.arcshell.browser`, the Windows registry keys and ProgIDs (`ArcShell*`), and an existing `Arc Shell` profile folder (`src/main/profile-dir.ts`). Cookies aren't encrypted (Electron's cookie-encryption fuse is off), so no Keychain key is tied to the old name. The repo moved from `yenebeb/arc-shell` to `yenebeb/yarc` the same day; GitHub redirects the old name (older installed apps poll it for updates), so never create a new repo called `arc-shell` on that account.
 - Google sign-in needs Electron's own UA (only the app-name token stripped); a spoofed Chrome UA is rejected. Chrome Sync is impossible for non-Chrome browsers → import instead.
 - Built-in ad blocking (Ghostery engine) because Electron has no `declarativeNetRequest`. Uses a custom adapter, not `enableBlockingInSession` (global IPC handlers break with multiple sessions).
 - No Apple Developer ID: macOS releases are signed with one self-signed certificate from CI (`MAC_CODESIGN_P12` / `MAC_CODESIGN_P12_PASSWORD` secrets, `scripts/mac-sign.mjs`), so camera/microphone permissions survive updates; ad-hoc (`identity: "-"`) without the secret. Not notarized, so Gatekeeper still needs *Open Anyway*. Never replace the certificate: every Mac would be asked for permissions again (`docs/electron-notes.md` section 9).
@@ -36,8 +36,8 @@ Windows: unit + e2e + installed. macOS (2026-11-01, Apple silicon): unit + e2e p
 
 - Import from Arc with real data: spaces in Arc's order, profile names, favorites, pinned tabs and folders, archive and history all import. Arc's named space icons (`customInfo.iconType.icon`, Ionicons names) are mapped to emoji. Gaps: untitled spaces become "Space N"; spaces without a theme get palette colors.
 - Shortcuts from a focused page `<input>` via `sendInputEvent`: Cmd+L/D/S/W/, , Ctrl+2, Ctrl+Tab with Ctrl keyup. Cmd+W never closes the window (the Window menu role has no Close item on macOS).
-- Traffic lights: hidden with the sidebar, shown during hover-peek and back after; no gap in native fullscreen. Links from other apps open Little Arc.
-- Fixed: the closed main window (app keeps running on macOS) crashed menu-bar commands, the overlay blur handler, toasts, Little Arc's "Open in YARC" and external links.
+- Traffic lights: hidden with the sidebar, shown during hover-peek and back after; no gap in native fullscreen. Links from other apps open a Little Window.
+- Fixed: the closed main window (app keeps running on macOS) crashed menu-bar commands, the overlay blur handler, toasts, Little Window's "Open in YARC" and external links.
 
 Still needs a human on a Mac:
 
@@ -46,9 +46,9 @@ Still needs a human on a Mac:
 3. Real keystrokes through the native menu: Cmd+C/V/X/A/Z in pages and the command bar, Cmd+Q, Arc shortcuts not also firing a menu item.
 4. Default browser from the installed app; `.html` via `open-file`.
 5. Gatekeeper first launch of the DMG from the release; README instructions accurate.
-6. Visual polish vs. Arc on macOS: matched side by side with Arc (2026-11-01): vibrancy + grain, per-space light/dark appearance, sidebar metrics, Arc favicons, ⌘T command bar (position, colors, inline completion). Still to compare: dark-appearance spaces, hover/active states, split view, Little Arc, Peek's look (card size, buttons, backdrop).
+6. Visual polish on macOS: done (2026-11-01) for vibrancy + grain, per-space light/dark appearance, sidebar spacing, imported favicons and the ⌘T command bar (position, colors, inline completion). Still to look at: dark-appearance spaces, hover/active states, split view, Little Window, Peek's look (card size, buttons, backdrop).
 
-Comparing with real Arc: with Screen Recording and Accessibility granted to the Claude Code `claude.app` (not Claude.app), `screencapture -R` and System Events work. Arc's menu bar (via System Events, `AXMenuItemCmdChar`/`AXMenuItemCmdModifiers`) is the source for its default shortcuts; they aren't stored in any file.
+Screen captures: with Screen Recording and Accessibility granted to the Claude Code `claude.app` (not Claude.app), `screencapture -R` and System Events work. YARC's own look is designed here, not copied: don't measure or trace another app's UI, binary or files beyond what a user's own data export needs (the importers).
 
 Updates (`src/main/updater.ts`): Windows auto-updates with electron-updater (NSIS, unsigned is fine) from the GitHub release's `latest.yml`, and only installs an installer whose Ed25519 `.sig` matches `UPDATE_PUBLIC_KEY` (`src/main/windows-update.ts`; electron-updater installs on quit only once that check passes). macOS updates itself without a Developer ID (Squirrel.Mac refuses ad-hoc signatures, so not electron-updater): `src/main/mac-update.ts` polls `releases/latest`, downloads the arch's `-mac.zip` with Node's fetch (no quarantine flag), checks its Ed25519 `.sig` against `UPDATE_PUBLIC_KEY` (`src/main/update-signature.ts`; CI signs with the `MAC_UPDATE_SIGNING_KEY` secret), unzips into the profile's `Update/` folder and swaps the bundle at quit. Tested on macOS 26.5 with packaged test builds served from a local feed (2026-11-02): no Keychain prompt (cookies aren't encrypted on macOS, so there is no Safe Storage item), no App Management prompt; camera/microphone grants survive updates when the release is signed with the self-signed certificate, and reset with ad-hoc signing (TCC matches the designated requirement; tested with the microphone: `docs/electron-notes.md` sections 8 and 9). If the app's folder isn't writable it falls back to opening the DMG. Linux is notify-only. A downloaded update is quiet, like Arc's: a *Restart to Update* pill in the sidebar and install on quit; the relaunch card (an overlay listing every version since the running one) only opens by itself after 7 days without a restart, then at most daily, or after 1 day when the release's `release.json` names a different Electron than `process.versions.electron` (`src/main/update-escalation.ts`; the wait is kept in `state.json` as `waitingUpdate`). Packaged builds only; not yet tried end to end against a real published release.
 

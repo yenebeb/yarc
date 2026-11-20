@@ -1,4 +1,4 @@
-// YARC's own pages (sidebar, overlay, Little Arc toolbar, permission prompt) come from yarc://ui/,
+// YARC's own pages (sidebar, overlay, Little Window toolbar, permission prompt) come from yarc://ui/,
 // not file://. That gives the UI an origin of its own, which the preload and every IPC handler
 // check, and lets file:// pages in tabs run without Electron's extra file privileges (the
 // GrantFileProtocolExtraPrivileges fuse is off, scripts/after-pack.mjs).

@@ -344,7 +344,7 @@
 
 /* ------------------------------------------------------------------ welcome & what's new */
 
-/* Arc's onboarding and release cards: centered, roomy, the space color washing the top. */
+/* Onboarding and release cards: centered, roomy, the space color washing the top. */
 .scrim.intro-scrim {
   background: rgb(10 5 25 / 0.42);
   backdrop-filter: blur(6px);
@@ -616,7 +616,7 @@
   flex: 1;
 }
 
-/* What to do to go on: Arc's try-it pill, tinted by the space. */
+/* What to do to go on: a try-it pill, tinted by the space. */
 .tour-try {
   display: inline-flex;
   align-items: center;

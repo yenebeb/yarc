@@ -1,0 +1,10 @@
+YARC
+Copyright © 2026 YARC contributors. Licensed under GPL-3.0-or-later (see LICENSE).
+
+YARC is an independent, open-source project. It is not affiliated with,
+endorsed by or connected to The Browser Company. "Arc" is a trademark of
+The Browser Company and is used here only to describe compatibility, such as
+importing data from Arc.
+
+YARC's code and artwork are its own. It is built on Electron and Chromium,
+which have their own licenses.

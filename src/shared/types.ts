@@ -98,9 +98,9 @@ export interface Settings {
   /** Hours of inactivity before an unpinned tab is archived. 0 = never. */
   archiveAfterHours: number
   searchEngine: SearchEngine
-  /** Open links from other apps in Little Arc (true) or as a new tab in the current space (false). */
+  /** Open links from other apps in a Little Window (true) or as a new tab in the current space (false). */
   littleArcForExternalLinks: boolean
-  /** Profile used by Little Arc windows; empty = profile of the active space. */
+  /** Profile used by Little Windows; empty = profile of the active space. */
   littleArcProfileId: ID | ''
   /** Links from pinned tabs and favorites to other sites open in Peek instead of replacing the page. */
   peekPinnedLinks: boolean
@@ -164,7 +164,7 @@ export interface ReleaseNotes {
 }
 
 export interface LittleArcMemory {
-  /** The size the user last gave a Little Arc window; absent = a size that suits the screen. */
+  /** The size the user last gave a Little Window; absent = a size that suits the screen. */
   size?: { width: number; height: number }
   /** Hostname → profile picked with the toolbar's profile chip, like Arc remembers it per site. */
   profileByHost: Record<string, ID>

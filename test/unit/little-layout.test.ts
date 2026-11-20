@@ -4,18 +4,18 @@ import { littleBarColor, littleBounds } from '../../src/main/little-layout.ts'
 
 const laptop = { x: 0, y: 25, width: 1728, height: 1092 }
 
-test('a new Little Arc window suits the screen and is centered on it', () => {
+test('a new Little Window suits the screen and is centered on it', () => {
   assert.deepEqual(littleBounds(laptop), { x: 346, y: 116, width: 1037, height: 819 })
   assert.deepEqual(littleBounds({ x: 1728, y: -900, width: 1920, height: 1055 }), { x: 2112, y: -812, width: 1152, height: 791 })
   assert.deepEqual(littleBounds({ x: 0, y: 0, width: 1280, height: 720 }), { x: 190, y: 13, width: 900, height: 680 })
 })
 
-test('a Little Arc window keeps the size the user gave it, within the screen', () => {
+test('a Little Window keeps the size the user gave it, within the screen', () => {
   assert.deepEqual(littleBounds(laptop, { width: 1300, height: 900 }), { x: 214, y: 89, width: 1300, height: 900 })
   assert.deepEqual(littleBounds(laptop, { width: 3000, height: 2000 }), { x: 20, y: 38, width: 1688, height: 1052 })
 })
 
-test("Little Arc's toolbar is the space color mixed into near-black", () => {
+test("Little Window's toolbar is the space color mixed into near-black", () => {
   assert.equal(littleBarColor('#0d0b18'), '#0d0b18')
   assert.equal(littleBarColor('#ffffff'), '#2a2834')
   assert.equal(littleBarColor('not a color'), littleBarColor('#7c6cf2'))

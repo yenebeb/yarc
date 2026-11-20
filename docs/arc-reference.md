@@ -123,7 +123,7 @@ Notation: on macOS, ⌘ = Command, ⌥ = Option, ⌃ = Control, ⇧ = Shift. On 
 | 6 | **Divider + "Clear" + "+ New Tab"** | A thin horizontal line separates Pinned from Today (introduced in 2022 to replace the "Explore" header) [O]. A "Clear" control (⇧⌘K) sits at the right end of the divider and is visible on hover [O: "hitting 'Clear' above your Unpinned Tabs"]. Directly below is a "+ New Tab" row [O: "A 'New Tab' button in the sidebar"]. The Tidy Tabs broom (Arc Max) appears at the top of Today [O]. |
 | 7 | **Today (unpinned) tabs** | Ephemeral tabs. New tabs are inserted at the **top** of the list, just under "+ New Tab" [U]. Auto-archived (see §2.3). Each row shows favicon, title, and an × on hover. Audio icon click toggles mute [O]. |
 | 8 | **Media / audio tray** | Appears above the bottom bar when you leave a tab playing audio or video. Controls multiple players [O]. Dismissable [O]. |
-| 9 | **Update banner** | Collapsed by default, expands on hover [O]. Strings in Arc 1.x for macOS: title "An update is ready!", description "Click to restart", button "Restart and Update"; after the update, "Update Complete!" with "See What's New" [Arc binary, 2026-11-09]. It can be dismissed (Arc keeps `autoUpdateBannerDismissalCount` in its defaults). Arc downloads with Sparkle in the background and installs on quit; the menu item reads "Update Available" instead of "Check for Updates" while one waits. On this Mac, with an update downloaded three days earlier (`currentUpdateDownloadedSince`) and the banner dismissed, Arc showed no banner and no dialog. YARC: a "Restart to Update" pill above the bottom bar, the relaunch card only after a week (`src/main/update-escalation.ts`). |
+| 9 | **Update banner** | Collapsed by default, expands on hover [O]. It can be dismissed. Arc downloads updates in the background and installs them on quit; the menu item reads "Update Available" instead of "Check for Updates" while one waits [O]. YARC: a "Restart to Update" pill above the bottom bar, the relaunch card only after a week (`src/main/update-escalation.ts`). |
 | 10 | **Bottom bar** | **Left:** Library button (Archive, Downloads, Media, Easels; called "Archive / Downloads" on Windows) [O: "bottom-leftmost icon"]. A download icon appears while downloads are active [O]. **Center:** Space switcher, one icon per Space (emoji/icon, or a dot when there is no icon). Click to switch; drag to reorder [O]. Right-click a Space icon to edit it [O]. **Right:** "+" menu: New Tab, New Space, New Folder, New Split, New Easel/Note, New Boost, Add files [O]. |
 
 ### 2.2 Interactions
@@ -163,18 +163,7 @@ Notation: on macOS, ⌘ = Command, ⌥ = Option, ⌃ = Control, ⇧ = Shift. On 
 
 ### 2.4 Window framing and visual treatment
 
-These values are measured from screenshots and are all [U] unless stated otherwise.
-
-| Element | Value |
-|---|---|
-| Default sidebar width | ≈ 240–260 px (macOS points). Resizable roughly 180–400 px. |
-| Web content frame | Content sits in a **rounded rectangle**, corner radius ≈ 8–10 px, **inset ≈ 8 px** from the window's top, right and bottom edges and from the sidebar. A subtle shadow/border sets it apart. The window background (the Space theme) is visible in the gap [O for rounded corners: "web contents corners become unrounded" bug fix]. |
-| Content with sidebar hidden | Same rounded card with ≈ 8 px inset on all sides [U]. |
-| Split View | Each pane is its own rounded card with ≈ 8 px gutters. The divider between panes is draggable [O]. Each pane takes on its site's color [O, Windows]. The focused pane has a subtle highlight or outline [U]. |
-| Sidebar rows | Row height ≈ 32–36 px, horizontal padding ≈ 8–12 px, corner radius ≈ 6–8 px. The selected tab is a lighter, translucent white "card" with a subtle shadow. Hover is a fainter fill [U]. |
-| Favorites tiles | ≈ 48–56 px tall rounded squares (radius ≈ 8–10 px). The selected tile is filled more brightly [U]. |
-| Peek | Floating rounded card at roughly 80–90 % of the content area, centered over the dimmed current page. Its controls (×, expand, split) sit to the left/top of the card [U]. Controls order matches across platforms [O]. |
-| Status pill (link hover URL) | Bottom-left of the content. Matches the sidebar theme [O]. Moves away when the cursor approaches [O]. |
+Web content sits in a rounded card inset from the window edges and the sidebar, with the space's theme showing around it [O]. In split view each pane is its own card, and the divider between panes can be dragged [O]. The link-hover status pill sits at the bottom left of the content and moves away from the cursor [O].
 
 **Space themes** [O unless noted]:
 - Each Space has a theme. It colors the whole window chrome: sidebar, top margin and the gap around the content card.
@@ -291,39 +280,7 @@ These values are measured from screenshots and are all [U] unless stated otherwi
 
 **Flow** [O, S26, S27]: ⌘T, type the site ("youtube", or a custom shortcut such as "yt"), press Tab, type the query, Enter. The results page opens like any Command Bar result. macOS only: the help article says it does not apply to Arc for Windows [O, S26]. Users add or edit sites in the Site Search section of Arc's settings, with a URL where `%s` is the query; Arc suggests one- or two-letter shortcuts for custom ones [O, S26]. The Command Bar action "Site Search Settings" opens that page.
 
-**How it works.** Arc's Command Bar passes a `keyword:` to Chromium's autocomplete (`autocomplete:cursorPosition:preventInlineAutocomplete:startFresh:keyword:` in the Arc binary), so Site Search is Chromium's search-engine keyword mode. Arc seeds the profile's Chromium `keywords` table on first run (`SiteSearchMigrations.swift`). The list below was read from that table in a real Arc profile (`~/Library/Application Support/Arc/User Data/Default/Web Data`, `select short_name, keyword, url, prepopulate_id, is_active from keywords`, 2026-11-03 and 2026-11-04). The 19 sites match the URL and favicon list in `/Applications/Arc.app/Contents/MacOS/Arc`.
-
-| Name | Keyword | Search URL (`%s` = query) |
-|---|---|---|
-| Google Drive | drive.google.com | `https://drive.google.com/drive/search?q=%s` |
-| Gmail | mail.google.com | `https://mail.google.com/mail/ca/u/0/#apps/%s` |
-| Google Maps | maps.google.com | `https://www.google.com/maps/search/%s` |
-| Google Calendar | calendar.google.com | `https://calendar.google.com/calendar/u/0/r/search?q=%s` |
-| Google Docs | docs.google.com | `https://docs.google.com/document/u/0/?q=%s` |
-| Dropbox | dropbox.com | `https://www.dropbox.com/search/personal?&query=%s` |
-| Amazon | amazon.com | `https://www.amazon.com/s?k=%s` |
-| GitHub | github.com | `https://github.com/search?q=%s` |
-| Figma | figma.com | `https://www.figma.com/files/search?q=%s` |
-| X | x.com | `https://x.com/search?q=%s` |
-| X | twitter.com | `https://twitter.com/search?q=%s` |
-| YouTube | youtube.com | `https://www.youtube.com/results?search_query=%s` |
-| Wikipedia | wikipedia.org | `https://wikipedia.org/w/index.php?search=%s` |
-| Reddit | reddit.com | `https://www.reddit.com/search/?q=%s` |
-| SoundCloud | soundcloud.com | `https://soundcloud.com/search?q=%s` |
-| Asana | asana.com | `https://app.asana.com/0/search?q=%s` |
-| LinkedIn | linkedin.com | `https://linkedin.com/search/results/all/?keywords=%s` |
-| Apple Music | music.apple.com | `https://music.apple.com/us/search?term=%s` |
-| Spotify | spotify.com | `https://open.spotify.com/search/%s` |
-| Google | google.com | `https://www.google.com/search?q=%s` |
-| Microsoft Bing | bing.com | `https://www.bing.com/search?q=%s` |
-| DuckDuckGo | duckduckgo.com | `https://duckduckgo.com/?q=%s` |
-| Ecosia | ecosia.org | `https://www.ecosia.org/search?q=%s` |
-| Brave | search.brave.com | `https://search.brave.com/search?q=%s` |
-| Qwant | qwant.com | `https://www.qwant.com/?q=%s` |
-| PrivacyWall | privacywall.org | `https://www.privacywall.org/search/secure/?q=%s` |
-| Perplexity | perplexity.ai | `https://www.perplexity.ai/search?q=%s` |
-
-The last eight are Chromium's default search engines (`prepopulate_id` set, `is_active = 0`, meaning "unspecified", not off). They work with Tab in Arc too ("bing" → Microsoft Bing, checked by a user on 2026-11-04). This is the EEA choice-screen set from a Dutch install; Chromium picks it per country, and YARC uses this one everywhere. The table also holds the starter packs `@bookmarks` and `@history`, which YARC doesn't have. A second, separate list in the binary (Google, YouTube, Amazon, Wikipedia, Reddit, Twitter, Threads, LinkedIn, Pinterest, TikTok, Spotify, GitHub, Stack Overflow, Goodreads, Netflix, plus image/news/maps/flights) belongs to Arc Max's AI "siteSearch" action (`gptSiteSearchShortcut`), not to Tab.
+**How it works.** Site Search behaves like Chromium's search-engine keyword mode: a keyword, Tab, then the query. YARC's own list (`src/shared/site-search.ts`) holds popular sites' public search URLs and the usual web search engines, sorted by name.
 
 **Mode details.** Not observed directly (driving Arc's UI from the agent failed on 2026-11-03); YARC follows Chromium's keyword mode [U]:
 - Matching: the typed text is a keyword prefix ("you" → youtube.com, "twitter" → twitter.com) or a site name prefix ("gmail", "google m"); `https://` and `www.` are ignored. YARC needs two letters unless one letter is a whole name ("x").
@@ -347,18 +304,14 @@ The last eight are Chromium's default search engines (`prepopulate_id` set, `is_
   - the "+" menu;
   - the Peek "Split" button.
 - Resize panes by dragging the divider.
-- Drop indicators while dragging a tab [U, not yet compared with real Arc; this is what YARC does]:
+- Drop indicators while dragging a tab [U; this is what YARC does]:
   - Over the page: the pane under the cursor is cut corner to corner into four triangles. The nearest edge (left, right, top, bottom) is where the tab goes, and a highlighted card shows the half of that pane it would take. On a split page the zones belong to the pane under the cursor. A full split (four tabs) shows no zone.
   - Over a sidebar tab row: the middle half of the row (vertically) means split. The row turns into a preview of the split row, both favicons and titles, the dragged tab on the half the cursor is over. The top and bottom quarters keep reordering.
   - Escape or a drop outside the window cancels the drag and changes nothing.
-- **Pane bars** [measured on a capture of real Arc's window on this Mac, 2026-11-11; Arc 1.x, macOS 26.5, a 1728 × 1050 pt window with a two-pane split]:
-  - Each pane has its own bar on top: **32 pt** tall, then a hairline (0.5 pt) and the page. The bar has the color of the page's top (a dark page gets a dark bar), so bar and page read as one card.
-  - Left: Back and Forward arrows, centered 21 pt and 58 pt from the pane's left edge (28 pt buttons, 9 pt apart, 7 pt in). Middle: the host ("opusfived.dev") in medium weight, gray, the **text** centered on the pane, with a link icon hanging to its left. Right: ×, centered 21 pt from the right edge; it closes that tab only.
-  - Panes start 10 pt from the window's top, right and bottom edges, with **10 pt** between them (YARC keeps its 8 pt inset and 6 pt gap for now).
-  - From the user's screenshots and description (not observed here, because that would mean moving the pointer in the user's Arc): the focused pane also shows Reload, its extension and site-control icons, and the Split View button (two columns) next to ×. On other panes, that button shows when the pointer nears ×. The focused pane has a border in the space color.
+- **Pane bars** [O]: each pane has its own bar on top with back and forward, the page's host and a close button that closes that tab only. The focused pane also shows Reload and the Split View button.
   - YARC: back, forward and close on every pane; reload and the Split View button on the focused one; the button on others while the pointer is near close; link icon copies the URL, clicking the host edits it (⌘L). Extension and site-control icons stay in the sidebar's URL field.
-- **Split View button menu** [from the user's screenshot of Arc]: Move Left (disabled at the left edge), Move Right · Add Right Split, Add Left Split · Separate Tab from Split, Convert to Vertical Split View · Share Split View…. YARC words a stacked group's items as Move Up/Down and Add Bottom/Top Split, and "Convert to Horizontal Split View" for a stacked split [U, Arc's wording there not seen]. Share Split View… is disabled: Arc shares through its own servers.
-- **The sidebar row** [measured on the same capture]: a split is one row, a half per tab, each with favicon and title (truncated), split by a thin vertical line; selected, the row is a white pill like any active tab. Clicking a half focuses that pane. YARC: the focused half is full color, the others dimmed; dragging a half reorders the whole split in the sidebar, or moves that tab when dropped on the page. Dropping a tab on a half's middle adds it beside that tab.
+- **Split View button menu** [O]: Move Left (disabled at the left edge), Move Right · Add Right Split, Add Left Split · Separate Tab from Split, Convert to Vertical Split View · Share Split View…. YARC words a stacked group's items as Move Up/Down and Add Bottom/Top Split, and "Convert to Horizontal Split View" for a stacked split [U, Arc's wording there not seen]. Share Split View… is disabled: Arc shares through its own servers.
+- **The sidebar row** [O]: a split is one row, a half per tab, each with favicon and title (truncated), split by a thin vertical line; selected, the row is a white pill like any active tab. Clicking a half focuses that pane. YARC: the focused half is full color, the others dimmed; dragging a half reorders the whole split in the sidebar, or moves that tab when dropped on the page. Dropping a tab on a half's middle adds it beside that tab.
 - Right-click a pane for Mute, Duplicate, Share.
 - "Remove Split View" closes the pane without closing its tab. "Expand Current Split" turns the focused pane into a standalone tab.
 
@@ -434,12 +387,12 @@ Checked by opening File › New Window in real Arc (System Events for the menus 
 ### Site permission prompts (checked in Arc on macOS 26, 2026-11-09)
 Triggered from a local test page (`Notification.requestPermission()`, `getUserMedia({video, audio})`, `geolocation.getCurrentPosition()`) and screen-captured.
 - **Where:** a popover hanging below the sidebar's URL field. Its arrow points at the Site Control Center button (the sliders icon at the right end of the field). It overlaps the page.
-- **Look:** an NSPopover in the system appearance: dark in system dark mode even over a light-appearance space. About 236 pt wide, ~15 pt corner radius, translucent. A 32 pt round icon well on the left (bell for notifications, camera for camera/microphone, location arrow for location), the question in 15 pt regular text, then two equal 32 pt buttons, 8 pt apart. **Allow** is the lighter, default-looking one.
+- **Look:** a popover in the system appearance with an icon, the question and two buttons; **Allow** is the default.
 - **Words:** "Allow `<origin>` to send you notifications?", "… to access your camera, microphone?", "… to access your location?". The full origin with its scheme (`http://localhost:8765`), not the bare host. The buttons are **Not Now** and **Allow**, not Block / Don't Allow.
 - **Keyboard:** Escape dismisses it.
 - **Later:** decisions can be changed in the Site Control Center (the sliders button).
 - **YARC (2026-11-09):** a prompt view of its own above the page (`src/main/prompt-view.ts`, `src/renderer/src/prompt.tsx`), fed by `PermissionQueue` (`src/main/permission-queue.ts`):
-  - **Position and look:** it points 22 px in from the right end of the sidebar's URL field, where Arc's Site Control Center button is. YARC has no such button yet. With the sidebar hidden or a full-screen page, it sits at the page's top-left corner without an arrow. In Little Arc, it hangs under the toolbar's URL pill. It follows YARC's theme (system / light / dark), like Arc's follows the system.
+  - **Position and look:** it points at the right end of the sidebar's URL field. With the sidebar hidden or a full-screen page, it sits at the page's top-left corner without an arrow. In Little Arc, it hangs under the toolbar's URL pill. It follows YARC's theme (system / light / dark), like Arc's follows the system.
   - **Words:** the host ("Allow meet.google.com to …"), not Arc's full origin: users asked for it (2026-11-10).
   - **Answers (2026-11-10), per profile, in `Profiles/<id>/permissions.json` (`src/main/site-permissions.ts`); incognito keeps them in memory:**
     - Allow sticks across restarts. Camera and microphone are separate answers.

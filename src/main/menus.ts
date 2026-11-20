@@ -24,7 +24,7 @@ export function buildContextMenu(browser: Browser, tab: LiveTab, p: ContextMenuP
       items.push(
         { label: 'Open Link in New Tab', click: () => browser.open(p.linkURL, 'background') },
         { label: 'Open Link in Split View', click: () => browser.open(p.linkURL, 'split') },
-        { label: 'Open Link in Little Arc', click: () => browser.openLittle(p.linkURL) },
+        { label: 'Open Link in a Little Window', click: () => browser.openLittle(p.linkURL) },
         { label: 'Open Link in Incognito Window', click: () => browser.openIncognito(p.linkURL) }
       )
     }
@@ -121,15 +121,15 @@ export function installDockMenu(browser: Browser): void {
       Menu.buildFromTemplate([
         { label: 'New Window', click: () => browser.openNewWindow() },
         { label: 'New Incognito Window', click: () => browser.openIncognito() },
-        { label: 'New Little Arc Window', click: () => browser.openLittle() },
+        { label: 'New Little Window', click: () => browser.openLittle() },
         { type: 'separator' },
-        { label: 'Show Little Arc Windows', enabled: open, click: () => littles().forEach((l) => l.win.show()) },
-        { label: 'Close Little Arc Windows', enabled: open, click: () => littles().forEach((l) => l.win.close()) }
+        { label: 'Show Little Windows', enabled: open, click: () => littles().forEach((l) => l.win.show()) },
+        { label: 'Close Little Windows', enabled: open, click: () => littles().forEach((l) => l.win.close()) }
       ])
     )
   }
   build()
-  // Little Arc windows come and go: the last two items are only enabled while there are some.
+  // Little Windows come and go: the last two items are only enabled while there are some.
   app.on('browser-window-created', (_e, win) => {
     setImmediate(build)
     win.on('closed', () => setImmediate(build))
@@ -175,7 +175,7 @@ export function installAppMenu(browser: Browser): void {
         { label: 'New Tab', click: run('newTab') },
         { label: 'New Window', click: () => browser.openNewWindow() },
         { label: 'New Incognito Window', click: () => browser.openIncognito() },
-        { label: 'New Little Arc Window', click: run('littleArc') },
+        { label: 'New Little Window', click: run('littleArc') },
         { label: 'New Space', click: run('newSpace') },
         { type: 'separator' },
         { label: 'Import from Arc…', click: run('importArc') },
@@ -243,7 +243,7 @@ export function buildItemMenu(browser: Browser, id: string): Menu | undefined {
   return Menu.buildFromTemplate(items)
 }
 
-/** The menu of a split pane's split view button, in Arc's order and wording. */
+/** The menu of a split pane's split view button. */
 export function buildSplitMenu(browser: Browser, id: string): Menu | undefined {
   const split = browser.store.activeSpace.splits.find((sp) => paneIds(sp.root).includes(id))
   if (!split) return undefined

@@ -30,6 +30,13 @@ startLog(join(app.isPackaged && !process.env.YARC_USER_DATA ? app.getPath('logs'
 app.userAgentFallback = browserUserAgent(app.userAgentFallback)
 registerUiScheme()
 askForClientCertificates()
+// macOS (and Linux) About panel: the same notice as Settings > About and NOTICE.
+app.setAboutPanelOptions({
+  applicationName: 'YARC',
+  applicationVersion: app.getVersion(),
+  copyright: 'Copyright © 2026 YARC contributors. GPL-3.0-or-later.',
+  credits: "Not affiliated with The Browser Company. 'Arc' is a trademark of The Browser Company."
+})
 // Pages read navigator.userAgent from their webContents, so switch it as a tab heads to a host that
 // needs another UA. The request that starts the navigation is already sent: profiles.ts fixes its header.
 app.on('web-contents-created', (_e, wc) => {
@@ -75,7 +82,7 @@ function installJumpList(): void {
   app.setUserTasks([
     task('--new-tab', 'New Tab', 'Open the command bar in YARC'),
     task('--new-window', 'New Window', 'Open another YARC window'),
-    task('--little-arc', 'New Little Arc Window', 'Open a small window for a quick lookup'),
+    task('--little-arc', 'New Little Window', 'Open a small window for a quick lookup'),
     task('--incognito', 'New Incognito Window', 'Browse without saving history, cookies or site data')
   ])
 }

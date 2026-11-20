@@ -880,13 +880,13 @@ browser-action-list::part(action):hover {
   }
 }
 
-/* Arc's command bar: wide, a third of the way down, tinted by the space; no dimming behind it. */
+/* The command bar: wide, a third of the way down, tinted by the space; no dimming behind it. */
 .scrim.clear {
   background: transparent;
   animation: none;
 }
 
-/* Arc's Peek buttons: dark circles in a column beside the card's top-right corner. */
+/* Peek's buttons: dark circles in a column beside the card's top-right corner. */
 .peek-buttons {
   position: fixed;
   display: flex;
@@ -1329,7 +1329,7 @@ select:focus {
 
 /* ------------------------------------------------------------------ little arc */
 
-/* Measured from Arc's Little Arc: a 47px dark bar, a 31px URL pill and an "Open in <Space>" button. */
+/* The Little Window toolbar: a 47px dark bar, a 31px URL pill and an "Open in <Space>" button. */
 body.page-little {
   --little-bar: #0d0b18;
   background: var(--little-bar);
@@ -1607,8 +1607,8 @@ body.page-little::before {
   pointer-events: none;
 }
 
-/* Split view: a bar on top of each pane, drawn under the page views (Arc). Arc: 32 pt tall, back and
-   forward 28 wide 9 apart from 7 in, close 7 from the right, the host centered, a hairline below. */
+/* Split view: a bar on top of each pane, drawn under the page views: back and forward on the left,
+   the host centered, close on the right, a hairline below. */
 .pane-card {
   position: absolute;
   border-radius: 8px;

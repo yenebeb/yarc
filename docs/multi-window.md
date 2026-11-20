@@ -4,7 +4,7 @@ Arc's behavior is in `arc-reference.md` §6 "Multiple windows". In short: every 
 
 ## Design
 
-**One controller, several windows.** The main `Browser` (`src/main/browser.ts`) keeps owning the store, the profiles, the live tabs and the Little Arc windows. Each main window is a `Win` (in `browser.ts`): its `MainWindow` (sidebar UI, overlay), the runtime state that used to sit on `Browser` (Peek, sidebar peek and its watcher, tab drag, Ctrl+Tab switcher, full-screen tab, current layout), and a persisted `WindowView`. Incognito windows stay separate controllers, as before.
+**One controller, several windows.** The main `Browser` (`src/main/browser.ts`) keeps owning the store, the profiles, the live tabs and the Little Windows. Each main window is a `Win` (in `browser.ts`): its `MainWindow` (sidebar UI, overlay), the runtime state that used to sit on `Browser` (Peek, sidebar peek and its watcher, tab drag, Ctrl+Tab switcher, full-screen tab, current layout), and a persisted `WindowView`. Incognito windows stay separate controllers, as before.
 
 **`WindowView`** (`PersistedState.windows`, in `state.json`) holds what is per window: `activeSpaceId`, the selected tab of each space (`selected`), each space's splits (`splits`), `sidebarVisible`, and the window's bounds and maximized state. `window.json` (the old single window's bounds) is read once, for the first window.
 

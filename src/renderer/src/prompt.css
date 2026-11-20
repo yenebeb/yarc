@@ -1,5 +1,5 @@
-/* The site permission prompt: Arc's popover (an NSPopover in the system appearance) with a
-   round icon, the question, and two equal buttons; Allow is the brighter one. */
+/* The site permission prompt: a translucent popover with a round icon, the question, and two
+   equal buttons; Allow is the brighter one. */
 
 body.page-prompt,
 body.page-prompt #root {

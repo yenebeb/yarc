@@ -1,4 +1,4 @@
-// The site permission prompt, drawn like Arc's: a small popover pointing at the URL field, over the
+// The site permission prompt: a small popover pointing at the URL field, over the
 // page. Its own little view (not the overlay), so the page stays usable around it and the command
 // bar can open without losing the question.
 import { WebContentsView, type BrowserWindow, type Rectangle } from 'electron'
@@ -8,7 +8,7 @@ import type { PermissionRequest, PromptAnswer } from './permission-queue'
 import { handleUi } from './ui-origin'
 import { loadRenderer, uiWebPreferences } from './window'
 
-/** The popover's width (like Arc's), plus room around it for the shadow and the arrow. */
+/** The popover's width, plus room around it for the shadow and the arrow. */
 export const PROMPT_WIDTH = 236
 const MARGIN = 16
 const VIEW_WIDTH = PROMPT_WIDTH + 2 * MARGIN

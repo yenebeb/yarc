@@ -1,4 +1,4 @@
-// Little Arc: a small, minimal window for quick links (and links opened from other apps).
+// Little Window: a small, minimal window for quick links (and links opened from other apps).
 import {
   BrowserWindow,
   clipboard,
@@ -22,7 +22,7 @@ import { PromptView } from './prompt-view'
 import { LiveTab, type OpenDisposition, type TabHost } from './tab'
 import { loadRenderer, uiWebPreferences } from './window'
 
-/** Toolbar height, like Arc's Little Arc. The page fills the rest of the window, edge to edge. */
+/** Toolbar height. The page fills the rest of the window, edge to edge. */
 const TOOLBAR = 47
 const isMac = process.platform === 'darwin'
 
@@ -219,7 +219,7 @@ export class LittleWindow implements TabHost {
   onFoundInPage(): void {}
 
   adoptOpenedPage(opener: LiveTab, options: BrowserWindowConstructorOptions | undefined, disposition: OpenDisposition, url: string): WebContents {
-    // New tabs from a Little Arc page go to the main window, like Arc.
+    // New tabs from a Little Window page go to the main window, like Arc.
     return this.browser.adoptOpenedPage(opener, options, disposition, url)
   }
 

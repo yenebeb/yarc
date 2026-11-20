@@ -45,7 +45,7 @@
   WriteRegStr SHELL_CONTEXT "${ARCSHELL_CLIENT_KEY}\DefaultIcon" "" "$appExe,0"
   WriteRegStr SHELL_CONTEXT "${ARCSHELL_CLIENT_KEY}\shell\open\command" "" '"$appExe"'
   WriteRegStr SHELL_CONTEXT "${ARCSHELL_CLIENT_KEY}\Capabilities" "ApplicationName" "${PRODUCT_NAME}"
-  WriteRegStr SHELL_CONTEXT "${ARCSHELL_CLIENT_KEY}\Capabilities" "ApplicationDescription" "${PRODUCT_NAME} - an open-source, Arc-style web browser"
+  WriteRegStr SHELL_CONTEXT "${ARCSHELL_CLIENT_KEY}\Capabilities" "ApplicationDescription" "${PRODUCT_NAME} - an open-source web browser"
   WriteRegStr SHELL_CONTEXT "${ARCSHELL_CLIENT_KEY}\Capabilities" "ApplicationIcon" "$appExe,0"
   WriteRegStr SHELL_CONTEXT "${ARCSHELL_CLIENT_KEY}\Capabilities\StartMenu" "StartMenuInternet" "ArcShell"
   WriteRegStr SHELL_CONTEXT "${ARCSHELL_CLIENT_KEY}\Capabilities\URLAssociations" "http" "${ARCSHELL_URL_PROGID}"

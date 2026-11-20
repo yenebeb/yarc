@@ -80,7 +80,7 @@ export const BINDINGS: Binding[] = [
   { id: 'toggleSidebar', title: 'Toggle Sidebar', ...both('Mod+S'), palette: true },
   { id: 'copyUrl', title: 'Copy URL', ...both('Mod+Shift+C'), palette: true },
   { id: 'copyUrlMarkdown', title: 'Copy URL as Markdown', ...both('Mod+Shift+Alt+C'), palette: true },
-  { id: 'littleArc', title: 'New Little Arc Window', ...both('Mod+Alt+N'), palette: true },
+  { id: 'littleArc', title: 'New Little Window', ...both('Mod+Alt+N'), palette: true },
   { id: 'newWindow', title: 'New Window', ...both('Mod+N'), palette: true },
   { id: 'newIncognitoWindow', title: 'New Incognito Window', ...both('Mod+Shift+N'), palette: true },
   { id: 'closeTab', title: 'Close Tab', mac: ['Cmd+W'], other: ['Ctrl+W', 'Ctrl+F4'], palette: true },

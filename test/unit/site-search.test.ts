@@ -4,7 +4,7 @@ import { matchSiteSearch, SITE_SEARCHES, siteSearchUrl } from '../../src/shared/
 
 const name = (input: string) => matchSiteSearch(input)?.name
 
-test('Arc\'s site search list: 19 sites and 8 search engines, each with a %s search URL', () => {
+test('the site search list: 19 sites and 8 search engines, each with a %s search URL', () => {
   assert.equal(SITE_SEARCHES.length, 27)
   for (const s of SITE_SEARCHES) assert.match(s.url, /^https:\/\/[^%]+%s/, s.name)
   assert.equal(new Set(SITE_SEARCHES.map((s) => s.keyword)).size, SITE_SEARCHES.length)

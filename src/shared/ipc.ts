@@ -59,7 +59,7 @@ export type LittleOp =
   | 'profileMenu'
   | 'spaceMenu'
 
-/** Where a Little Arc toolbar menu opens, in window coordinates. */
+/** Where a Little Window toolbar menu opens, in window coordinates. */
 export interface LittleAnchor {
   x: number
   y: number

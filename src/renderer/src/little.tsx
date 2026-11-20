@@ -1,4 +1,4 @@
-// Little Arc toolbar, like Arc's: a URL pill (profile chip, domain, copy link) and "Open in <Space>".
+// Little Window toolbar: a URL pill (profile chip, domain, copy link) and "Open in <Space>".
 import { useEffect, useState, type MouseEvent } from 'react'
 import { createRoot } from 'react-dom/client'
 import type { LittleOp, LittleState } from '../../shared/ipc'

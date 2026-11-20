@@ -1,4 +1,4 @@
-// The site permission prompt, like Arc's: "Allow meet.google.com to access your camera?"
+// The site permission prompt: "Allow meet.google.com to access your camera?"
 // with Not Now / Allow, in a popover pointing at the URL field. The main process sizes and places
 // this view (prompt-view.ts); the page only draws the popover and reports how tall it came out.
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'

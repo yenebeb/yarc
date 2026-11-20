@@ -1,4 +1,4 @@
-// Preload for YARC's own UI (sidebar, overlay, Little Arc toolbar, permission prompt). Never used for web pages.
+// Preload for YARC's own UI (sidebar, overlay, Little Window toolbar, permission prompt). Never used for web pages.
 // Runs sandboxed: everything it imports is bundled into it (electron.vite.config.ts).
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
 import { injectBrowserAction } from 'electron-chrome-extensions/browser-action'

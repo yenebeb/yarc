@@ -202,17 +202,17 @@ function General({ state }: { state: AppState }) {
           />
           <span className="set-value">{width}px</span>
         </Row>
-        <ToggleRow title="Sidebar on the right" hint="Arc never had this." checked={s.sidebarRight} onChange={(v) => patch({ sidebarRight: v })} />
+        <ToggleRow title="Sidebar on the right" hint="Put the sidebar on the other side of the window." checked={s.sidebarRight} onChange={(v) => patch({ sidebarRight: v })} />
       </Group>
-      <Group title="Little Arc and Peek">
+      <Group title="Little Window and Peek">
         <ToggleRow
-          title="Open links from other apps in Little Arc"
+          title="Open links from other apps in a Little Window"
           hint="When off, they open as a new tab in the current space."
           checked={s.littleArcForExternalLinks}
           onChange={(v) => patch({ littleArcForExternalLinks: v })}
         />
-        <Row title="Little Arc profile" hint="Which logins and history Little Arc windows use.">
-          <Select label="Little Arc profile" value={s.littleArcProfileId} onChange={(v) => patch({ littleArcProfileId: v })}>
+        <Row title="Little Window profile" hint="Which logins and history Little Windows use.">
+          <Select label="Little Window profile" value={s.littleArcProfileId} onChange={(v) => patch({ littleArcProfileId: v })}>
             <option value="">Current space's profile{spaceProfile ? ` (now: ${spaceProfile.name})` : ''}</option>
             {state.profiles.map((p) => (
               <option key={p.id} value={p.id}>
@@ -223,7 +223,7 @@ function General({ state }: { state: AppState }) {
         </Row>
         <ToggleRow
           title="Open other sites from pinned tabs in Peek"
-          hint="Links from pinned tabs and favorites to another site open in a Peek preview, like Arc."
+          hint="Links from pinned tabs and favorites to another site open in a Peek preview."
           checked={s.peekPinnedLinks}
           onChange={(v) => patch({ peekPinnedLinks: v })}
         />
@@ -421,7 +421,7 @@ function Shortcuts() {
   }
   return (
     <>
-      <p className="set-note">Shortcuts follow Arc's defaults{isMac ? '' : ' on Windows'}. They can't be changed yet.</p>
+      <p className="set-note">Shortcuts can't be changed yet.</p>
       <Group>
         {rows.map((r) => (
           <div key={r.title} className="set-row set-shortcut">
@@ -443,7 +443,7 @@ function About() {
     <div className="set-about">
       <img className="logo" src={logo} alt="" />
       <h2>YARC</h2>
-      <p>Yarrr! Yet Another Arc Clone: an open-source, Arc-style browser. Not affiliated with The Browser Company.</p>
+      <p>Yarrr! An open-source browser for people who liked Arc. Not affiliated with The Browser Company.</p>
     </div>
   )
 }

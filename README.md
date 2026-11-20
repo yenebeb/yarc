@@ -1,14 +1,14 @@
 <p align="center"><img src="build/icon.svg" width="160" alt="YARC's icon: a purple A in a pirate hat, bandana and eyepatch"></p>
 
-# YARC: an open-source replacement for the Arc browser
+# YARC: an open-source alternative to the Arc browser
 
-**YARC is a free, open-source replacement for the Arc browser, which shuts down on 22 December 2026.** It works the way Arc did, with a vertical sidebar, Spaces with their own profiles, the command bar, split view, Little Arc and Peek. It imports your Arc spaces, profiles, favorites, pinned tabs, folders, archive and history in one step. It runs on macOS, Windows and Linux (experimental).
+**YARC is a free, open-source alternative to the Arc browser, which shuts down on 22 December 2026.** It will feel familiar if you used Arc: a vertical sidebar, Spaces with their own profiles, the command bar, split view, Little Window and Peek. It imports your Arc spaces, profiles, favorites, pinned tabs, folders, archive and history in one step. It runs on macOS, Windows and Linux (experimental).
 
 **[Download YARC](https://github.com/yenebeb/yarc/releases/latest)** · [Website](https://yenebeb.nl/yarc) · [Moving from Arc](#moving-from-arc)
 
-The Browser Company is shutting Arc down on **22 December 2026**. After that date the app stops working and Arc accounts are deactivated. YARC (*Yet Another Arc Clone*, yarrr!) is meant for people who don't want to switch to Dia or go back to a tab strip. It reproduces Arc's workflow and imports your Arc sidebar, so you can carry on as before.
+The Browser Company is shutting Arc down on **22 December 2026**. After that date the app stops working and Arc accounts are deactivated. YARC (yarrr!) is meant for people who don't want to switch to Dia or go back to a tab strip. It keeps the sidebar-first way of browsing and imports your Arc sidebar, so you can carry on as before.
 
-> YARC is an independent project. It is not affiliated with, endorsed by or connected to The Browser Company. "Arc" is their trademark; this project re-implements the interaction design on top of Chromium (via Electron).
+> YARC is an independent project. It is not affiliated with, endorsed by or connected to The Browser Company. "Arc" is a trademark of The Browser Company. YARC's code and artwork are its own, written from scratch on top of Chromium (via Electron).
 
 ![YARC: sidebar with favorites, pinned tabs, a folder and Today tabs](docs/screenshots/sidebar.png)
 
@@ -106,9 +106,9 @@ Drag the gap between panes to resize them, and double-click it to make them equa
 
 `⌘N` / `Ctrl+N` (or File › New Window, and the Dock menu on macOS) opens another window on the space you're in, with the command bar open. Every window shows the same sidebar: a tab you pin in one shows up in the other. Each window keeps its own space, selected tab, split view and sidebar. A tab can be open in two windows at once: the window you're using has the live page, the other shows how it last looked until you click it. YARC reopens all your windows when you start it again.
 
-### Little Arc
+### Little Window
 
-![Little Arc](docs/screenshots/little-arc.png)
+![Little Window](docs/screenshots/little-arc.png)
 
 A small, minimal window for quick lookups. Open one with `Ctrl+Alt+N` / `⌘⌥N`. When YARC is your default browser, links from other apps (Slack, Discord, email) open here too, so your sidebar stays tidy. If you want to keep the page, click **Open in** *your space*: it moves into your Today tabs as it is, without reloading. The arrow next to it picks another space. If you don't want to keep it, just close the window.
 
@@ -140,7 +140,7 @@ The source browser's files are never changed: YARC copies them first and reads t
 - **Open in Chrome** (`Ctrl/⌘+Alt+O`) for the rare site that only works in Google Chrome.
 - Permission prompts for the camera, microphone, location and notifications, asked once per site.
 - Light, dark or system theme, and a choice of Google, DuckDuckGo, Bing, Kagi or Brave Search.
-- **A tour** on the first launch, like Arc's onboarding: import from Arc, Chrome or Zen, make YARC your default browser, then one step each for spaces and the sidebar, peeking at a hidden sidebar, the command bar, pinning, split view, Little Arc and incognito windows. Those steps float over the page; do what a step says (press `⌘S`, `⌘T`, `⌘D`, drag a tab onto the page…) and it goes on by itself, or press *Skip*. *Take the YARC Tour* in the command bar (or the **YARC** menu on macOS) runs it again.
+- **A tour** on the first launch, like Arc's onboarding: import from Arc, Chrome or Zen, make YARC your default browser, then one step each for spaces and the sidebar, peeking at a hidden sidebar, the command bar, pinning, split view, Little Window and incognito windows. Those steps float over the page; do what a step says (press `⌘S`, `⌘T`, `⌘D`, drag a tab onto the page…) and it goes on by itself, or press *Skip*. *Take the YARC Tour* in the command bar (or the **YARC** menu on macOS) runs it again.
 - **What's New** on the first launch after an update lists every change since the version you had, even when one update skips several releases. Open it again with *What's New* in the command bar (or the **YARC** menu on macOS).
 
 ## Install
@@ -204,6 +204,10 @@ After an update, YARC shows **What's New** once: the changes in every version si
 1. On the Mac, copy the folder `~/Library/Application Support/Arc` to a USB stick or cloud drive. In Finder, press `⇧⌘G` and paste that path to get there.
 2. On the other computer, run **Import from Arc**, choose **Use a Different Copy…** and select the copied `Arc` folder or the `StorableSidebar.json` file inside it.
 
+### Where things are
+
+Most features keep the names you know from Arc. One is different: Arc's Little Arc is called **Little Window** in YARC (`⌘⌥N`, or `Ctrl+Alt+N` on Windows).
+
 ### What isn't imported
 
 - **Saved passwords, cookies and logins.** Browsers encrypt these with a key tied to the machine, so you'll need to sign in to your sites again. Before Arc goes away, export your passwords from Arc (`arc://settings/passwords` → ⋮ → Export) and import them into a password manager such as Bitwarden or 1Password. Their extensions work in YARC.
@@ -222,7 +226,7 @@ These are Arc's shortcuts. **Mod** means `⌘` on macOS and `Ctrl` on Windows. T
 | Copy URL | `⌘⇧C` | `Ctrl+Shift+C` |
 | Copy URL as Markdown | `⌘⇧⌥C` | `Ctrl+Shift+Alt+C` |
 | New window | `⌘N` | `Ctrl+N` |
-| New Little Arc window | `⌘⌥N` | `Ctrl+Alt+N` |
+| New Little Window | `⌘⌥N` | `Ctrl+Alt+N` |
 | Close tab (unload if pinned) | `⌘W` | `Ctrl+W` / `Ctrl+F4` |
 | Reopen closed tab | `⌘⇧T` | `Ctrl+Shift+T` |
 | Pin / unpin tab | `⌘D` | `Ctrl+D` |
@@ -247,7 +251,7 @@ These are Arc's shortcuts. **Mod** means `⌘` on macOS and `Ctrl` on Windows. T
 | Duplicate tab | `⌘⇧D` | `Ctrl+Shift+D` |
 | Open in Chrome | `⌘⌥O` | `Ctrl+Alt+O` |
 
-In a Little Arc window: `Mod+O` moves the page into the main window, `Mod+Shift+O` picks the space to move it to, `Mod+W` closes the window, `Mod+Shift+C` copies the URL, and `Mod+[` / `Mod+]` (`Alt+←` / `Alt+→` on Windows) go back and forward.
+In a Little Window: `Mod+O` moves the page into the main window, `Mod+Shift+O` picks the space to move it to, `Mod+W` closes the window, `Mod+Shift+C` copies the URL, and `Mod+[` / `Mod+]` (`Alt+←` / `Alt+→` on Windows) go back and forward.
 
 In Peek: `Esc` or `Mod+W` closes it, and `Mod+O` opens the page as a tab.
 
@@ -301,7 +305,7 @@ pnpm dev             # start with hot reload
 | `pnpm start` | Run the production build |
 | `pnpm typecheck` | TypeScript check |
 | `pnpm test` | Unit tests: URL handling, shortcuts, sidebar model, Arc parser |
-| `pnpm test:e2e` | Build, then drive the real app with Playwright (tabs, spaces, splits, Little Arc, persistence) |
+| `pnpm test:e2e` | Build, then drive the real app with Playwright (tabs, spaces, splits, Little Window, persistence) |
 | `pnpm dist:win` | Windows installers in `release/` |
 | `pnpm dist:mac` | macOS DMGs in `release/` (run on a Mac) |
 | `pnpm dist:dir` | Unpacked app for quick local testing |
@@ -360,7 +364,7 @@ Details and gaps are in [docs/electron-notes.md](docs/electron-notes.md#6-securi
 | `src/main/profiles.ts` | Sessions, permissions, downloads |
 | `src/main/extensions.ts` | Chrome extension APIs and the Web Store, per profile |
 | `src/main/adblock.ts` | Built-in ad and tracker blocking for every profile |
-| `src/main/little.ts` | Little Arc windows |
+| `src/main/little.ts` | Little Windows |
 | `src/main/peek.ts` | Peek: pages from pinned tabs and favorites floating over the current tab |
 | `src/main/importers/` | Arc, Zen and Chromium importers |
 | `src/shared/` | State types, actions, keymap, URL helpers (unit tested) |
@@ -388,4 +392,4 @@ Before opening a PR, run `pnpm typecheck && pnpm test && pnpm test:e2e`. `main` 
 
 ## License
 
-[GPL-3.0-or-later](LICENSE). YARC is an independent project and is not affiliated with The Browser Company. "Arc" is a trademark of its respective owner.
+[GPL-3.0-or-later](LICENSE). YARC is an independent project and is not affiliated with The Browser Company. "Arc" is a trademark of The Browser Company (see [NOTICE](NOTICE)).

@@ -77,7 +77,7 @@ export class MainWindow {
       minHeight: 360,
       show: false,
       titleBarStyle: mac ? 'hiddenInset' : 'hidden',
-      // Same spot as Arc's traffic lights.
+      // In line with the top bar.
       trafficLightPosition: { x: 13, y: 16 },
       webPreferences: uiWebPreferences()
     }

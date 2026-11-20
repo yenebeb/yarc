@@ -531,7 +531,7 @@ test('spaces with their own profile do not share storage', async () => {
   expect((await state()).activeSpaceId).toBe(firstSpace)
 })
 
-test('Little Arc opens a mini window and can move the page into the main window', async () => {
+test('Little Window opens a mini window and can move the page into the main window', async () => {
   await dispatch({ type: 'littleArc', url: `${base}/little` })
   await pageWithUrl('little.html')
   await pageWithUrl('/little')
@@ -545,7 +545,7 @@ test('Little Arc opens a mini window and can move the page into the main window'
   expect((await space()).today[0].url).toBe(`${base}/little`)
 })
 
-test('Little Arc reopens a page with the profile picked on its chip, remembered per site, and keeps its size', async () => {
+test('Little Window reopens a page with the profile picked on its chip, remembered per site, and keeps its size', async () => {
   const url = `${base}/little-profile`
   const littles = () =>
     app.evaluate(() => [...(globalThis as any).arcBrowser.littles].map((l: any) => ({ profile: l.profile.id, url: l.url, size: l.win.getSize() })))
@@ -640,7 +640,7 @@ function launchSecondInstance(arg: string): void {
   child.unref()
 }
 
-test('links and .html files from other apps open in Little Arc', async () => {
+test('links and .html files from other apps open in a Little Window', async () => {
   const littles = () => app.evaluate(() => (globalThis as any).arcBrowser.littles.size as number)
   const before = await littles()
   launchSecondInstance(`${base}/from-slack`)
@@ -849,7 +849,7 @@ test('menu bar commands reopen the closed main window (macOS)', async () => {
   await expect.poll(() => app.evaluate(() => (globalThis as any).arcBrowser.window.overlayMode.kind)).toBe('command')
 })
 
-test('Little Arc can move its page into a closed main window (macOS)', async () => {
+test('Little Window can move its page into a closed main window (macOS)', async () => {
   test.skip(process.platform !== 'darwin', 'macOS keeps the app running without windows')
   await app.evaluate(() => (globalThis as any).arcBrowser.window.win.close())
   await expect.poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length)).toBe(0)

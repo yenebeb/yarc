@@ -264,7 +264,7 @@ http(s). Non-web pinned items such as `arc://…` and `chrome-extension://…` e
 |---|---|---|
 | `customInfo.iconType.emoji_v2` | string (grapheme, may include ZWJ and variation selectors) | preferred **[confirmed]** |
 | `customInfo.iconType.emoji` | integer Unicode scalar | older format: `String.fromCodePoint(n)` in a try/catch **[confirmed by Zen]** |
-| `customInfo.iconType.icon` | string | a named icon from Arc's `CustomIcon` enum, drawn from its bundled `ionicons.ttf`: `star`, `bookmark`, `heart`, `bulb`, `planet`, `musicalNote`, `github`, … (61 names, camelCase) **[confirmed in the macOS Arc binary and real data]**. We map them to the closest emoji |
+| `customInfo.iconType.icon` | string | a named icon (Ionicons names): `star`, `bookmark`, `heart`, `bulb`, `planet`, `musicalNote`, `github`, … (61 names, camelCase) **[confirmed in real data]**. We map them to the closest emoji |
 | none | | no icon; the space shows its initial |
 
 ### 2.8 Space color / theme
