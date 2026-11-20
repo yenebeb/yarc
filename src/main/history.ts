@@ -73,17 +73,32 @@ export class History {
     if (title && !this.closed) this.db.prepare('UPDATE urls SET title = ? WHERE url = ?').run(title, url)
   }
 
-  search(query: string, limit = 8): HistoryEntry[] {
-    const like = contains(query)
-    const weekAgo = Date.now() - 7 * 864e5
-    return this.db
+  /**
+   * Pages for the command bar: every word of the query in the title or URL. The pages whose title or
+   * address starts with the query come first, then the most visited; the caller ranks them.
+   */
+  search(query: string, limit = 500): HistoryEntry[] {
+    const words = query.trim().split(/\s+/).filter(Boolean)
+    if (!words.length) return []
+    const start = `${query.trim().replace(/[\\%_]/g, (m) => `\\${m}`)}%`
+    const starting = this.db
       .prepare(
         `SELECT url, title, visit_count AS visitCount, last_visit AS lastVisit FROM urls
-         WHERE url LIKE ? ESCAPE '\\' OR title LIKE ? ESCAPE '\\'
-         ORDER BY (visit_count + CASE WHEN last_visit > ? THEN 10 ELSE 0 END) DESC, last_visit DESC
-         LIMIT ?`
+         WHERE title LIKE ?1 ESCAPE '\\' OR url LIKE 'http://' || ?1 ESCAPE '\\' OR url LIKE 'https://' || ?1 ESCAPE '\\'
+           OR url LIKE 'http://www.' || ?1 ESCAPE '\\' OR url LIKE 'https://www.' || ?1 ESCAPE '\\'
+         ORDER BY visit_count DESC, last_visit DESC LIMIT 100`
       )
-      .all(like, like, weekAgo, limit) as unknown as HistoryEntry[]
+      .all(start) as unknown as HistoryEntry[]
+    const everyWord = words.map(() => `(url LIKE ? ESCAPE '\\' OR title LIKE ? ESCAPE '\\')`).join(' AND ')
+    const containing = this.db
+      .prepare(
+        `SELECT url, title, visit_count AS visitCount, last_visit AS lastVisit FROM urls
+         WHERE ${everyWord}
+         ORDER BY visit_count DESC, last_visit DESC LIMIT ?`
+      )
+      .all(...words.flatMap((w) => [contains(w), contains(w)]), limit) as unknown as HistoryEntry[]
+    const seen = new Set(starting.map((h) => h.url))
+    return [...starting, ...containing.filter((h) => !seen.has(h.url))]
   }
 
   recent(limit = 200, offset = 0, query = ''): (HistoryEntry & { time: number })[] {

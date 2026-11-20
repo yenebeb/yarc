@@ -242,6 +242,7 @@ const completionText = (url: string) => url.replace(/^https?:\/\/(www\.)?/i, '')
 const KIND_ICON: Partial<Record<SearchResult['kind'], IconName>> = {
   suggestion: 'search',
   history: 'clock',
+  pastSearch: 'clock',
   command: 'command',
   url: 'globe',
   archive: 'archive'
@@ -290,11 +291,9 @@ function CommandBar({ state, mode }: { state: AppState; mode: Extract<OverlayMod
     const extra: SearchResult[] = suggestions
       .filter((s) => !seen.has(s.toLowerCase()))
       .map((s) => ({ kind: 'suggestion', id: `sug:${s}`, title: s, url: s, subtitle: '' }))
-    // The top hit first, then the search for the query, then tabs/commands/history and the other suggestions.
-    const all = [...local, ...extra]
-    const search = all.findIndex((r, i) => i > 0 && r.kind === 'suggestion')
-    if (search > 1) all.splice(1, 0, ...all.splice(search, 1))
-    return all.slice(0, MAX_RESULTS)
+    // The main process already put the top hit, the search for the query, then commands, tabs and
+    // history in order (src/main/search-rank.ts); the search engine's suggestions come last.
+    return [...local, ...extra].slice(0, MAX_RESULTS)
   }, [local, suggestions, site, query])
 
   /** The site Tab would switch to. */

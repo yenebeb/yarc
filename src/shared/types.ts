@@ -291,7 +291,8 @@ export type OverlayMode =
   | { kind: 'update' }
 
 export interface SearchResult {
-  kind: 'tab' | 'favorite' | 'pinned' | 'history' | 'suggestion' | 'url' | 'command' | 'archive'
+  /** `pastSearch`: something searched for before, found in history; its `url` is the query. */
+  kind: 'tab' | 'favorite' | 'pinned' | 'history' | 'pastSearch' | 'suggestion' | 'url' | 'command' | 'archive'
   id: string
   title: string
   subtitle?: string

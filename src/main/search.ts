@@ -5,45 +5,16 @@ import { spaceItems } from '../shared/tree'
 import type { SearchResult } from '../shared/types'
 import { SEARCH_ENGINES, toUrl } from '../shared/url'
 import type { Browser } from './browser'
-
-/** Case-insensitive match score: prefix > word start > substring > subsequence. 0 = no match. */
-export function score(text: string, query: string): number {
-  const t = text.toLowerCase()
-  const q = query.toLowerCase()
-  if (!q) return 1
-  if (t.startsWith(q)) return 100
-  const i = t.indexOf(q)
-  if (i > 0 && /[\s/.\-_:]/.test(t[i - 1])) return 80
-  if (i >= 0) return 60
-  let k = 0
-  for (const ch of t) if (ch === q[k]) k++
-  return k === q.length && q.length > 2 ? 20 : 0
-}
+import { arrange, historyCandidates, type Candidate } from './search-rank'
 
 export function search(browser: Browser, raw: string): SearchResult[] {
   const query = raw.trim()
   const state = browser.store.state
   const active = browser.store.activeSpace
-  const results: SearchResult[] = []
   const live = browser.live
 
-  if (query) {
-    const url = toUrl(query)
-    results.push(
-      url
-        ? { kind: 'url', id: `url:${url}`, title: url, subtitle: 'Open URL', url }
-        : {
-            kind: 'suggestion',
-            id: `search:${query}`,
-            title: query,
-            subtitle: `Search ${SEARCH_ENGINES[state.settings.searchEngine].name}`,
-            url: query
-          }
-    )
-  }
-
   // Open tabs and sidebar items, active space first.
-  const tabHits: (SearchResult & { score: number })[] = []
+  const tabs: Candidate[] = []
   const seen = new Set<string>()
   const spaces = [active, ...state.spaces.filter((s) => s !== active)]
   for (const space of spaces) {
@@ -52,10 +23,8 @@ export function search(browser: Browser, raw: string): SearchResult[] {
       seen.add(item.id)
       const title = item.savedTitle || live.get(item.id)?.wc.getTitle() || item.title
       const url = item.url
-      const s = Math.max(score(title, query), score(url.replace(/^https?:\/\/(www\.)?/, ''), query) * 0.9)
-      if (!s) continue
       const isFav = state.profiles.some((p) => p.favorites.includes(item))
-      tabHits.push({
+      const result: SearchResult = {
         kind: isFav ? 'favorite' : item.savedUrl ? 'pinned' : 'tab',
         id: `tab:${item.id}`,
         title,
@@ -63,52 +32,50 @@ export function search(browser: Browser, raw: string): SearchResult[] {
         url,
         favicon: item.favicon,
         target: item.id,
-        spaceId: space.id,
-        score: s + (space === active ? 10 : 0) + (live.has(item.id) ? 5 : 0)
-      })
+        spaceId: space.id
+      }
+      tabs.push({ source: 'tab', result, inActiveSpace: space === active, loaded: live.has(item.id) })
     }
   }
-  tabHits.sort((a, b) => b.score - a.score)
-  const tabs = tabHits.slice(0, query ? 6 : 8)
-  // A strong match on an open tab beats "search for…", like Arc's "Switch to Tab" top hit.
-  if (tabs[0] && tabs[0].score >= 100) results.unshift(...tabs)
-  else results.push(...tabs)
+  if (!query) {
+    // Nothing typed: the open tabs, the active space's loaded ones first.
+    const weight = (t: Candidate) => (t.source === 'tab' ? (t.inActiveSpace ? 2 : 0) + (t.loaded ? 1 : 0) : 0)
+    return [...tabs].sort((a, b) => weight(b) - weight(a)).slice(0, 8).map((t) => t.result)
+  }
 
-  if (!query) return results
+  const url = toUrl(query)
+  const typed: SearchResult = url
+    ? { kind: 'url', id: `url:${url}`, title: url, subtitle: 'Open URL', url }
+    : {
+        kind: 'suggestion',
+        id: `search:${query}`,
+        title: query,
+        subtitle: `Search ${SEARCH_ENGINES[state.settings.searchEngine].name}`,
+        url: query
+      }
 
-  const commands: (SearchResult & { score: number })[] = []
+  const commands: Candidate[] = []
   for (const b of BINDINGS) {
     if (!b.palette) continue
     const title = b.id === 'installUpdate' ? browser.updater.actionTitle() : b.title
-    if (!title) continue
-    const s = score(title, query)
-    if (s >= 60) commands.push({ kind: 'command', id: `cmd:${b.id}`, title, target: b.id, score: s })
+    if (title) commands.push({ source: 'command', result: { kind: 'command', id: `cmd:${b.id}`, title, target: b.id } })
   }
   for (const space of state.spaces) {
-    const s = score(`Switch to ${space.name}`, query) || score(space.name, query)
-    if (s >= 60) {
-      commands.push({ kind: 'command', id: `space:${space.id}`, title: `Switch to ${space.emoji ?? ''} ${space.name}`.replace(/\s+/g, ' '), target: `space:${space.id}`, score: s })
-    }
-  }
-  commands.sort((a, b) => b.score - a.score)
-  results.push(...commands.slice(0, 4))
-
-  const history = browser.profiles.get(active.profileId).history.search(query, 8)
-  const urls = new Set(results.map((r) => r.url))
-  for (const h of history) {
-    if (urls.has(h.url)) continue
-    urls.add(h.url)
-    results.push({ kind: 'history', id: `hist:${h.url}`, title: h.title || h.url, subtitle: h.url, url: h.url })
-    if (results.length > 18) break
+    const title = `Switch to ${space.emoji ?? ''} ${space.name}`.replace(/\s+/g, ' ')
+    commands.push({ source: 'command', result: { kind: 'command', id: `space:${space.id}`, title, target: `space:${space.id}` } })
   }
 
-  for (const a of state.archive) {
-    if (results.length > 22) break
-    if (urls.has(a.url) || !(score(a.title, query) >= 60 || score(a.url, query) >= 60)) continue
-    urls.add(a.url)
-    results.push({ kind: 'archive', id: `arch:${a.id}`, title: a.title, subtitle: `Archived · ${a.url}`, url: a.url, favicon: a.favicon, target: a.id })
-  }
-  return results
+  const history = historyCandidates(browser.profiles.get(active.profileId).history.search(query), query)
+
+  const archive: Candidate[] = state.archive.map((a) => ({
+    source: 'archive',
+    result: { kind: 'archive', id: `arch:${a.id}`, title: a.title, subtitle: `Archived · ${a.url}`, url: a.url, favicon: a.favicon, target: a.id }
+  }))
+
+  // Open tabs before the same page in history or the archive.
+  const urls = new Set([typed.url, ...tabs.map((t) => t.result.url)])
+  const elsewhere = [...history, ...archive].filter((c) => !c.result.url || !urls.has(c.result.url))
+  return arrange(query, typed, [...commands, ...tabs, ...elsewhere])
 }
 
 export async function suggest(browser: Browser, query: string): Promise<string[]> {
