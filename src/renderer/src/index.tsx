@@ -68,7 +68,7 @@ function useToast(): string | undefined {
   return text
 }
 
-/** Still images of pages another window shows live (IPC.snapshot), by item id. */
+/** Still images of pages another window shows live (IPC.snapshot, refreshed as they paint), by item id. */
 function useStills(): Record<string, string> {
   const [stills, setStills] = useState<Record<string, string>>({})
   useEffect(() => arc.onSnapshot(({ id, image }) => setStills((s) => ({ ...s, [id]: image }))), [])
@@ -173,7 +173,8 @@ function ContentDecor({ state }: { state: AppState }) {
       <div className="content-empty" style={{ left: content.x, top: content.y, width: content.width, height: content.height }} />
     )
   }
-  // A page can be live in one window only; here it shows as it last looked. A click brings it back.
+  // A page can be live in one window only; here it shows greyed out, mirrored from the window
+  // that has it (a few frames a second). A click, or focusing this window, brings it here.
   const elsewhere = views
     .filter((v) => v.elsewhere)
     .map((v) => (

@@ -56,6 +56,7 @@ import { DownloadBurst, isDangerous, markFromInternet } from './downloads'
 import { Extensions } from './extensions'
 import { runImport } from './importers'
 import { LittleWindow } from './little'
+import { Mirror, stillOf } from './mirror'
 import { Peek, sameSite } from './peek'
 import { buildContextMenu, buildFolderMenu, buildItemMenu, buildSpaceMenu, buildSplitMenu } from './menus'
 import { Profiles, type ProfileRuntime } from './profiles'
@@ -129,6 +130,8 @@ export class Browser implements TabHost {
    */
   private cur!: Win
   readonly live = new Map<ID, LiveTab>()
+  /** Streams pages one window shows live to the other windows that show them too (as stills). */
+  private mirror = new Mirror((wc, still) => this.sendStill(wc, still))
   private mru: ID[] = []
   private closed: ClosedTab[] = []
   downloads: DownloadItemInfo[] = []
@@ -369,6 +372,9 @@ export class Browser implements TabHost {
       // Its pages stay for the other windows; the window isn't restored at the next launch.
       if (!this.quitting) this.state.windows = this.state.windows.filter((v) => v !== w.view)
       if (this.cur === w) this.use(this.wins[this.wins.length - 1])
+      // Pages the closed window had live go live in a window that shows a still of them.
+      for (const other of this.wins) if (this.waitsForPage(other)) this.on(other, () => this.layout())
+      this.syncMirrors()
       this.store.save()
       return this.emitSoon()
     }
@@ -746,12 +752,24 @@ export class Browser implements TabHost {
     const mode = w.overlayMode.kind === 'peek' ? this.peekMode() : w.overlayMode
     if (mode.kind !== 'none') w.setOverlay(mode, this.overlayRect(mode))
     this.syncPrompts()
+    this.syncMirrors()
     this.emitSoon()
+    // A page this window let go of goes live again in a window that shows a still of it.
+    for (const other of this.wins) if (other !== this.cur && this.waitsForPage(other)) this.on(other, () => this.layout())
+  }
+
+  /** True when `w` shows a still of a page that no window has live, so it should take the page. */
+  private waitsForPage(w: Win): boolean {
+    if (!w.open) return false
+    return w.layout.views.some((v) => {
+      const view = v.elsewhere ? this.live.get(v.id)?.view : undefined
+      return !!view && !this.wins.some((x) => x.open && x.main.isShown(view))
+    })
   }
 
   /**
    * Shows these pages in the current window. A page can be in one window only: one that another
-   * window shows moves here, and that window shows a still of it until it gets it back.
+   * window shows moves here, and that window shows a live still of it until it gets it back.
    */
   private show(slots: ViewSlot[]): void {
     for (const other of this.wins) {
@@ -761,22 +779,43 @@ export class Browser implements TabHost {
     this.window.show(slots)
   }
 
-  /** Takes a page out of `w`, which now shows a still image of it (IPC.snapshot). */
+  /** Takes a page out of `w`, which now shows a still image of it (IPC.snapshot), kept live by the mirror. */
   private lend(w: Win, view: WebContentsView): void {
     w.main.detach(view)
     const pane = w.layout.views.find((v) => this.live.get(v.id)?.view === view)
     if (!pane) return
     pane.elsewhere = true
     const tab = this.live.get(pane.id)!
+    // The mirror only sends a frame when the page paints again; a still page needs one now.
     void tab.wc
       .capturePage()
       .then((image) => {
-        if (!w.open || image.isEmpty()) return
-        const still = image.getSize().width > 1600 ? image.resize({ width: 1600 }) : image
-        w.main.ui.send(IPC.snapshot, { id: pane.id, image: `data:image/jpeg;base64,${still.toJPEG(80).toString('base64')}` })
+        if (w.open && !image.isEmpty()) w.main.ui.send(IPC.snapshot, { id: pane.id, image: stillOf(image) })
       })
       .catch(() => {})
     this.emitSoon()
+  }
+
+  /** Mirrors exactly the pages some window shows a still of. */
+  private syncMirrors(): void {
+    const pages = new Set<WebContents>()
+    for (const w of this.wins) {
+      if (!w.open) continue
+      for (const v of w.layout.views) {
+        const t = v.elsewhere ? this.live.get(v.id) : undefined
+        if (t && !t.destroyed) pages.add(t.wc)
+      }
+    }
+    this.mirror.watch(pages)
+  }
+
+  /** Sends a new still of a mirrored page to every window that shows it elsewhere. */
+  private sendStill(wc: WebContents, image: string): void {
+    const id = this.itemIdFor(wc)
+    if (!id) return
+    for (const w of this.wins) {
+      if (w.open && w.layout.views.some((v) => v.id === id && v.elsewhere)) w.main.ui.send(IPC.snapshot, { id, image })
+    }
   }
 
   private overlayRect(mode: OverlayMode): Rectangle | undefined {

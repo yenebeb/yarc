@@ -735,6 +735,9 @@ browser-action-list::part(action):hover {
   height: 100%;
   object-fit: cover;
   object-position: top left;
+  /* Greyed out: this window mirrors the page; the window that has it live is where it takes input. */
+  filter: grayscale(1);
+  opacity: 0.6;
 }
 
 .content-empty kbd,

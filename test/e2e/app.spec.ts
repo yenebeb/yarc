@@ -781,6 +781,52 @@ test('dragging a tab inside the peeking sidebar drops in the sidebar, not on the
   })
 })
 
+test('a tab selected in two windows is live in one and mirrored, greyed, in the other; the other takes it back when it is let go', async () => {
+  await dispatch({ type: 'open', url: `${base}/shared`, where: 'tab' })
+  const shared = (await space()).activeItemId!
+  await dispatch({ type: 'open', url: `${base}/other`, where: 'tab' })
+  const other = (await space()).activeItemId!
+  await dispatch({ type: 'activate', id: shared })
+
+  // A second window selects the same tab: it takes the page; the first shows a still of it.
+  await app.evaluate((_e, id) => {
+    const b = (globalThis as any).arcBrowser
+    b.openNewWindow()
+    b.on(b.wins[1], () => b.activate(id))
+  }, shared)
+  const where = () =>
+    app.evaluate((_e, id) => {
+      const b = (globalThis as any).arcBrowser
+      const view = b.live.get(id).view
+      return b.wins.map((w: any) => (w.main.isShown(view) ? 'live' : w.layout.views.some((v: any) => v.id === id && v.elsewhere) ? 'still' : 'none'))
+    }, shared)
+  await expect.poll(where).toEqual(['still', 'live'])
+
+  // What happens in the live window shows in the other one: its still keeps coming.
+  await app.evaluate(() => {
+    const ui = (globalThis as any).arcBrowser.wins[0].main.ui
+    const send = ui.send.bind(ui)
+    ;(globalThis as any).stills = 0
+    ui.send = (channel: string, ...args: unknown[]) => {
+      if (channel === 'arc:snapshot') (globalThis as any).stills++
+      return send(channel, ...args)
+    }
+  })
+  await app.evaluate((_e, { id, url }) => (globalThis as any).arcBrowser.live.get(id).wc.loadURL(url), { id: shared, url: `${base}/moved` })
+  await expect.poll(() => app.evaluate(() => (globalThis as any).stills), { timeout: 10_000 }).toBeGreaterThan(0)
+
+  // The second window moves on to another tab: the first gets the page back, live.
+  await app.evaluate((_e, id) => {
+    const b = (globalThis as any).arcBrowser
+    b.on(b.wins[1], () => b.activate(id))
+  }, other)
+  await expect.poll(where).toEqual(['live', 'none'])
+  expect(await app.evaluate(() => (globalThis as any).arcBrowser.mirror.subs.size)).toBe(0)
+
+  await app.evaluate(() => (globalThis as any).arcBrowser.wins[1].main.win.close())
+  await expect.poll(() => app.evaluate(() => (globalThis as any).arcBrowser.wins.length)).toBe(1)
+})
+
 test('state survives a restart', async () => {
   const before = await state()
   await app.close()
