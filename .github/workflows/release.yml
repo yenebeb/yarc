@@ -4,7 +4,7 @@ name: release
 #   the next patch (v0.1.2 -> v0.1.3) by default;
 #   PR label `release:minor` / `release:major` for a bigger bump, `release:skip` (or
 #   "[skip release]" in the commit message) for none.
-# The tag is created on the merge commit, the three platforms build into a draft release,
+# The tag is created on the squashed commit, the three platforms build into a draft release,
 # and the release is published once all of them succeed. A failed build leaves the draft.
 # Run it manually from the Actions tab to release main with a chosen bump.
 # Pull requests run it too, as a dry run: the same three builds, tests and packaging, without a

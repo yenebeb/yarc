@@ -309,7 +309,7 @@ pnpm dev             # start with hot reload
 
 Releases are automatic: every pull request merged into `main` becomes a release.
 
-1. The [release workflow](.github/workflows/release.yml) tags the merge commit with the next version: a patch bump by default (`v0.1.2` → `v0.1.3`). Add the PR label `release:minor` or `release:major` for a bigger bump, or `release:skip` (or put `[skip release]` in the commit message) to not release.
+1. The [release workflow](.github/workflows/release.yml) tags the squashed commit with the next version: a patch bump by default (`v0.1.2` → `v0.1.3`). Add the PR label `release:minor` or `release:major` for a bigger bump, or `release:skip` (or put `[skip release]` in the commit message) to not release.
 2. It builds Windows, macOS and Linux from that tag and uploads them to the release, with a `release.json` that names the Electron version, so installed copies can tell a security update from a normal one.
 3. Once all three builds succeed, the release is published. If one fails, the release stays a draft.
 

@@ -42,7 +42,8 @@ jobs:
             # For release.yml if someone merges it by hand: the auto-merge's push starts no workflows.
             gh api -X POST "repos/$GH_REPO/issues/$PR/labels" -f 'labels[]=release:skip' > /dev/null
           fi
-          gh pr merge "$PR" --auto --merge
+          # Squash: main takes only linear history and signed commits, and GitHub signs a squash.
+          gh pr merge "$PR" --auto --squash
           if [ "$electron" = false ]; then
             echo "Not an Electron bump: it ships with the next release."
             exit 0
