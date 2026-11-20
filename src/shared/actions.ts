@@ -92,5 +92,7 @@ export type Action =
   | { type: 'spaceMenu'; id: ID }
   | { type: 'extensionsStore' }
   | { type: 'adblockToggleSite'; id?: ID }
+  /** The share picker's answer: the chosen screen or window (none = cancel), and whether to add system audio (Windows). */
+  | { type: 'sharePick'; id: string; sourceId?: string; systemAudio?: boolean }
   /** Settings > Site Permissions: allow or block a site's permission, or forget it so the site asks again. */
   | { type: 'sitePermission'; profileId: ID; origin: string; key: string; setting: 'allow' | 'block' | 'reset' }

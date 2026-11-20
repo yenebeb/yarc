@@ -3,13 +3,18 @@ import {
   app,
   BrowserWindow,
   clipboard,
+  desktopCapturer,
   dialog,
   nativeTheme,
   screen,
   shell,
+  webContents,
   WebContentsView,
   type BaseWindow,
   type BrowserWindowConstructorOptions,
+  type DesktopCapturerSource,
+  type DisplayMediaRequestHandlerHandlerRequest,
+  type Streams,
   type ContextMenuParams,
   type Event,
   type Input,
@@ -43,7 +48,7 @@ import type {
 import { appendPane, flipSplit, gather, groupAt, layoutPanes, movePane, newSplitRoot, PANE_BAR, paneIds, placePane, removePane, type Side } from '../shared/split'
 import { isFloating, stepAfter, type TourEvent, type TourStep } from '../shared/tour'
 import { resolveInput, SEARCH_ENGINES } from '../shared/url'
-import { PERMISSION_KEYS, permissionOrigin } from '../shared/permissions'
+import { PERMISSION_KEYS, permissionOrigin, siteName } from '../shared/permissions'
 import { AdBlock, hostOf } from './adblock'
 import { recentChanges, startupScreen, type Changelog } from './changelog'
 import { openInChrome } from './chrome'
@@ -453,6 +458,63 @@ export class Browser implements TabHost {
 
   private downloadBurst = new DownloadBurst()
 
+  /** The share picker on screen: its answer goes to `callback`. */
+  private sharePick: { id: string; sources: Map<string, DesktopCapturerSource>; audio: boolean; callback: (streams: Streams | null) => void } | undefined
+
+  /** A page asked to share the screen (Windows, Linux): shows the picker in the page's window. */
+  private async pickShare(req: DisplayMediaRequestHandlerHandlerRequest, callback: (streams: Streams | null) => void): Promise<void> {
+    // macOS uses its own picker (useSystemPicker); YARC has none of its own there.
+    if (!req.videoRequested || process.platform === 'darwin') return callback(null)
+    let sources: DesktopCapturerSource[]
+    try {
+      sources = await desktopCapturer.getSources({ types: ['screen', 'window'], thumbnailSize: { width: 320, height: 200 } })
+    } catch (err) {
+      console.warn('[share] no screens or windows to offer', err)
+      return callback(null)
+    }
+    if (!sources.length) return callback(null)
+    // A newer request replaces one still waiting.
+    if (this.sharePick) this.answerShare(this.sharePick.id, undefined, false, false)
+    const wc = req.frame ? webContents.fromFrame(req.frame) : undefined
+    const tab = wc ? [...this.live.values()].find((t) => t.wc === wc) : undefined
+    if (tab) this.use(this.winOf(tab))
+    const id = newId()
+    this.sharePick = { id, sources: new Map(sources.map((s) => [s.id, s])), audio: req.audioRequested, callback }
+    this.setOverlay({
+      kind: 'share-picker',
+      id,
+      site: siteName(req.securityOrigin),
+      // System audio only exists on Windows (Electron's loopback capture).
+      systemAudio: req.audioRequested && process.platform === 'win32',
+      sources: sources.map((s) => ({
+        id: s.id,
+        name: s.name,
+        screen: s.id.startsWith('screen:'),
+        thumbnail: s.thumbnail.isEmpty() ? '' : `data:image/jpeg;base64,${s.thumbnail.toJPEG(70).toString('base64')}`
+      }))
+    })
+  }
+
+  /** The picker's answer: share `sourceId`, or nothing. `close`: also close the picker (not when it's already closing). */
+  private answerShare(id: string, sourceId: string | undefined, systemAudio: boolean, close = true): void {
+    const pick = this.sharePick
+    if (!pick || pick.id !== id) return
+    this.sharePick = undefined
+    const source = sourceId ? pick.sources.get(sourceId) : undefined
+    let streams: Streams | null = null
+    if (source) {
+      streams = { video: source }
+      if (systemAudio && pick.audio && process.platform === 'win32') streams.audio = 'loopback'
+    }
+    try {
+      pick.callback(streams)
+    } catch (err) {
+      // The page navigated away or closed meanwhile.
+      console.warn('[share] the page is gone', err)
+    }
+    if (close && this.window.overlayMode.kind === 'share-picker') this.setOverlay({ kind: 'none' })
+  }
+
   private onProfileCreated(rt: ProfileRuntime): void {
     rt.session.on('will-download', (e, item, wc) => {
       const site = hostOf(wc && !wc.isDestroyed() ? wc.getURL() : item.getURL())
@@ -492,6 +554,9 @@ export class Browser implements TabHost {
       })
       this.emitSoon()
     })
+    // getDisplayMedia (sharing the screen in Meet, Zoom, Teams…). On macOS the system's picker
+    // asks and the handler isn't called; on Windows and Linux YARC's picker does (pickShare).
+    rt.session.setDisplayMediaRequestHandler((req, callback) => void this.pickShare(req, callback), { useSystemPicker: true })
     this.adblock.attach(rt.session)
     // Like Chrome, extensions stay out of incognito.
     if (!this.incognito) void this.extensions.setup(rt)
@@ -762,6 +827,9 @@ export class Browser implements TabHost {
       if (current.kind === 'tour' && !isFloating(current.step)) this.tour = undefined
       else mode = { kind: 'tour', step: this.tour }
     }
+    // Closing the share picker any other way (Escape, a click outside, another panel) is Cancel.
+    const current = this.window.overlayMode
+    if (current.kind === 'share-picker' && mode.kind !== 'share-picker') this.answerShare(current.id, undefined, false, false)
     if (mode.kind !== 'peek') this.dropPeek()
     if (this.window.overlayMode.kind === 'find' && mode.kind !== 'find') this.activeTab()?.wc.stopFindInPage('keepSelection')
     if (mode.kind !== 'sidebar') this.cur.sidebarPeek = false
@@ -1759,6 +1827,8 @@ export class Browser implements TabHost {
         void shell.openPath(d.path)
         return
       }
+      case 'sharePick':
+        return this.answerShare(a.id, a.sourceId, a.systemAudio === true)
       case 'downloadsClear':
         this.downloads = this.downloads.filter((d) => d.state === 'progressing')
         return this.emitSoon()

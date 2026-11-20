@@ -13,6 +13,7 @@ import { Favicon, Icon, type IconName } from './icons'
 import { Tour, UpdateReady, WhatsNew } from './panels/Intro'
 import { Library } from './panels/Library'
 import { Settings } from './panels/Settings'
+import { SharePicker } from './panels/SharePicker'
 import { SpaceEditor } from './panels/SpaceEditor'
 import { Sidebar } from './Sidebar'
 import './styles.css'
@@ -84,6 +85,13 @@ function App() {
         <>
           <div className="scrim" onMouseDown={close} />
           <SpaceEditor key={`${key}-${mode.spaceId}`} state={state} close={close} spaceId={mode.spaceId} />
+        </>
+      )
+    case 'share-picker':
+      return (
+        <>
+          <div className="scrim" onMouseDown={close} />
+          <SharePicker key={mode.id} mode={mode} />
         </>
       )
     case 'peek':

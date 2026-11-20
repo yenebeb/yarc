@@ -849,8 +849,9 @@ granted the microphone by a person, then updated with `mac-update.ts`:
 - **Ad-hoc**, 0.1.0 → 0.1.1: tccd logged `Failed to match existing code requirement for subject …
   and service kTCCServiceMicrophone` and asked again.
 
-Not tested: the camera (same check), and screen recording (pages can't ask for it yet: no
-`setDisplayMediaRequestHandler`). Switching from ad-hoc to a certificate re-asks once, because
+Not tested: the camera (same check), and screen recording (pages share the screen through
+macOS's own picker, `setDisplayMediaRequestHandler` with `useSystemPicker`, which doesn't need
+YARC to have Screen Recording permission). Switching from ad-hoc to a certificate re-asks once, because
 existing grants name the old cdhash.
 
 Release builds are signed this way now: section 9.

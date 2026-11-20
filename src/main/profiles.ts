@@ -16,9 +16,14 @@ export interface ProfileRuntime {
   history: History
 }
 
-/** Permissions granted without asking. Those in PROMPT ask the user (PermissionQueue), who answers per profile (SiteDecisions). */
-const AUTO_GRANT = new Set(['fullscreen', 'clipboard-sanitized-write', 'pointerLock', 'speaker-selection'])
-const PROMPT = new Set(['media', 'geolocation', 'notifications', 'midi', 'midiSysex', 'clipboard-read', 'display-capture', 'idle-detection', 'hid', 'serial', 'usb', 'window-management'])
+/** Those in PROMPT ask the user (PermissionQueue), who answers per profile (SiteDecisions). */
+/**
+ * Granted without asking. Screen sharing (display-capture) too, like Chrome: Chromium only lets a
+ * page ask after a click, and the screen picker the request opens is the user's consent
+ * (browser.ts pickShare).
+ */
+const AUTO_GRANT = new Set(['fullscreen', 'clipboard-sanitized-write', 'pointerLock', 'speaker-selection', 'display-capture'])
+const PROMPT = new Set(['media', 'geolocation', 'notifications', 'midi', 'midiSysex', 'clipboard-read', 'idle-detection', 'hid', 'serial', 'usb', 'window-management'])
 
 /**
  * Prompted permissions that report "granted" until the user blocks them. Electron's check handler

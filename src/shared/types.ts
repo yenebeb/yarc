@@ -258,11 +258,21 @@ export interface Rect {
   height: number
 }
 
+/** A screen or window the share picker offers, with a small preview (a data: URL). */
+export interface ShareSource {
+  id: string
+  name: string
+  screen: boolean
+  thumbnail: string
+}
+
 export type OverlayMode =
   | { kind: 'none' }
   /** `splitAt`: from a pane's split menu (Add Right Split…), the new tab goes on `side` of `target`. */
   | { kind: 'command'; initial?: string; editCurrent?: boolean; target?: 'tab' | 'split' | 'current'; splitAt?: SplitAt }
   | { kind: 'find' }
+  /** A page asked to share the screen (getDisplayMedia): pick a screen or window, or cancel. */
+  | { kind: 'share-picker'; id: string; site: string; sources: ShareSource[]; systemAudio: boolean }
   /** A short message over the top of the page that doesn't take the keyboard (full screen: "Press Esc to exit"). */
   | { kind: 'notice'; text: string }
   | { kind: 'settings' }

@@ -632,3 +632,99 @@
 .tour-try .kbd {
   background: var(--panel);
 }
+
+/* The screen picker (panels/SharePicker.tsx): tabs for screens and windows, a grid of previews. */
+.share-picker {
+  top: 12vh;
+  width: min(720px, calc(100vw - 48px));
+  display: flex;
+  flex-direction: column;
+  max-height: 76vh;
+}
+
+.share-picker header {
+  padding: 20px 24px 8px;
+}
+
+.share-picker h2 {
+  margin: 0 0 14px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.share-tabs {
+  display: flex;
+  gap: 4px;
+}
+
+.share-tabs button {
+  border: 0;
+  border-radius: 8px;
+  padding: 6px 12px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: default;
+}
+
+.share-tabs button:hover {
+  background: var(--hover);
+}
+
+.share-tabs button.on {
+  background: var(--active);
+  font-weight: 600;
+}
+
+.share-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 12px;
+  padding: 12px 24px;
+  overflow-y: auto;
+}
+
+.share-source {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border: 2px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: default;
+}
+
+.share-source:hover {
+  background: var(--hover);
+}
+
+.share-source.on {
+  border-color: var(--accent);
+}
+
+.share-source img,
+.share-source .share-blank {
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  object-fit: contain;
+  border-radius: 6px;
+  background: var(--field);
+}
+
+.share-name {
+  font-size: 12px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.share-audio {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}
