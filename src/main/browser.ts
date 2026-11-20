@@ -2124,6 +2124,7 @@ export class Browser implements TabHost {
     this.ensureWindow()
     const space = (spaceId && this.store.space(spaceId)) || this.littleTargetSpace(little.profile.id)
     const tab = little.release()
+    this.extensions.moveTab(tab, this.window.win)
     const item: TabItem = { id: newId(), url: tab.wc.getURL(), title: tab.wc.getTitle(), favicon: tab.favicon, lastActive: Date.now() }
     space.today.unshift(item)
     tab.host = this

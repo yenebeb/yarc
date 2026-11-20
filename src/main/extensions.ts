@@ -11,6 +11,8 @@ import type { LiveTab } from './tab'
 
 export class Extensions {
   private byProfile = new Map<ID, ElectronChromeExtensions>()
+  /** Set while YARC tells the library which tab it selected, so the library's echo is ignored. */
+  private selecting = false
 
   constructor(private browser: Browser) {}
 
@@ -28,7 +30,11 @@ export class Extensions {
         const tab = b.liveFor(item)
         return [tab.wc, b.window.win]
       },
+      // Called when an extension selects a tab, and also as an echo of our own selectTab. Acting on
+      // the echo recursed until the stack overflowed whenever the library had the tab in a window
+      // that has closed, and the tab could no longer be selected.
       selectTab: (wc) => {
+        if (this.selecting) return
         const id = b.itemIdFor(wc)
         if (id) b.activate(id)
       },
@@ -80,7 +86,26 @@ export class Extensions {
   }
 
   selectTab(tab: LiveTab): void {
-    this.byProfile.get(tab.profileId)?.selectTab(tab.wc)
+    const ext = this.byProfile.get(tab.profileId)
+    if (!ext) return
+    this.selecting = true
+    try {
+      ext.selectTab(tab.wc)
+    } finally {
+      this.selecting = false
+    }
+  }
+
+  /**
+   * Tells the library a tab now lives in another window (a Little Window page moved into the main
+   * window), so extensions see the right window. Call it before YARC knows the tab as an item:
+   * the library's removeTab callback closes the item.
+   */
+  moveTab(tab: LiveTab, win: BaseWindow): void {
+    const ext = this.byProfile.get(tab.profileId)
+    if (!ext) return
+    ext.removeTab(tab.wc)
+    ext.addTab(tab.wc, win)
   }
 
   contextMenuItems(tab: LiveTab, params: ContextMenuParams): MenuItem[] {

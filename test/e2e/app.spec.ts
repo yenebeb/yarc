@@ -543,6 +543,13 @@ test('Little Window opens a mini window and can move the page into the main wind
   })
   await expect.poll(async () => (await space()).today.length).toBe(count + 1)
   expect((await space()).today[0].url).toBe(`${base}/little`)
+
+  // Once the Little Window has closed, the page can still be left and selected again.
+  const moved = (await space()).today[0]
+  await dispatch({ type: 'open', url: `${base}/after-little`, where: 'tab' })
+  await expect.poll(async () => (await space()).activeItemId).not.toBe(moved.id)
+  await dispatch({ type: 'activate', id: moved.id })
+  expect((await state()).layout.views.map((v) => v.id)).toEqual([moved.id])
 })
 
 test('Little Window reopens a page with the profile picked on its chip, remembered per site, and keeps its size', async () => {
