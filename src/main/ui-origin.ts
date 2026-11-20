@@ -5,6 +5,7 @@
 import { app, ipcMain, protocol, type IpcMainInvokeEvent, type WebContents } from 'electron'
 import { readFile } from 'node:fs/promises'
 import { extname, join, normalize, sep } from 'node:path'
+import { logError } from './log'
 
 const SCHEME = 'yarc'
 const ORIGIN = `${SCHEME}://ui`
@@ -88,10 +89,22 @@ export function fromUi(e: IpcMainInvokeEvent): boolean {
 
 /** ipcMain.handle for UI channels: anything else (a web page, an extension) is refused. */
 export function handleUi<A extends unknown[], R>(channel: string, fn: (e: IpcMainInvokeEvent, ...args: A) => R): void {
-  ipcMain.handle(channel, (e, ...args) => {
+  ipcMain.handle(channel, async (e, ...args) => {
     if (!fromUi(e)) throw new Error(`${channel}: not from YARC's UI`)
-    return fn(e, ...(args as A))
+    try {
+      return await fn(e, ...(args as A))
+    } catch (err) {
+      // Otherwise it only reaches the sidebar's console, which a packaged build can't open.
+      logError(`${channel}${actionType(args[0])}`, err)
+      throw err
+    }
   })
+}
+
+/** An action's type (never its URLs or text), to say which sidebar action failed. */
+function actionType(arg: unknown): string {
+  const type = arg && typeof arg === 'object' && 'type' in arg ? arg.type : undefined
+  return typeof type === 'string' ? ` ${type}` : ''
 }
 
 /**

@@ -56,6 +56,7 @@ import { DownloadBurst, isDangerous, markFromInternet } from './downloads'
 import { Extensions } from './extensions'
 import { runImport } from './importers'
 import { LittleWindow } from './little'
+import { logInfo, logProblem, setLogContext } from './log'
 import { Mirror, stillOf } from './mirror'
 import { Peek, sameSite } from './peek'
 import { buildContextMenu, buildFolderMenu, buildItemMenu, buildSpaceMenu, buildSplitMenu } from './menus'
@@ -129,6 +130,8 @@ export class Browser implements TabHost {
    * After the last window closes (macOS) it stays, closed, until a window opens again.
    */
   private cur!: Win
+  /** The current window last logged as missing from the saved windows, to log it once. */
+  private reportedLost: Win | undefined
   readonly live = new Map<ID, LiveTab>()
   /** Streams pages one window shows live to the other windows that show them too (as stills). */
   private mirror = new Mirror((wc, still) => this.sendStill(wc, still))
@@ -213,7 +216,10 @@ export class Browser implements TabHost {
 
   start(): void {
     Browser.all.add(this)
-    if (Browser.all.size === 1) this.registerIpc()
+    if (Browser.all.size === 1) {
+      this.registerIpc()
+      setLogContext(() => [...Browser.all].map((b) => b.describeWindows()).join('; '))
+    }
     this.store.beforeWrite = () => this.captureCurrent()
     const saved = this.state.windows
     if (!saved.length) saved.push({ ...viewFromState(this.state, newId()), ...this.legacyBounds() })
@@ -277,6 +283,7 @@ export class Browser implements TabHost {
     }
     const w = new Win(new MainWindow(view.bounds, background), view)
     this.wins.push(w)
+    logInfo(`${this.incognito ? 'incognito ' : ''}window ${short(view.id)} opened`)
     this.use(w)
     const win = w.main.win
     if (view.maximized) win.maximize()
@@ -365,6 +372,7 @@ export class Browser implements TabHost {
 
   private onWindowClosed(w: Win): void {
     this.wins = this.wins.filter((x) => x !== w)
+    logInfo(`${this.incognito ? 'incognito ' : ''}window ${short(w.view.id)} closed, ${this.wins.length} left`)
     clearInterval(w.peekWatch)
     w.peek?.destroy()
     w.peek = undefined
@@ -387,6 +395,7 @@ export class Browser implements TabHost {
   /** Makes `w` the window commands act on: the state's per-window fields become its own (window-state.ts). */
   private use(w: Win): void {
     if (w === this.cur) return
+    if (!w.open && this.wins.length) logProblem(`window ${short(w.view.id)} made current after it closed`)
     if (this.cur) captureView(this.state, this.cur.view)
     this.cur = w
     applyView(this.state, w.view)
@@ -412,7 +421,20 @@ export class Browser implements TabHost {
 
   /** Brings the current window's values into its saved view, before the state is written. */
   private captureCurrent(): void {
-    if (this.cur) captureView(this.state, this.cur.view)
+    if (!this.cur) return
+    // The current window's values would be saved for no window: the open ones keep stale ones.
+    const lost = this.wins.length > 0 && (!this.cur.open || !this.state.windows.includes(this.cur.view))
+    if (lost && this.reportedLost !== this.cur) logProblem(`saving while the current window ${short(this.cur.view.id)} is closed or not saved`)
+    this.reportedLost = lost ? this.cur : undefined
+    captureView(this.state, this.cur.view)
+  }
+
+  /** Which window is current and which are open and saved, for the error log. */
+  private describeWindows(): string {
+    const cur = this.cur
+    const flags = cur ? `${cur.open ? '' : ' (closed)'}${this.state.windows.includes(cur.view) ? '' : ' (not saved)'}` : ''
+    const ids = (list: { id: ID }[]) => list.map((v) => short(v.id)).join(', ')
+    return `${this.incognito ? 'incognito' : 'main'}: current ${cur ? short(cur.view.id) + flags : 'none'}, open [${ids(this.wins.map((w) => w.view))}], saved [${ids(this.state.windows)}]`
   }
 
   /** Keeps the last focused window last in the saved list, so it opens in front at the next launch. */
@@ -2261,4 +2283,9 @@ function settingsPatch(current: Settings, patch: unknown): Partial<Settings> {
     clean[key] = value
   }
   return clean as Partial<Settings>
+}
+
+/** The start of an id: enough to tell windows apart in the log. */
+function short(id: ID): string {
+  return id.slice(0, 8)
 }

@@ -1,9 +1,11 @@
 import { app, BrowserWindow } from 'electron'
 import { existsSync } from 'node:fs'
+import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { Browser } from './browser'
 import { askForClientCertificates } from './client-certificates'
 import { Extensions } from './extensions'
+import { startLog } from './log'
 import { installAppMenu, installDockMenu } from './menus'
 import { profileDir } from './profile-dir'
 import { Profiles } from './profiles'
@@ -21,6 +23,9 @@ if (app.isPackaged && ['remote-debugging-port', 'remote-debugging-pipe'].some((s
 // Tests and portable setups can point the profile somewhere else.
 if (process.env.YARC_USER_DATA) app.setPath('userData', process.env.YARC_USER_DATA)
 else app.setPath('userData', profileDir(app.getPath('appData'), app.isPackaged ? 'YARC' : 'YARC (dev)'))
+// What goes wrong in main, for bug reports: ~/Library/Logs/YARC/main.log on macOS,
+// %APPDATA%\YARC\logs\main.log on Windows. Dev builds and tests log inside their own profile.
+startLog(join(app.isPackaged && !process.env.YARC_USER_DATA ? app.getPath('logs') : join(app.getPath('userData'), 'logs'), 'main.log'))
 
 app.userAgentFallback = browserUserAgent(app.userAgentFallback)
 registerUiScheme()

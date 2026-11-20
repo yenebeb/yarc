@@ -281,6 +281,7 @@ No. Blocking is built in (see [Built-in ad and tracker blocking](#built-in-ad-an
 | Per-profile extensions | `Profiles/<id>/Extensions` | same |
 | Ad-blocking filter cache | `adblock/engine.bin` | same |
 | Cookies, site storage, cache | `Partitions/profile-<id>` | same |
+| Error log | `logs\main.log` | `~/Library/Logs/YARC/main.log` |
 
 ## Building from source
 
@@ -381,7 +382,7 @@ Planned or open for contributions:
 
 ## Contributing
 
-Issues and pull requests are welcome. If you're an Arc user and something doesn't behave the way Arc did, please open an issue describing what Arc did. [docs/arc-reference.md](docs/arc-reference.md) collects what we know about Arc's behavior, and is worth correcting too.
+Issues and pull requests are welcome. If you're an Arc user and something doesn't behave the way Arc did, please open an issue describing what Arc did. [docs/arc-reference.md](docs/arc-reference.md) collects what we know about Arc's behavior, and is worth correcting too. If YARC freezes or stops responding, attach the error log (see [Where your data lives](#where-your-data-lives)): it records what failed and which windows were open.
 
 Before opening a PR, run `pnpm typecheck && pnpm test && pnpm test:e2e`. `main` only accepts pull requests whose CI (`check`) passes, and release tags (`v*`) can't be moved or deleted.
 
