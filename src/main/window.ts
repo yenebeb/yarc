@@ -11,6 +11,8 @@ import { guardUi, uiOrigin, uiPageUrl } from './ui-origin'
 export const PAD = 8
 
 const mac = process.platform === 'darwin'
+/** Where the traffic lights sit (macOS): in line with the sidebar's top bar. */
+const TRAFFIC_LIGHTS = { x: 13, y: 16 }
 /** Height of the strip at the top of the window with the native min/max/close buttons (Windows, Linux). */
 export const CAPTION_H = mac ? 0 : 32
 /** Caption button glyphs: the UI's --text for light and dark (styles.css). */
@@ -77,8 +79,7 @@ export class MainWindow {
       minHeight: 360,
       show: false,
       titleBarStyle: mac ? 'hiddenInset' : 'hidden',
-      // In line with the top bar.
-      trafficLightPosition: { x: 13, y: 16 },
+      trafficLightPosition: TRAFFIC_LIGHTS,
       webPreferences: uiWebPreferences()
     }
     if (mac) {
@@ -119,6 +120,16 @@ export class MainWindow {
   /** The caption buttons' strip; Windows hides the buttons in fullscreen. */
   captionHeight(): number {
     return mac || this.win.isFullScreen() ? 0 : CAPTION_H
+  }
+
+  /**
+   * Shows or hides the traffic lights (macOS). Electron shows them again at macOS's default spot,
+   * out of line with the sidebar's top bar, so they are put back where they belong.
+   */
+  setTrafficLights(visible: boolean): void {
+    if (!mac) return
+    this.win.setWindowButtonVisibility(visible)
+    if (visible) this.win.setWindowButtonPosition(TRAFFIC_LIGHTS)
   }
 
   setAppearance(appearance: 'light' | 'dark' | undefined): void {

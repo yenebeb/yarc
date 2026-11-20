@@ -295,7 +295,7 @@ export class Browser implements TabHost {
     this.use(w)
     const win = w.main.win
     if (view.maximized) win.maximize()
-    if (isMac) win.setWindowButtonVisibility(this.state.settings.sidebarVisible)
+    w.main.setTrafficLights(this.state.settings.sidebarVisible)
     for (const wc of [win.webContents, w.main.overlay.webContents]) {
       wc.on('before-input-event', (e, input) => {
         this.use(w)
@@ -906,7 +906,7 @@ export class Browser implements TabHost {
     this.watchPeek(mode.kind === 'sidebar' && !this.cur.tabDrag)
     if (mode.kind !== 'switcher') this.cur.switcher = undefined
     this.window.setOverlay(mode, this.overlayRect(mode))
-    if (isMac && !this.state.settings.sidebarVisible) this.window.win.setWindowButtonVisibility(mode.kind === 'sidebar')
+    if (!this.state.settings.sidebarVisible) this.window.setTrafficLights(mode.kind === 'sidebar')
     if (mode.kind === 'none' && refocus) this.activeTab()?.wc.focus()
     if (mode.kind === 'command') this.tourEvent('newTab')
     this.syncPrompts()
@@ -1823,7 +1823,7 @@ export class Browser implements TabHost {
         s.sidebarVisible = !s.sidebarVisible
         this.cur.sidebarPeek = false
         if (this.window.overlayMode.kind === 'sidebar') this.window.setOverlay({ kind: 'none' }, undefined)
-        if (isMac) this.window.win.setWindowButtonVisibility(s.sidebarVisible)
+        this.window.setTrafficLights(s.sidebarVisible)
         this.layout()
         this.changed()
         if (this.tour && this.window.overlayMode.kind === 'none') this.setOverlay({ kind: 'tour', step: this.tour }, false)
@@ -1844,7 +1844,7 @@ export class Browser implements TabHost {
         Object.assign(this.state.settings, settingsPatch(this.state.settings, a.patch))
         this.syncAdblock()
         if (a.patch.theme) nativeTheme.themeSource = a.patch.theme
-        if (isMac && a.patch.sidebarVisible !== undefined) this.window.win.setWindowButtonVisibility(a.patch.sidebarVisible)
+        if (a.patch.sidebarVisible !== undefined) this.window.setTrafficLights(a.patch.sidebarVisible)
         if (a.patch.autoUpdate !== undefined) this.updater.sync()
         this.layout()
         return this.changed()
