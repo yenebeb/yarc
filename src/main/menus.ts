@@ -114,7 +114,7 @@ function commandRunner(browser: Browser): (cmd: CommandId) => () => void {
 /** The Dock icon's menu on macOS, like Arc's. */
 export function installDockMenu(browser: Browser): void {
   if (process.platform !== 'darwin') return
-  const littles = () => [...browser.littles].filter((l) => !l.win.isDestroyed())
+  const littles = () => browser.openLittles()
   const build = () => {
     const open = littles().length > 0
     app.dock?.setMenu(

@@ -141,6 +141,14 @@ export class Browser implements TabHost {
   extensionList: Record<ID, ExtensionInfo[]> = {}
   private emitTimer: NodeJS.Timeout | undefined
   readonly littles = new Set<LittleWindow>()
+
+  /**
+   * The Little Windows that are still open. Read this, not `littles`: Electron marks a closing
+   * window destroyed a moment before its 'closed' event takes it off the list.
+   */
+  openLittles(): LittleWindow[] {
+    return [...this.littles].filter((l) => !l.win.isDestroyed())
+  }
   /**
    * The tour's step while it runs. Its card can be out of sight while the user tries a step (the
    * command bar, the peeking sidebar, a tab drag); it comes back when that closes.
@@ -459,7 +467,7 @@ export class Browser implements TabHost {
   /** An incognito window closed: forget its pages, cookies, storage and history. */
   private dispose(): void {
     Browser.all.delete(this)
-    for (const l of this.littles) l.win.close()
+    for (const l of this.openLittles()) l.win.close()
     for (const rt of this.profiles.all()) void rt.session.clearData()
     this.profiles.closeAll()
   }
@@ -918,13 +926,13 @@ export class Browser implements TabHost {
     // extension page, say) has nowhere to ask, so it hears "no".
     const pages = new Set<number>([...this.live.values()].filter((t) => !t.destroyed).map((t) => t.wc.id))
     for (const w of this.wins) if (w.peek && !w.peek.tab.destroyed) pages.add(w.peek.tab.wc.id)
-    for (const l of this.littles) if (l.pageId !== undefined) pages.add(l.pageId)
+    for (const l of this.openLittles()) if (l.pageId !== undefined) pages.add(l.pageId)
     for (const wcId of queue.waitingPages()) {
       if (pages.has(wcId)) continue
       const req = queue.next([wcId])
       if (req) queue.answer(req.id, 'dismiss')
     }
-    for (const l of this.littles) l.syncPrompt(queue)
+    for (const l of this.openLittles()) l.syncPrompt(queue)
     // Each window asks for the pages it shows live.
     for (const w of this.wins) if (w.open) this.on(w, () => this.syncPrompt())
   }
@@ -2150,7 +2158,7 @@ export class Browser implements TabHost {
 
   /** Whether one of this controller's Little Windows is `wc`. */
   private ownsLittle(wc: WebContents): boolean {
-    return [...this.littles].some((l) => !l.win.isDestroyed() && l.win.webContents === wc)
+    return this.openLittles().some((l) => l.win.webContents === wc)
   }
 
   /**
@@ -2184,7 +2192,7 @@ export class Browser implements TabHost {
     })
     handleUi(IPC.focus, (e) => e.sender.focus())
     handleUi(IPC.littleOp, (e, op: LittleOp, at?: LittleAnchor) => {
-      for (const l of of(e).littles) if (l.win.webContents === e.sender) return l.op(op, at)
+      for (const l of of(e).openLittles()) if (l.win.webContents === e.sender) return l.op(op, at)
     })
   }
 

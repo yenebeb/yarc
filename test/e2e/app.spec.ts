@@ -538,7 +538,7 @@ test('Little Window opens a mini window and can move the page into the main wind
   const count = (await space()).today.length
   await app.evaluate(() => {
     const b = (globalThis as any).arcBrowser
-    const l = [...b.littles][0]
+    const l = b.openLittles()[0]
     l.op('openInMain')
   })
   await expect.poll(async () => (await space()).today.length).toBe(count + 1)
@@ -548,7 +548,7 @@ test('Little Window opens a mini window and can move the page into the main wind
 test('Little Window reopens a page with the profile picked on its chip, remembered per site, and keeps its size', async () => {
   const url = `${base}/little-profile`
   const littles = () =>
-    app.evaluate(() => [...(globalThis as any).arcBrowser.littles].map((l: any) => ({ profile: l.profile.id, url: l.url, size: l.win.getSize() })))
+    app.evaluate(() => (globalThis as any).arcBrowser.openLittles().map((l: any) => ({ profile: l.profile.id as string, url: l.url as string, size: l.win.getSize() as number[] })) as { profile: string; url: string; size: number[] }[])
   await app.evaluate(() => (globalThis as any).arcBrowser.state.profiles.push({ id: 'p-little', name: 'Chip', favorites: [] }))
   await dispatch({ type: 'littleArc', url })
   await expect.poll(async () => (await littles()).find((l) => l.url === url)?.profile).toBeTruthy()
@@ -556,7 +556,7 @@ test('Little Window reopens a page with the profile picked on its chip, remember
 
   await app.evaluate((_e, url) => {
     const b = (globalThis as any).arcBrowser
-    b.switchLittleProfile([...b.littles].find((l: any) => l.url === url), 'p-little')
+    b.switchLittleProfile(b.openLittles().find((l: any) => l.url === url), 'p-little')
   }, url)
   await expect.poll(async () => (await littles()).filter((l) => l.url === url).map((l) => l.profile)).toEqual(['p-little'])
   const chips = () => Promise.all(app.windows().filter((w) => w.url().includes('little.html') && !w.isClosed()).map((w) => w.locator('.little-profile').textContent()))
@@ -564,7 +564,7 @@ test('Little Window reopens a page with the profile picked on its chip, remember
 
   // The user resizes it, closes it, and opens the site again: same profile, same size.
   await app.evaluate((_e, url) => {
-    const l = [...(globalThis as any).arcBrowser.littles].find((l: any) => l.url === url)
+    const l = (globalThis as any).arcBrowser.openLittles().find((l: any) => l.url === url)
     l.win.setSize(1010, 710)
     l.win.emit('resized')
     l.win.close()
@@ -575,7 +575,7 @@ test('Little Window reopens a page with the profile picked on its chip, remember
 
   await app.evaluate(() => {
     const b = (globalThis as any).arcBrowser
-    for (const l of b.littles) l.win.close()
+    for (const l of b.openLittles()) l.win.close()
     b.state.littleArc = { profileByHost: {} }
     b.state.profiles = b.state.profiles.filter((p: any) => p.id !== 'p-little')
   })
@@ -641,7 +641,7 @@ function launchSecondInstance(arg: string): void {
 }
 
 test('links and .html files from other apps open in a Little Window', async () => {
-  const littles = () => app.evaluate(() => (globalThis as any).arcBrowser.littles.size as number)
+  const littles = () => app.evaluate(() => (globalThis as any).arcBrowser.openLittles().length as number)
   const before = await littles()
   launchSecondInstance(`${base}/from-slack`)
   await expect.poll(littles, { timeout: 15_000 }).toBe(before + 1)
@@ -652,7 +652,7 @@ test('links and .html files from other apps open in a Little Window', async () =
   await expect.poll(littles, { timeout: 15_000 }).toBe(before + 2)
   await pageWithUrl('local%20page.html')
   await app.evaluate(() => {
-    for (const l of (globalThis as any).arcBrowser.littles) l.win.close()
+    for (const l of (globalThis as any).arcBrowser.openLittles()) l.win.close()
   })
   await expect.poll(littles).toBe(0)
 })
@@ -855,7 +855,7 @@ test('Little Window can move its page into a closed main window (macOS)', async 
   await expect.poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length)).toBe(0)
   await app.evaluate((_e, url) => (globalThis as any).arcBrowser.openLittle(url), `${base}/little-closed`)
   await pageWithUrl('/little-closed')
-  await app.evaluate(() => [...(globalThis as any).arcBrowser.littles][0].op('openInMain'))
+  await app.evaluate(() => (globalThis as any).arcBrowser.openLittles()[0].op('openInMain'))
   await expect.poll(async () => (await space()).today.some((t) => t.url.endsWith('/little-closed'))).toBe(true)
   await expect.poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length)).toBe(1)
 })
