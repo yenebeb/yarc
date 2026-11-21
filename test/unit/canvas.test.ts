@@ -88,7 +88,7 @@ describe('snapping while moving', () => {
   })
 
   test('centers line up too: a smaller photo below snaps to the middle of the one above', () => {
-    const below = { x: 143, y: 400, width: 100, height: 80 }
+    const below = { x: 146, y: 400, width: 100, height: 80 }
     const chairsMiddle = chair.x + chair.width / 2
     const snap = snapMove(below, [chair], NEAR)
     assert.equal(below.x + snap.dx + below.width / 2, chairsMiddle)
