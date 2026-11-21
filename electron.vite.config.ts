@@ -12,7 +12,7 @@ export default defineConfig({
     define: { __CHANGELOG__: JSON.stringify(changelog) },
     build: {
       externalizeDeps: true,
-      rollupOptions: { input: { index: resolve('src/main/index.ts') } }
+      rollupOptions: { input: { index: resolve('src/main/index.ts'), 'adblock-build': resolve('src/main/adblock-build.ts') } }
     }
   },
   preload: {
@@ -26,6 +26,7 @@ export default defineConfig({
     root: 'src/renderer',
     plugins: [react()],
     build: {
+      minify: true,
       rollupOptions: {
         input: {
           index: resolve('src/renderer/index.html'),

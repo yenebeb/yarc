@@ -1,9 +1,9 @@
 // Not enableBlockingInSession(): it registers global IPC handlers per session (a second profile throws).
 import { ElectronBlocker } from '@ghostery/adblocker-electron'
-import { ipcMain, type InsertCSSOptions, type IpcMainInvokeEvent,type OnBeforeRequestListenerDetails, type OnHeadersReceivedListenerDetails, type Session, type WebContents } from 'electron'
-import { mkdir, readFile, stat, writeFile } from 'node:fs/promises'
+import { ipcMain, utilityProcess, type InsertCSSOptions, type IpcMainInvokeEvent, type OnBeforeRequestListenerDetails, type OnHeadersReceivedListenerDetails, type Session, type WebContents } from 'electron'
+import { readFile, stat } from 'node:fs/promises'
 import { createRequire } from 'node:module'
-import { dirname } from 'node:path'
+import { join } from 'node:path'
 import type { Settings } from '../shared/types'
 
 const PRELOAD = createRequire(__filename).resolve('@ghostery/adblocker-electron-preload')
@@ -39,16 +39,11 @@ export class AdBlock {
       cached = await readFile(this.cacheFile)
       fresh = Date.now() - info.mtimeMs < FILTERS_MAX_AGE
     } catch {}
-    if (cached && fresh) return this.use(ElectronBlocker.deserialize(new Uint8Array(cached)))
-    try {
-      const engine = await ElectronBlocker.fromPrebuiltAdsAndTracking(fetch)
-      this.use(engine)
-      await mkdir(dirname(this.cacheFile), { recursive: true })
-      await writeFile(this.cacheFile, engine.serialize())
-    } catch (err) {
-      console.warn('[adblock] could not download filter lists', err)
-      if (cached) this.use(ElectronBlocker.deserialize(new Uint8Array(cached)))
+    if (!fresh) {
+      if (await buildEngine(this.cacheFile)) cached = await readFile(this.cacheFile)
+      else console.warn('[adblock] could not download filter lists')
     }
+    if (cached) this.use(ElectronBlocker.deserialize(new Uint8Array(cached)))
   }
 
   private use(engine: ElectronBlocker): void {
@@ -150,6 +145,11 @@ function inAskingFrame(e: IpcMainInvokeEvent) {
 // As Ghostery's content script does: at top level each scriptlet's helpers (proxyApplyFn, JSONPath) would overwrite the previous one's, and two Function.prototype.toString proxies then call each other forever.
 export function inOwnBlock(scriptlet: string): string {
   return `{\n${scriptlet}\n}`
+}
+
+function buildEngine(file: string): Promise<boolean> {
+  const child = utilityProcess.fork(join(__dirname, 'adblock-build.js'), [file], { serviceName: 'YARC ad block lists' })
+  return new Promise((resolve) => child.once('exit', (code) => resolve(code === 0)))
 }
 
 export function hostOf(url: string): string {
