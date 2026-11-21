@@ -132,11 +132,9 @@ Music and other sound from a tab you leave gets a card at the bottom of the side
 
 ### Canvases, YARC's Easels
 
-A canvas is a freeform board in your sidebar for collecting bits of the web: a moodboard, a research wall, a plan. It's YARC's take on Arc's Easels, and unlike Easels it works on Windows and Linux too. Make one with **New Canvas** in the command bar. It sits with your pinned tabs, and you can drag it into folders or onto another space. Draw on it, write on it, and paste or drop images on it.
+![Capturing part of a page to a canvas, then pressing play to see it live](docs/screenshots/canvases.gif)
 
-`⌘⇧2` / `Ctrl+Shift+2` (**Capture to Canvas**) captures part of the page you're on. Point at a photo, chart or card and click, or drag an area; scroll to take a bigger part. Then pick the canvas it goes to. Right-click an image on a page and choose **Add Image to Canvas** to keep the image itself at full size. Hovering a capture on the canvas shows the page it came from; click the arrow to open it in Peek. Press ▶ on a capture to play the real page in its box, live and clickable, so a canvas can be a dashboard made of pieces of several sites; ⏸ goes back to the still. A live capture plays again when you open its canvas. Select a few captures and click **Arrange in Grid** to tidy them up. The menu exports the canvas as a PNG or copies it.
-
-Canvases stay on your computer: there's no sharing. Arc's Easels can't be imported yet: their contents lived on Arc's servers. Export them from Arc's Library (it saves every Easel as web pages) before Arc shuts down; importing that export is planned.
+A board in your sidebar for bits of the web, like Arc's Easels, and on Windows and Linux too. `⌘⇧2` / `Ctrl+Shift+2` captures part of a page; ▶ shows a capture live. Canvases stay on your computer.
 
 ### Built-in ad and tracker blocking
 
