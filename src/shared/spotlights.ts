@@ -25,7 +25,19 @@ export interface Spotlight {
 }
 
 /** Newest first. */
-export const SPOTLIGHTS: Spotlight[] = []
+export const SPOTLIGHTS: Spotlight[] = [
+  {
+    id: 'floating-player',
+    title: 'Videos keep playing when you leave their tab',
+    text:
+      'Switch away from a playing video and it floats in a small player in front of all your apps. Drag it anywhere, resize it, ' +
+      'or double-click it to go back to the tab. Music and other sound get a card at the bottom of the sidebar.',
+    actions: [
+      { label: 'Try It', command: 'floatingPlayerDemo' },
+      { label: 'Settings', command: 'settings' }
+    ]
+  }
+]
 
 /** How many spotlights What's New shows when opened from the menu or the command bar. */
 export const RECENT_SPOTLIGHTS = 3

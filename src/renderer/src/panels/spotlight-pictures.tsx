@@ -22,7 +22,32 @@ export function MiniWindow({ tabs = 4, active = 0, children }: { tabs?: number; 
   )
 }
 
-const PICTURES: Record<string, () => ReactNode> = {}
+/**
+ * The floating player: a video plays in the page, the highlight moves to another tab, and the video
+ * shrinks into the window's corner over the sidebar, still playing, while the other page shows.
+ */
+function FloatingPlayer() {
+  return (
+    <div className="fp-scene">
+      <MiniWindow active={-1}>
+        <div className="fp-other">
+          <i />
+          <i />
+          <i />
+          <i />
+        </div>
+      </MiniWindow>
+      <span className="fp-tab" />
+      <div className="fp-video">
+        <span className="fp-play" />
+      </div>
+    </div>
+  )
+}
+
+const PICTURES: Record<string, () => ReactNode> = {
+  'floating-player': FloatingPlayer
+}
 
 export function SpotlightPicture({ id }: { id: string }) {
   const draw = PICTURES[id]

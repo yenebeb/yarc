@@ -56,6 +56,7 @@ import { openInChrome } from './chrome'
 import { DownloadBurst, isDangerous, markFromInternet } from './downloads'
 import { Extensions } from './extensions'
 import { runImport } from './importers'
+import { FLOATING_DEMO_URL } from './floating-demo'
 import { FloatingPlayer, type FloatAnchor, type FloatingHost } from './floating-player'
 import { LittleWindow } from './little'
 import { logInfo, logProblem, setLogContext } from './log'
@@ -923,6 +924,25 @@ export class Browser implements TabHost, FloatingHost {
     this.setMedia(closed(this.media, id))
   }
 
+  /**
+   * Try It on the floating player's spotlight: a demo video plays in a new tab, then YARC goes back
+   * to the tab you were on, so the video floats. In an empty space the demo stays, for you to leave.
+   */
+  private async floatingPlayerDemo(): Promise<void> {
+    if (!this.state.settings.floatVideos) return this.toast('Turn on floating videos in Settings first')
+    const from = this.space.activeItemId
+    const demo = this.newTab(FLOATING_DEMO_URL)
+    demo.title = 'Floating Player Demo'
+    const tab = this.live.get(demo.id)
+    for (let i = 0; i < 50 && tab && !tab.playing && !tab.destroyed; i++) await new Promise((r) => setTimeout(r, 100))
+    if (!tab?.playing || this.space.activeItemId !== demo.id) return
+    // A moment on the page first, so it's clear where the video comes from.
+    await new Promise((r) => setTimeout(r, 1200))
+    if (this.space.activeItemId !== demo.id) return
+    if (from && findItem(this.state, from)) this.activate(from)
+    else this.toast('Switch to another tab to see the video float')
+  }
+
   backToTab(id: ID): void {
     if (!findItem(this.state, id)) return
     // Back in the tab's own space (activate() switches to it), in the window the user is in.
@@ -1757,6 +1777,8 @@ export class Browser implements TabHost, FloatingHost {
         return this.setOverlay({ kind: 'tour', step: 'welcome' })
       case 'whatsNew':
         return this.setOverlay({ kind: 'whats-new', releases: recentChanges(CHANGELOG, app.getVersion()), spotlights: recentSpotlights(SPOTLIGHTS) })
+      case 'floatingPlayerDemo':
+        return void this.floatingPlayerDemo()
     }
   }
 

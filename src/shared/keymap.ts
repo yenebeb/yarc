@@ -54,6 +54,7 @@ export type CommandId =
   | 'installUpdate'
   | 'whatsNew'
   | 'tour'
+  | 'floatingPlayerDemo'
 
 export interface Binding {
   id: CommandId
@@ -127,7 +128,9 @@ export const BINDINGS: Binding[] = [
   // Listed only while an update is waiting, under the title Updater.actionTitle() gives it.
   { id: 'installUpdate', title: 'Install Update', mac: [], other: [], palette: true },
   { id: 'whatsNew', title: "What's New in YARC", mac: [], other: [], palette: true },
-  { id: 'tour', title: 'Take the YARC Tour', mac: [], other: [], palette: true }
+  { id: 'tour', title: 'Take the YARC Tour', mac: [], other: [], palette: true },
+  // The floating player spotlight's Try It: plays a demo video in a new tab, then goes back.
+  { id: 'floatingPlayerDemo', title: 'Try the Floating Player', mac: [], other: [], palette: true }
 ]
 
 export interface KeyInput {

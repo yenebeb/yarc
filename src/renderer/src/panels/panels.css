@@ -598,6 +598,156 @@
   box-shadow: 0 1px 2px rgb(0 0 0 / 0.08);
 }
 
+/* The floating player's picture (6 s loop): the video leaves the page for the window's corner. */
+.fp-scene {
+  position: relative;
+  width: 300px;
+  height: 168px;
+}
+
+/* The selected tab: the first row, then the second once you "switch". MiniWindow's rows sit at
+   6px (window padding) + 16px (sidebar padding), 14px apart. */
+.fp-tab {
+  position: absolute;
+  left: 8px;
+  top: 22px;
+  width: 60px;
+  height: 9px;
+  border-radius: 3px;
+  background: color-mix(in oklab, var(--accent) 55%, transparent);
+  animation: fp-tab 6s ease-in-out infinite;
+}
+
+/* The other page: a few lines of text, shown once the video has left. */
+.fp-other {
+  position: absolute;
+  inset: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  animation: fp-other 6s ease-in-out infinite;
+}
+
+.fp-other i {
+  height: 8px;
+  border-radius: 4px;
+  background: color-mix(in oklab, var(--text) 12%, transparent);
+}
+
+.fp-other i:first-child {
+  width: 55%;
+  height: 12px;
+  background: color-mix(in oklab, var(--text) 22%, transparent);
+}
+
+.fp-other i:nth-child(3) {
+  width: 80%;
+}
+
+/* The video: fills the page (left 76px = window padding + sidebar + gap), then floats. */
+.fp-video {
+  position: absolute;
+  left: 76px;
+  top: 6px;
+  width: 218px;
+  height: 156px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 6px;
+  background:
+    linear-gradient(120deg, transparent 30%, rgb(255 255 255 / 0.22) 45%, transparent 60%) 0 0 / 300% 100%,
+    linear-gradient(135deg, var(--accent), color-mix(in oklab, var(--accent) 40%, #e8578f));
+  animation:
+    fp-float 6s cubic-bezier(0.5, 0, 0.2, 1) infinite,
+    fp-shine 2s linear infinite;
+}
+
+.fp-play {
+  width: 0;
+  height: 0;
+  margin-left: 4px;
+  border-style: solid;
+  border-width: 9px 0 9px 15px;
+  border-color: transparent transparent transparent rgb(255 255 255 / 0.9);
+  animation: fp-play 6s ease-in-out infinite;
+}
+
+@keyframes fp-tab {
+  0%,
+  30% {
+    transform: translateY(0);
+  }
+  40%,
+  92% {
+    transform: translateY(14px);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+
+@keyframes fp-other {
+  0%,
+  34% {
+    opacity: 0;
+  }
+  46%,
+  90% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes fp-float {
+  0%,
+  32% {
+    left: 76px;
+    top: 6px;
+    width: 218px;
+    height: 156px;
+    box-shadow: none;
+  }
+  50%,
+  90% {
+    left: 12px;
+    top: 98px;
+    width: 104px;
+    height: 58px;
+    box-shadow: 0 8px 20px rgb(20 10 40 / 0.35);
+  }
+  100% {
+    left: 76px;
+    top: 6px;
+    width: 218px;
+    height: 156px;
+    box-shadow: none;
+  }
+}
+
+@keyframes fp-shine {
+  from {
+    background-position: 100% 0, 0 0;
+  }
+  to {
+    background-position: -50% 0, 0 0;
+  }
+}
+
+@keyframes fp-play {
+  0%,
+  45%,
+  100% {
+    transform: scale(1);
+  }
+  55%,
+  85% {
+    transform: scale(0.7);
+  }
+}
+
 /* The relaunch card: a long list of updates scrolls, the buttons stay put. */
 .intro.update-ready .intro-body {
   max-height: min(46vh, 360px);
