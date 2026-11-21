@@ -95,6 +95,21 @@ test("clicking the current space's icon opens its menu", async () => {
   await expect.poll(() => app.evaluate(() => (globalThis as any).poppedMenu)).toContain('Edit Space…')
 })
 
+test("the space editor's own color picker sets a custom color", async () => {
+  await dispatch({ type: 'overlay', mode: { kind: 'space-editor' } })
+  const overlay = await pageWithUrl('overlay.html')
+  await overlay.locator('.custom-sw').click()
+  await expect(overlay.locator('#color-picker')).toBeVisible()
+  await overlay.locator('.cp-hex').fill('#336699')
+  await expect(overlay.locator('.color-row .hex')).toHaveText('#336699')
+  await overlay.locator('.cp-hue').fill('0')
+  await expect(overlay.locator('.color-row .hex')).toHaveText('#993333')
+  await overlay.locator('.space-editor header').click()
+  await expect(overlay.locator('#color-picker')).toBeHidden()
+  await expect(overlay.locator('.custom-sw')).toHaveClass(/\bon\b/)
+  await dispatch({ type: 'overlay', mode: { kind: 'none' } })
+})
+
 test('pages start below the native caption buttons on Windows and Linux', async () => {
   const ui = await pageWithUrl('index.html')
   const mac = process.platform === 'darwin'

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react'
 import type { AppState } from '../../../shared/types'
 import { activeSpace, cx, dispatch, isMac } from '../api'
 import { Icon } from '../icons'
+import { CustomColor } from './ColorPicker'
 import { firstGrapheme, SPACE_COLORS } from './util'
 import './panels.css'
 
@@ -158,7 +159,7 @@ export function SpaceEditor({ state, close, spaceId }: { state: AppState; close:
                   onClick={() => setColor(c)}
                 />
               ))}
-              <input type="color" aria-label="Custom color" title="Custom color" value={HEX.test(color) ? color : '#7c6cf2'} onChange={(e) => setColor(e.target.value)} />
+              <CustomColor color={color} onChange={setColor} />
               <span className="hex">{color}</span>
             </div>
           </div>

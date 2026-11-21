@@ -285,24 +285,97 @@
   box-shadow: 0 0 0 2px var(--panel), 0 0 0 4px var(--accent);
 }
 
-.color-row input[type='color'] {
-  width: 30px;
-  height: 30px;
-  padding: 0;
+.color-row .custom-sw {
+  anchor-name: --custom-color;
+}
+
+.color-row .custom-sw:not(.on) {
+  background: conic-gradient(#f25f5c, #f2a541, #e8d44d, #3dbb8a, #3fa7d6, #7c6cf2, #c06cf2, #f25f5c);
+}
+
+.color-picker {
+  position-anchor: --custom-color;
+  inset: auto;
+  top: anchor(bottom);
+  left: anchor(left);
+  position-try-fallbacks: flip-block, flip-inline;
+  margin: 8px 0;
+  width: 232px;
+  padding: 10px;
+  display: none;
+  flex-direction: column;
+  gap: 10px;
+  color: var(--text);
+  background: var(--panel);
   border: 1px solid var(--panel-line);
-  border-radius: 50%;
-  background: none;
-  overflow: hidden;
-  cursor: default;
+  border-radius: 12px;
+  box-shadow: var(--shadow-lg);
 }
 
-.color-row input[type='color']::-webkit-color-swatch-wrapper {
-  padding: 0;
+.color-picker:popover-open {
+  display: flex;
 }
 
-.color-row input[type='color']::-webkit-color-swatch {
-  border: 0;
+.cp-area {
+  position: relative;
+  height: 140px;
+  border-radius: 8px;
+  touch-action: none;
+  outline: none;
+}
+
+.cp-area:focus-visible {
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+.cp-thumb {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  margin: -7px 0 0 -7px;
   border-radius: 50%;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.3), 0 1px 3px rgb(0 0 0 / 0.3);
+  pointer-events: none;
+}
+
+.color-picker input.cp-hue {
+  appearance: none;
+  width: 100%;
+  height: 12px;
+  margin: 0;
+  border-radius: 6px;
+  background: linear-gradient(to right, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00);
+}
+
+.color-picker input.cp-hue::-webkit-slider-thumb {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.3), 0 1px 3px rgb(0 0 0 / 0.3);
+}
+
+.cp-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cp-preview {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.12);
+}
+
+.cp-hex {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 8px;
+  font-variant-numeric: tabular-nums;
 }
 
 .color-row .hex {
