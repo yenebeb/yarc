@@ -156,8 +156,9 @@ async function board(s, canvasId, fragments) {
 
 const flows = {
   async hero(s) {
-    const canvasId = await s.ev(() => globalThis.arcBrowser.canvases.create(globalThis.arcBrowser.space, 'Lisbon trip').id)
-    await board(s, canvasId, ['weather', 'palette', 'photo', 'clock'])
+    await s.ev(() => globalThis.arcBrowser.canvases.create(globalThis.arcBrowser.space, 'Lisbon trip'))
+    await s.dispatch({ type: 'open', url: 'https://en.wikipedia.org/wiki/Rick_Astley', where: 'tab' })
+    await sleep(6000)
     await s.frame('hero', 1000)
   },
 
