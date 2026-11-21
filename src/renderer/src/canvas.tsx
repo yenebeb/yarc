@@ -1058,13 +1058,14 @@ function Board({ loaded }: { loaded: CanvasLoad }) {
     const board = boardRef.current?.getBoundingClientRect()
     if (!board) return
     const visible = { x: 0, y: 0, width: board.width, height: board.height }
+    const clip = { x: board.left, y: board.top, width: board.width, height: board.height }
     const cards: LiveCard[] = !shown
       ? []
       : items.flatMap((i) => {
           if (i.kind !== 'capture' || !i.live || !i.capture || !i.source) return []
           const box = onScreen(i)
           const hidden = !!menu || box.width < LIVE_MIN.width || box.height < LIVE_MIN.height || !intersects(box, visible)
-          return [{ id: i.id, url: i.source.url, capture: i.capture, box: { ...box, x: box.x + board.left, y: box.y + board.top }, zoom: view.zoom, hidden }]
+          return [{ id: i.id, url: i.source.url, capture: i.capture, box: { ...box, x: box.x + board.left, y: box.y + board.top }, clip, zoom: view.zoom, pixelRatio: devicePixelRatio, hidden }]
         })
     const json = JSON.stringify(cards)
     if (json === lastLive.current) return

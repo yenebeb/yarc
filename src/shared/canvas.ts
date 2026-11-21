@@ -61,13 +61,15 @@ export interface CardItem extends ItemBox {
   live?: boolean
 }
 
-/** A live card's picture box in the canvas page's CSS pixels; `hidden` while it's too small to read or something is drawn over it. */
+/** A live card's picture box and the board it's cut to, in the canvas page's CSS pixels; `hidden` while it's too small to read or something is drawn over it. */
 export interface LiveCard {
   id: string
   url: string
   capture: CaptureGeometry
   box: Box
+  clip: Box
   zoom: number
+  pixelRatio: number
   hidden: boolean
 }
 

@@ -1,4 +1,4 @@
-import { BrowserWindow, clipboard, ClipboardItem, dialog, nativeImage, WebContentsView, type Event, type Input, type IpcMainEvent, type WebContents } from 'electron'
+import { BrowserWindow, clipboard, ClipboardItem, dialog, nativeImage, View, WebContentsView, type Event, type Input, type IpcMainEvent, type WebContents } from 'electron'
 import { existsSync, mkdirSync, renameSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { FILE_ID, IMAGE_TYPES, type CanvasImage, type CanvasLoad, type CanvasScene, type CaptureGeometry, type CaptureSource, type LiveCard } from '../shared/canvas'
@@ -24,8 +24,9 @@ const CANVAS_KEYS = new Set<CommandId>(['togglePin', 'zoomIn', 'zoomOut', 'zoomR
 const PICK_WORLD = 1847
 
 export class CanvasPage {
+  /** What the window shows: the page, with its live cards above it (a web page's own child views are drawn under it). */
+  readonly stage = new View()
   readonly view: WebContentsView
-  /** Child views, so they're clipped to the page and leave the window with it. */
   readonly live = new Map<string, LiveCapture>()
   private shown = true
 
@@ -37,6 +38,11 @@ export class CanvasPage {
     this.view.setBorderRadius(8)
     loadRenderer(this.view.webContents, 'canvas', { id })
     this.view.webContents.on('before-input-event', onInput)
+    this.stage.addChildView(this.view)
+    this.stage.on('bounds-changed', () => {
+      const { width, height } = this.stage.getBounds()
+      this.view.setBounds({ x: 0, y: 0, width, height })
+    })
   }
 
   get wc(): WebContents {
@@ -53,7 +59,7 @@ export class CanvasPage {
     const live = this.live.get(cardId)
     if (!live) return
     this.live.delete(cardId)
-    this.view.removeChildView(live.box)
+    this.stage.removeChildView(live.view)
     live.close()
   }
 
@@ -88,8 +94,8 @@ export class Canvases {
     return page
   }
 
-  showing(isShown: (view: WebContentsView) => boolean): void {
-    for (const page of this.pages.values()) page.setShown(isShown(page.view))
+  showing(isShown: (view: View) => boolean): void {
+    for (const page of this.pages.values()) page.setShown(isShown(page.stage))
   }
 
   pageOf(wc: WebContents): CanvasPage | undefined {
@@ -102,7 +108,7 @@ export class Canvases {
     const page = this.pages.get(id)
     if (!page) return
     this.pages.delete(id)
-    this.browser.detachEverywhere(page.view)
+    this.browser.detachEverywhere(page.stage)
     page.destroy()
   }
 
@@ -309,7 +315,7 @@ export class Canvases {
       else {
         const added = new LiveCapture(this.browser, hit.space.profileId, card)
         page.live.set(card.id, added)
-        page.view.addChildView(added.box)
+        page.stage.addChildView(added.view)
       }
     }
   }

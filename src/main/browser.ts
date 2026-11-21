@@ -15,6 +15,7 @@ import {
   type IpcMainInvokeEvent,
   type Rectangle,
   type Result,
+  type View,
   type WebContents
 } from 'electron'
 import { existsSync, readFileSync } from 'node:fs'
@@ -642,7 +643,7 @@ export class Browser implements TabHost, FloatingHost {
     return !!findItem(this.state, id) || !!findCanvas(this.state, id)
   }
 
-  detachEverywhere(view: WebContentsView): void {
+  detachEverywhere(view: View): void {
     for (const w of this.wins) if (w.open) w.main.detach(view)
   }
 
@@ -713,7 +714,7 @@ export class Browser implements TabHost, FloatingHost {
       const active = space.activeItemId && findItem(this.state, space.activeItemId) ? space.activeItemId : undefined
       const canvas = !active && space.activeItemId ? findCanvas(this.state, space.activeItemId) : undefined
       if (canvas) {
-        this.show([{ view: this.canvases.page(canvas.canvas.id).view, rect: content }])
+        this.show([{ view: this.canvases.page(canvas.canvas.id).stage, rect: content }])
         views.push({ id: canvas.canvas.id, rect: content })
       } else if (!active) {
         this.show([])
@@ -774,7 +775,7 @@ export class Browser implements TabHost, FloatingHost {
     this.canvases.showing((view) => this.wins.some((w) => w.open && w.main.isShown(view)))
   }
 
-  private lend(w: WindowSession, view: WebContentsView): void {
+  private lend(w: WindowSession, view: View): void {
     w.main.detach(view)
     const pane = w.layout.views.find((v) => this.live.get(v.id)?.view === view)
     if (!pane) return

@@ -1,4 +1,4 @@
-import { BrowserWindow, WebContentsView, nativeTheme, screen, type BrowserWindowConstructorOptions, type Rectangle, type WebContents } from 'electron'
+import { BrowserWindow, WebContentsView, nativeTheme, screen, type BrowserWindowConstructorOptions, type Rectangle, type View, type WebContents } from 'electron'
 import { join } from 'node:path'
 import { IPC } from '../shared/ipc'
 import { isFloating } from '../shared/tour'
@@ -15,7 +15,7 @@ export const CAPTION_H = mac ? 0 : 32
 export const captionSymbols = (dark: boolean): string => (dark ? '#f1eff6' : '#1d1b22')
 
 export interface ViewSlot {
-  view: WebContentsView
+  view: View
   rect: Rectangle
 }
 
@@ -51,7 +51,7 @@ export class MainWindow {
   readonly win: BrowserWindow
   readonly overlay: WebContentsView
   overlayMode: OverlayMode = { kind: 'none' }
-  private shown: WebContentsView[] = []
+  private shown: View[] = []
   private overlayAttached = false
   private top: WebContentsView | undefined
   prompt: PromptView | undefined
@@ -169,14 +169,14 @@ export class MainWindow {
     this.prompt?.raise()
   }
 
-  detach(view: WebContentsView): void {
+  detach(view: View): void {
     if (this.shown.includes(view)) {
       this.win.contentView.removeChildView(view)
       this.shown = this.shown.filter((v) => v !== view)
     }
   }
 
-  isShown(view: WebContentsView): boolean {
+  isShown(view: View): boolean {
     return this.shown.includes(view)
   }
 
