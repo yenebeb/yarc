@@ -2,7 +2,7 @@
 
 # YARC: an open-source alternative to the Arc browser
 
-**YARC is a free, open-source alternative to the Arc browser, which shuts down on 22 December 2026.** It will feel familiar if you used Arc: a vertical sidebar, Spaces with their own profiles, the command bar, split view, Little Window and Peek. It imports your Arc spaces, profiles, favorites, pinned tabs, folders, archive and history in one step. It runs on macOS, Windows and Linux (experimental), and it collects nothing about you: no telemetry, no account, no servers of its own.
+**YARC is a free, open-source alternative to the Arc browser, which shuts down on 22 December 2026.** It will feel familiar if you used Arc: a vertical sidebar, Spaces with their own profiles, the command bar, split view, Little Window, Peek, and canvases in place of Easels. It imports your Arc spaces, profiles, favorites, pinned tabs, folders, archive and history in one step. It runs on macOS, Windows and Linux (experimental), and it collects nothing about you: no telemetry, no account, no servers of its own.
 
 **[Download YARC](https://github.com/yenebeb/yarc/releases/latest)** · [Website](https://yenebeb.nl/yarc) · [Moving from Arc](#moving-from-arc)
 
@@ -124,11 +124,11 @@ Leave a tab while its video plays and the video keeps going in a small floating 
 
 Music and other sound from a tab you leave gets a card at the bottom of the sidebar instead, with play/pause, mute and the site's icon to go back to the tab. Hover the cards to see them all, each with its title, a button to float its video again and **✕** to close it. You can turn the floating player off in Settings.
 
-### Canvases
+### Canvases, YARC's Easels
 
-A canvas is a freeform board in your sidebar for collecting bits of the web: a moodboard, a research wall, a plan. Make one with **New Canvas** in the command bar. It sits with your pinned tabs, and you can drag it into folders or onto another space. Draw on it, write on it, and paste or drop images on it.
+A canvas is a freeform board in your sidebar for collecting bits of the web: a moodboard, a research wall, a plan. It's YARC's take on Arc's Easels, and unlike Easels it works on Windows and Linux too. Make one with **New Canvas** in the command bar. It sits with your pinned tabs, and you can drag it into folders or onto another space. Draw on it, write on it, and paste or drop images on it.
 
-`⌘⇧2` / `Ctrl+Shift+2` (**Capture to Canvas**) captures part of the page you're on. Point at a photo, chart or card and click, or drag an area; scroll to take a bigger part. Then pick the canvas it goes to. Right-click an image on a page and choose **Add Image to Canvas** to keep the image itself at full size. Hovering a capture on the canvas shows the page it came from; click the arrow to open it in Peek. Select a few captures and click **Arrange in Grid** to tidy them up. The menu exports the canvas as a PNG or copies it.
+`⌘⇧2` / `Ctrl+Shift+2` (**Capture to Canvas**) captures part of the page you're on. Point at a photo, chart or card and click, or drag an area; scroll to take a bigger part. Then pick the canvas it goes to. Right-click an image on a page and choose **Add Image to Canvas** to keep the image itself at full size. Hovering a capture on the canvas shows the page it came from; click the arrow to open it in Peek. Press ▶ on a capture to play the real page in its box, live and clickable, so a canvas can be a dashboard made of pieces of several sites; ⏸ goes back to the still. A live capture plays again when you open its canvas. Select a few captures and click **Arrange in Grid** to tidy them up. The menu exports the canvas as a PNG or copies it.
 
 Canvases stay on your computer: there's no sharing. Arc's Easels can't be imported yet: their contents lived on Arc's servers. Export them from Arc's Library (it saves every Easel as web pages) before Arc shuts down; importing that export is planned.
 
@@ -230,7 +230,7 @@ Most features keep the names you know from Arc. One is different: Arc's Little A
 
 - **Saved passwords, cookies and logins.** Browsers encrypt these with a key tied to the machine, so you'll need to sign in to your sites again. Before Arc goes away, export your passwords from Arc (`arc://settings/passwords` → ⋮ → Export) and import them into a password manager such as Bitwarden or 1Password. Their extensions work in YARC.
 - **Boosts and Notes.** YARC doesn't have these features yet.
-- **Easels.** Their contents were kept on Arc's servers, not on your computer, so they can't be read from Arc's files. **Before Arc shuts down, export them**: Arc's Library has a button that exports every Easel as web pages, which open offline. YARC has [canvases](#canvases) instead, and importing that export into canvases is planned.
+- **Easels.** Their contents were kept on Arc's servers, not on your computer, so they can't be read from Arc's files. **Before Arc shuts down, export them**: Arc's Library has a button that exports every Easel as web pages, which open offline. YARC has [canvases](#canvases-yarcs-easels) instead, and importing that export into canvases is planned.
 - **Extensions.** Reinstall them from the Chrome Web Store, in each space that needs them.
 
 ## Keyboard shortcuts
@@ -407,7 +407,6 @@ Planned or open for contributions:
 - [ ] Multiple main windows
 - [ ] Sync between your own devices
 - [ ] Notes
-- [ ] Live captures on canvases (press play to see the page live; [docs/canvas.md](docs/canvas.md))
 - [ ] Code signing and notarization, to remove the install warnings (and keep macOS camera, microphone and screen permissions across updates)
 
 ## Contributing
