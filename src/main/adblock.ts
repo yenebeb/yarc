@@ -1,6 +1,6 @@
 // Not enableBlockingInSession(): it registers global IPC handlers per session (a second profile throws).
 import { ElectronBlocker } from '@ghostery/adblocker-electron'
-import { ipcMain, type IpcMainInvokeEvent, type OnBeforeRequestListenerDetails, type OnHeadersReceivedListenerDetails, type Session, type WebContents } from 'electron'
+import { ipcMain, type InsertCSSOptions, type IpcMainInvokeEvent,type OnBeforeRequestListenerDetails, type OnHeadersReceivedListenerDetails, type Session, type WebContents } from 'electron'
 import { mkdir, readFile, stat, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { dirname } from 'node:path'
@@ -23,7 +23,7 @@ export class AdBlock {
   ) {
     ipcMain.handle('@ghostery/adblocker/inject-cosmetic-filters', (e: IpcMainInvokeEvent, url: string, msg?: unknown) => {
       if (!this.engine || !this.activeFor(e.sender, url)) return
-      return this.engine.onInjectCosmeticFilters(e, url, msg as never)
+      return this.engine.onInjectCosmeticFilters(inAskingFrame(e) as never, url, msg as never)
     })
     ipcMain.handle('@ghostery/adblocker/is-mutation-observer-enabled', (e: IpcMainInvokeEvent) =>
       this.engine ? this.engine.onIsMutationObserverEnabled(e) : false
@@ -132,6 +132,18 @@ export class AdBlock {
     if (!this.enabled) return false
     if (details.resourceType === 'mainFrame') return !this.isAllowed(details.url)
     return this.activeFor(details.webContents, details.referrer)
+  }
+}
+
+// Ghostery's webContents.executeJavaScript waits until the page has loaded (a listener per scriptlet), too late for most, and leaves a throwing one unhandled.
+function inAskingFrame(e: IpcMainInvokeEvent) {
+  return {
+    frameId: e.frameId,
+    processId: e.processId,
+    sender: {
+      insertCSS: (css: string, options: InsertCSSOptions) => e.sender.insertCSS(css, options),
+      executeJavaScript: (code: string) => e.senderFrame?.executeJavaScript(code).catch(() => {})
+    }
   }
 }
 

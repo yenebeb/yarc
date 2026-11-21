@@ -1,7 +1,7 @@
 // End-to-end tests against the built app (run `pnpm build` first; `pnpm test:e2e` does).
 import { _electron as electron, expect, test, type ElectronApplication, type Page } from '@playwright/test'
 import { spawn } from 'node:child_process'
-import { mkdtempSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { createServer, type Server } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
@@ -60,7 +60,9 @@ async function pageWithUrl(fragment: string): Promise<Page> {
 
 test.beforeAll(async () => {
   server = createServer((req, res) => {
+    if (req.url === '/never-loads') return
     res.setHeader('content-type', 'text/html')
+    if (req.url === '/still-loading') return res.end('<!doctype html><title>Still loading</title><img src="/never-loads">')
     res.end(req.url === '/video-page' ? VIDEO_PAGE : page((req.url ?? '/').slice(1) || 'home'))
   })
   await new Promise<void>((r) => server.listen(0, '127.0.0.1', r))
@@ -70,6 +72,7 @@ test.beforeAll(async () => {
 
 test.afterAll(async () => {
   await app?.close()
+  server?.closeAllConnections()
   server?.close()
 })
 
@@ -645,6 +648,37 @@ test('built-in ad blocking blocks ad requests and can be turned off per site', a
   await expect.poll(async () => (await state()).live[id]?.shielded).toBe(false)
   await dispatch({ type: 'adblockToggleSite' })
   expect((await state()).settings.adblockAllowlist).not.toContain('127.0.0.1')
+})
+
+test('ad block scriptlets run while the page still loads, and one that throws is caught', async () => {
+  test.setTimeout(90_000)
+  await expect.poll(() => app.evaluate(() => !!(globalThis as any).arcBrowser.adblock.engine), { timeout: 60_000 }).toBe(true)
+  await app.evaluate(() => {
+    const engine = (globalThis as any).arcBrowser.adblock.engine
+    const original = engine.getCosmeticsFilters
+    engine.restoreForTest = () => (engine.getCosmeticsFilters = original)
+    engine.getCosmeticsFilters = function (request: { url: string; getInjectionRules: boolean }) {
+      const result = original.call(this, request)
+      if (!request.url.includes('/still-loading') || !request.getInjectionRules) return result
+      return { ...result, scripts: [...Array(12).fill('window.scriptlets = (window.scriptlets ?? 0) + 1'), 'throw new Error("scriptlet")'] }
+    }
+  })
+  try {
+    await dispatch({ type: 'open', url: `${base}/still-loading`, where: 'tab' })
+    const ran = () =>
+      app.evaluate(async () => {
+        const wc = (globalThis as any).arcBrowser.activeTab().wc
+        return { loading: wc.isLoading(), count: await wc.mainFrame.executeJavaScript('window.scriptlets ?? 0') }
+      })
+    await expect.poll(async () => (await ran()).count).toBe(12)
+    expect((await ran()).loading).toBe(true)
+    const log = readFileSync(join(userData, 'logs', 'main.log'), 'utf8')
+    expect(log).not.toContain('Script failed to execute')
+    expect(log).not.toContain('MaxListenersExceededWarning')
+  } finally {
+    await app.evaluate(() => (globalThis as any).arcBrowser.adblock.engine.restoreForTest())
+    await dispatch({ type: 'close', id: (await space()).activeItemId! })
+  }
 })
 
 // What Windows/macOS do when YARC is the default browser: start a second instance with the URL.
