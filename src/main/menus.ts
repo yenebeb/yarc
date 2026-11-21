@@ -184,7 +184,9 @@ export function installAppMenu(browser: Browser): void {
         { type: 'separator' },
         opensDialog('importArc'),
         opensDialog('importZen'),
-        item('importChrome', 'Import from Chrome…')
+        item('importChrome', 'Import from Chrome…'),
+        { type: 'separator' },
+        opensDialog('exportBookmarks')
       ]
     },
     { role: 'editMenu' },

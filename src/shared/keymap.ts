@@ -46,6 +46,7 @@ export type CommandId =
   | 'importArc'
   | 'importZen'
   | 'importChrome'
+  | 'exportBookmarks'
   | 'extensions'
   | 'focusPage'
   | 'setDefaultBrowser'
@@ -122,6 +123,7 @@ export const BINDINGS: Binding[] = [
   { id: 'importArc', title: 'Import from Arc', mac: [], other: [], palette: true },
   { id: 'importZen', title: 'Import from Zen', mac: [], other: [], palette: true },
   { id: 'importChrome', title: 'Import History & Bookmarks from Chrome', mac: [], other: [], palette: true },
+  { id: 'exportBookmarks', title: 'Export Spaces as Bookmarks', mac: [], other: [], palette: true },
   { id: 'extensions', title: 'Get Extensions (Chrome Web Store)', mac: [], other: [], palette: true },
   { id: 'focusPage', title: 'Focus Page', mac: [], other: [] },
   { id: 'setDefaultBrowser', title: 'Make YARC the Default Browser', mac: [], other: [], palette: true },

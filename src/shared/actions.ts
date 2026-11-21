@@ -74,6 +74,7 @@ export type Action =
   | { type: 'archiveClear' }
   /** `keepOverlay`: from the welcome screen, which stays open for its other steps. */
   | { type: 'import'; source: 'arc' | 'zen' | 'chrome'; path?: string; keepOverlay?: boolean }
+  | { type: 'exportBookmarks' }
   | { type: 'command'; id: string; keepOverlay?: boolean }
   | { type: 'relaunchUpdate' }
   | { type: 'itemMenu'; id: ID }

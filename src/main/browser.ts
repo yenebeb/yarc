@@ -2,6 +2,7 @@ import {
   app,
   BrowserWindow,
   clipboard,
+  dialog,
   nativeTheme,
   screen,
   shell,
@@ -18,6 +19,7 @@ import {
   type WebContents
 } from 'electron'
 import { existsSync, readFileSync } from 'node:fs'
+import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { Action, DropTarget } from '../shared/actions'
 import { IPC, type LittleAnchor, type LittleOp } from '../shared/ipc'
@@ -42,6 +44,7 @@ import { appendPaneIn, flipSplit, gatherSplit, layoutPanes, movePane, PANE_BAR, 
 import { isFloating, stepAfter, type TourEvent, type TourStep } from '../shared/tour'
 import { resolveInput, SEARCH_ENGINES } from '../shared/url'
 import { AdBlock, hostOf } from './adblock'
+import { bookmarksHtml } from './bookmarks-export'
 import { Canvases } from './canvas'
 import { recentSpotlights, SPOTLIGHTS, unseenSpotlights } from '../shared/spotlights'
 import { recentChanges, startupScreen, type Changelog } from './changelog'
@@ -120,6 +123,7 @@ const COMMAND_ACTIONS: Partial<Record<CommandId, Action>> = {
   importArc: { type: 'import', source: 'arc' },
   importZen: { type: 'import', source: 'zen' },
   importChrome: { type: 'import', source: 'chrome' },
+  exportBookmarks: { type: 'exportBookmarks' },
   extensions: { type: 'extensionsStore' }
 }
 
@@ -834,6 +838,19 @@ export class Browser implements TabHost, FloatingHost {
     this.onScreen.delete(id)
     this.videoTabs.delete(id)
     this.setMedia(closed(this.media, id))
+  }
+
+  private async exportBookmarks(): Promise<void> {
+    const state = (this.main ?? this).state
+    const defaultPath = join(app.getPath('downloads'), `YARC bookmarks ${new Date().toISOString().slice(0, 10)}.html`)
+    const { canceled, filePath } = await dialog.showSaveDialog(this.window.win, { defaultPath, filters: [{ name: 'Bookmarks', extensions: ['html'] }] })
+    if (canceled || !filePath) return
+    try {
+      await writeFile(filePath, bookmarksHtml(state))
+      this.toast(`Exported ${state.spaces.length === 1 ? '1 space' : `${state.spaces.length} spaces`} as bookmarks`)
+    } catch (err) {
+      this.toast(`Export failed: ${(err as Error).message}`)
+    }
   }
 
   private async floatingPlayerDemo(): Promise<void> {
@@ -1826,6 +1843,9 @@ export class Browser implements TabHost, FloatingHost {
         }
         return
       }
+      case 'exportBookmarks':
+        this.setOverlay({ kind: 'none' }, false)
+        return this.exportBookmarks()
       case 'relaunchUpdate':
         return void this.updater.apply(true)
       case 'command':

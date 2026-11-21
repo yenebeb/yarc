@@ -15,7 +15,7 @@ const SECTIONS: { id: Section; label: string; icon?: IconName }[] = [
   { id: 'general', label: 'General', icon: 'settings' },
   { id: 'profiles', label: 'Profiles', icon: 'profile' },
   { id: 'sites', label: 'Site Permissions', icon: 'lock' },
-  { id: 'import', label: 'Import', icon: 'download' },
+  { id: 'import', label: 'Import & Export', icon: 'download' },
   { id: 'extensions', label: 'Extensions', icon: 'puzzle' },
   { id: 'shortcuts', label: 'Keyboard Shortcuts', icon: 'command' },
   { id: 'about', label: 'About' }
@@ -383,6 +383,13 @@ function Import() {
         <Row title="Chromium browsers" hint="History and bookmarks from Chrome, Edge or Brave.">
           <button className="btn" onClick={() => dispatch({ type: 'import', source: 'chrome' })}>
             Import from Chrome / Edge / Brave…
+          </button>
+        </Row>
+      </Group>
+      <Group>
+        <Row title="Export" hint="Every space's pinned tabs and folders, and your favorites, as a bookmarks file any browser can import.">
+          <button className="btn" onClick={() => dispatch({ type: 'exportBookmarks' })}>
+            Export as Bookmarks…
           </button>
         </Row>
       </Group>
