@@ -326,6 +326,18 @@ function TopBar({ state }: { state: AppState }) {
       <button className="icon-btn" title={`Toggle sidebar (${isMac ? '⌘S' : 'Ctrl+S'})`} onClick={() => dispatch({ type: 'toggleSidebar' })}>
         <Icon name="sidebar" />
       </button>
+      {isMac ? null : (
+        <button
+          className="icon-btn"
+          title="Menu"
+          onClick={(e) => {
+            const r = e.currentTarget.getBoundingClientRect()
+            dispatch({ type: 'appMenu', x: r.left, y: r.bottom + 4 })
+          }}
+        >
+          <Icon name="menu" />
+        </button>
+      )}
       <div className="spacer" />
       <button className="icon-btn" disabled={!live?.canGoBack} onClick={() => dispatch({ type: 'back' })} title="Back">
         <Icon name="back" />

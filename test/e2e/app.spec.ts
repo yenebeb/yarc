@@ -125,6 +125,24 @@ test('pages start below the native caption buttons on Windows and Linux', async 
   }
 })
 
+test('the menu button opens Settings on Windows and Linux; macOS has the menu bar instead', async () => {
+  const ui = await pageWithUrl('index.html')
+  const button = ui.locator('.topbar button[title="Menu"]')
+  if (process.platform === 'darwin') return expect(button).toHaveCount(0)
+  await app.evaluate(({ Menu }) => {
+    const popup = Menu.prototype.popup
+    Menu.prototype.popup = function (this: Electron.Menu) {
+      ;(globalThis as any).appMenu = this
+      Menu.prototype.popup = popup
+    }
+  })
+  await button.click()
+  await expect.poll(() => app.evaluate(() => !!(globalThis as any).appMenu)).toBe(true)
+  await app.evaluate(() => (globalThis as any).appMenu.items.find((i: Electron.MenuItem) => i.label === 'Settings…').click())
+  await expect.poll(() => app.evaluate(() => (globalThis as any).arcBrowser.window.overlayMode.kind)).toBe('settings')
+  await dispatch({ type: 'overlay', mode: { kind: 'none' } })
+})
+
 test('command bar opens a new tab at the top of Today', async () => {
   const ui = await pageWithUrl('index.html')
   await ui.locator('.newtab').click()

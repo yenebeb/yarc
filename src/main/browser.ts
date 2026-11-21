@@ -60,7 +60,7 @@ import { pauseMedia, probeMedia, toggleMedia } from './media-page'
 import { closeFloating, closed, dismiss, emptyMedia, float, left, minimize, shown, type LeftWith, type MediaState } from './media-state'
 import { Mirror, stillOf } from './mirror'
 import { Peek, sameSite } from './peek'
-import { buildCanvasMenu, buildContextMenu, buildFolderMenu, buildItemMenu, buildSpaceMenu, buildSplitMenu } from './menus'
+import { buildAppMenu, buildCanvasMenu, buildContextMenu, buildFolderMenu, buildItemMenu, buildSpaceMenu, buildSplitMenu } from './menus'
 import { Profiles, type ProfileRuntime } from './profiles'
 import { PROMPT_WIDTH, PromptView, type PromptAnchor } from './prompt-view'
 import { search, suggest } from './search'
@@ -1886,6 +1886,8 @@ export class Browser implements TabHost, FloatingHost {
         return buildFolderMenu(this, a.id)?.popup({ window: this.window.win })
       case 'canvasMenu':
         return buildCanvasMenu(this, a.id)?.popup({ window: this.window.win })
+      case 'appMenu':
+        return buildAppMenu(this).popup({ window: this.window.win, x: Math.round(Number(a.x)), y: Math.round(Number(a.y)) })
       case 'renameCanvas':
         this.canvases.rename(a.id, String(a.name))
         return this.changed()
