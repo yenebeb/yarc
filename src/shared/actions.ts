@@ -75,6 +75,7 @@ export type Action =
   /** `keepOverlay`: from the welcome screen, which stays open for its other steps. */
   | { type: 'import'; source: 'arc' | 'zen' | 'chrome'; path?: string; keepOverlay?: boolean }
   | { type: 'exportBookmarks' }
+  | { type: 'importChoices'; ids: string[] }
   | { type: 'command'; id: string; keepOverlay?: boolean }
   | { type: 'relaunchUpdate' }
   | { type: 'itemMenu'; id: ID }

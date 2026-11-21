@@ -41,7 +41,7 @@ import type {
   WindowView
 } from '../shared/types'
 import { appendPaneIn, flipSplit, gatherSplit, layoutPanes, movePane, PANE_BAR, paneIds, placePaneIn, removeFromSplits, resizeGroup, splitOf, type Side } from '../shared/split'
-import { isFloating, stepAfter, type TourEvent, type TourStep } from '../shared/tour'
+import { isFloating, nextStep, stepAfter, type TourEvent, type TourStep } from '../shared/tour'
 import { resolveInput, SEARCH_ENGINES, withoutTracking } from '../shared/url'
 import { AdBlock, hostOf } from './adblock'
 import { bookmarksHtml } from './bookmarks-export'
@@ -51,7 +51,7 @@ import { recentChanges, startupScreen, type Changelog } from './changelog'
 import { openInChrome } from './chrome'
 import { DownloadList } from './download-list'
 import { Extensions } from './extensions'
-import { runImport } from './importers'
+import { findImportChoices, importChoices, runImport, type FoundChoice } from './importers'
 import { FLOATING_DEMO_URL } from './floating-demo'
 import { FloatingPlayer, type FloatAnchor, type FloatingHost } from './floating-player'
 import { LittleWindow } from './little'
@@ -189,6 +189,8 @@ export class Browser implements TabHost, FloatingHost {
     return [...this.littles].filter((l) => !l.win.isDestroyed())
   }
   private tour: TourStep | undefined
+  private importScan?: Promise<void>
+  private importFound?: FoundChoice[]
   private legacyWindowFile: string | undefined
   private static readonly all = new Set<Browser>()
 
@@ -518,7 +520,18 @@ export class Browser implements TabHost, FloatingHost {
   private withPanelData(snap: AppState, mode: OverlayMode): AppState {
     if (mode.kind === 'library') return { ...snap, archive: this.state.archive }
     if (mode.kind === 'settings') return { ...snap, sitePermissions: Object.fromEntries(this.state.profiles.map((p) => [p.id, this.profiles.decisions(p.id).list()])) }
+    if (mode.kind === 'tour' && mode.step === 'import') return { ...snap, importChoices: this.importChoiceRows() }
     return snap
+  }
+
+  private importChoiceRows(): AppState['importChoices'] {
+    this.importScan ??= findImportChoices()
+      .catch(() => [])
+      .then((found) => {
+        this.importFound = found
+        this.emitSoon()
+      })
+    return this.importFound?.map(({ id, browser, name, detail, ticked }) => ({ id, browser, name, detail, ticked }))
   }
 
   private liveInfo(): AppState['live'] {
@@ -1846,6 +1859,12 @@ export class Browser implements TabHost, FloatingHost {
       case 'exportBookmarks':
         this.setOverlay({ kind: 'none' }, false)
         return this.exportBookmarks()
+      case 'importChoices': {
+        const summary = await importChoices(this, (this.importFound ?? []).filter((c) => a.ids.includes(c.id)))
+        if (summary) this.toast(summary)
+        if (this.tour === 'import') this.setOverlay({ kind: 'tour', step: nextStep('import')! }, false)
+        return
+      }
       case 'relaunchUpdate':
         return void this.updater.apply(true)
       case 'command':

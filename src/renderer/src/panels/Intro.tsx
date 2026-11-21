@@ -4,7 +4,7 @@ import { bindingLabel, type CommandId } from '../../../shared/keymap'
 import { spotlight, type Spotlight } from '../../../shared/spotlights'
 import { isFloating, nextStep, previousStep, TOUR_STEPS, tryEvent, type TourStep } from '../../../shared/tour'
 import { spaceItems } from '../../../shared/tree'
-import type { AppState, ReleaseNotes, UpdateStatus } from '../../../shared/types'
+import type { AppState, ImportChoice, ReleaseNotes, UpdateStatus } from '../../../shared/types'
 import { activeSpace, cx, dispatch, isMac } from '../api'
 import { Icon } from '../icons'
 import './panels.css'
@@ -14,7 +14,40 @@ const key = (id: CommandId) => <kbd className="kbd">{bindingLabel(id, isMac)}</k
 
 const go = (step: TourStep | undefined) => step && dispatch({ type: 'overlay', mode: { kind: 'tour', step } })
 
-const importFrom = (source: 'arc' | 'chrome' | 'zen') => () => dispatch({ type: 'import', source, keepOverlay: true })
+function ImportChoices({ choices }: { choices: ImportChoice[] | undefined }) {
+  const [picked, setPicked] = useState(() => new Set(choices?.filter((c) => c.ticked).map((c) => c.id)))
+  const [busy, setBusy] = useState(false)
+  if (!choices) return <p className="import-empty">Looking for other browsers…</p>
+  if (!choices.length) return <p className="import-empty">No other browser found on this computer. To bring a copy from another computer, pick Import from Arc in the command bar.</p>
+  const toggle = (id: string) => setPicked((p) => new Set(p.has(id) ? [...p].filter((x) => x !== id) : [...p, id]))
+  const start = () => {
+    setBusy(true)
+    dispatch({ type: 'importChoices', ids: [...picked] })
+  }
+  return (
+    <>
+      <ul className="import-choices">
+        {choices.map((c) => (
+          <li key={c.id}>
+            <label className={cx(picked.has(c.id) && 'on')}>
+              <input type="checkbox" checked={picked.has(c.id)} disabled={busy} onChange={() => toggle(c.id)} />
+              <span className="import-badge">{c.browser[0]}</span>
+              <span className="import-label">
+                {c.name ? `${c.browser} · ${c.name}` : c.browser}
+                <small>{c.detail}</small>
+              </span>
+            </label>
+          </li>
+        ))}
+      </ul>
+      <div className="intro-buttons">
+        <button className="btn primary" autoFocus disabled={busy || !picked.size} onClick={start}>
+          {busy ? 'Importing…' : picked.size ? `Import ${picked.size}` : 'Import'}
+        </button>
+      </div>
+    </>
+  )
+}
 
 const SHORTCUTS: { id: CommandId; label: string }[] = [
   { id: 'newTab', label: 'New tab, search or command' },
@@ -44,21 +77,9 @@ function content(step: TourStep, state: AppState): StepContent {
       }
     case 'import':
       return {
-        title: 'Bring your tabs along',
-        text: 'Spaces, pinned tabs, favorites and history from Arc or Zen; history and bookmarks from Chrome, Edge or Brave.',
-        body: (
-          <div className="intro-buttons centered">
-            <button className="btn primary" onClick={importFrom('arc')}>
-              Import from Arc
-            </button>
-            <button className="btn" onClick={importFrom('chrome')}>
-              Chrome
-            </button>
-            <button className="btn" onClick={importFrom('zen')}>
-              Zen
-            </button>
-          </div>
-        )
+        title: 'Bring your old browser along',
+        text: 'Tick as many as you like: each comes in with its own spaces and profile, and your old browser keeps its copy.',
+        body: <ImportChoices key={state.importChoices ? 'found' : 'looking'} choices={state.importChoices} />
       }
     case 'default':
       return {
@@ -223,6 +244,10 @@ export function Tour({ step, state, close }: { step: TourStep; state: AppState; 
         {step === 'done' ? (
           <button ref={primary} className="btn primary" onClick={close}>
             Start Browsing
+          </button>
+        ) : step === 'import' && state.importChoices?.length ? (
+          <button className="btn ghost" onClick={() => go(next)}>
+            Not now
           </button>
         ) : (
           <button ref={primary} className="btn primary" onClick={() => go(next)}>

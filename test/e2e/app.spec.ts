@@ -524,6 +524,39 @@ test('find in page counts matches', async () => {
   await dispatch({ type: 'stopFind' })
 })
 
+test('the tour imports the ticked browsers, each into a space of its own', async () => {
+  await dispatch({ type: 'open', url: `${base}/before-import`, where: 'tab' })
+  const profile = join(userData, 'fake-chrome', 'Default')
+  mkdirSync(profile, { recursive: true })
+  writeFileSync(join(profile, 'Bookmarks'), JSON.stringify({ roots: { bookmark_bar: { children: [{ type: 'url', name: 'Kept', url: `${base}/bookmarked` }] } } }))
+  const arc = join(userData, 'fake-arc')
+  mkdirSync(arc)
+  writeFileSync(join(arc, 'StorableSidebar.json'), readFileSync('docs/fixtures/StorableSidebar.sample.json'))
+  const found = [
+    { id: 'arc:Default', browser: 'Arc', name: 'Personal', detail: '1 space', ticked: true, source: 'arc', path: arc, profile: 'Default' },
+    { id: 'arc:Profile 1', browser: 'Arc', name: 'Work', detail: '1 space', ticked: true, source: 'arc', path: arc, profile: 'Profile 1' },
+    { id: 'chromium:x', browser: 'Chrome', name: '', detail: 'Bookmarks and history', ticked: false, source: 'chromium', path: profile, profile: 'Default' }
+  ]
+  const before = (await state()).spaces.length
+  await app.evaluate((_e, found) => Object.assign((globalThis as any).arcBrowser, { importFound: found, importScan: Promise.resolve() }), found)
+  await dispatch({ type: 'overlay', mode: { kind: 'tour', step: 'import' } })
+  const overlay = await pageWithUrl('overlay.html')
+  const start = overlay.locator('.import-choices + .intro-buttons .btn')
+  await expect(start).toHaveText('Import 2')
+  await overlay.locator('.import-choices label', { hasText: 'Chrome' }).click()
+  await overlay.locator('.import-choices label', { hasText: 'Arc · Personal' }).click()
+  await expect(start).toHaveText('Import 2')
+  await start.click()
+  await expect(overlay.locator('.intro h1')).toHaveText('Make YARC your default browser')
+  const s = await state()
+  const added = s.spaces.slice(before)
+  expect(added.map((x) => x.name)).toEqual(['Work', 'Chrome'])
+  expect(new Set(s.spaces.map((x) => x.profileId)).size).toBe(s.spaces.length)
+  expect(added[1].pinned).toMatchObject([{ kind: 'folder', name: 'Bookmarks', children: [{ url: `${base}/bookmarked`, title: 'Kept' }] }])
+  await dispatch({ type: 'endTour' })
+  for (const x of added) await dispatch({ type: 'deleteSpace', id: x.id })
+})
+
 test('spaces with their own profile do not share storage', async () => {
   await dispatch({ type: 'open', url: `${base}/storage`, where: 'tab' })
   const a = await pageWithUrl('/storage')

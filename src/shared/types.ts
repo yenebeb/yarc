@@ -152,6 +152,15 @@ export interface WindowView {
   maximized?: boolean
 }
 
+/** A browser profile found on this computer that the tour can import. `name` is empty when it's the browser's only profile. */
+export interface ImportChoice {
+  id: string
+  browser: string
+  name: string
+  detail: string
+  ticked: boolean
+}
+
 export interface ReleaseNotes {
   version: string
   changes: string[]
@@ -219,6 +228,8 @@ export interface AppState extends PersistedState {
   layout: { content: Rect; views: { id: ID; rect: Rect; bar?: Rect; elsewhere?: boolean }[]; splitId?: ID }
   update: UpdateStatus
   sitePermissions: Record<ID, SitePermissionRow[]>
+  /** Only on the tour's import step; undefined while still looking. */
+  importChoices?: ImportChoice[]
   /** Tabs playing out of sight. `cards`: oldest first. `videos`: cards whose video can float again. */
   media: { cards: ID[]; floating?: ID; videos: ID[] }
 }

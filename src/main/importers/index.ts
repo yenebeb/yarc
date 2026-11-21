@@ -6,7 +6,7 @@ import { basename, dirname, join } from 'node:path'
 import type { Browser } from '../browser'
 import { newId, SPACE_COLORS } from '../store'
 import { FAVICON_MAX } from '../tab'
-import { SIDEBAR_WIDTH, type ArchivedTab, type PersistedState, type PinnedNode, type Profile, type Space, type TabItem } from '../../shared/types'
+import { SIDEBAR_WIDTH, type ArchivedTab, type ImportChoice, type PersistedState, type PinnedNode, type Profile, type Space, type TabItem } from '../../shared/types'
 import { parseArcSidebar, readArcJson } from './arc-sidebar'
 import { countTabs, findArcRoot, findChromiumBrowsers, listProfiles, readBookmarks, readHistory, readProfileNames } from './chromium'
 import { findZenProfiles, findZenRoots, readZenContainers, readZenHistory, readZenPrefs, readZenSession, resolveZenProfile, type ZenProfile } from './zen'
@@ -14,12 +14,74 @@ import { parseZenSession } from './zen-session'
 
 export type ImportSource = 'arc' | 'zen' | 'chrome'
 
+export interface FoundChoice extends ImportChoice {
+  source: 'arc' | 'zen' | 'chromium'
+  path: string
+  /** Arc's profile folder, or the Chromium profile's name. */
+  profile: string
+}
+
 const MAX_ARCHIVE = 1000
 
 export async function runImport(browser: Browser, source: ImportSource, path?: string): Promise<string | undefined> {
   if (source === 'arc') return importArc(browser, path)
   if (source === 'zen') return importZen(browser, path)
   return importChromium(browser, path)
+}
+
+export async function findImportChoices(): Promise<FoundChoice[]> {
+  const zen = findZenProfiles()
+  const zenChoices = zen.map((p): FoundChoice => ({ id: `zen:${p.path}`, browser: 'Zen', name: zen.length > 1 ? p.name : '', detail: 'Spaces, pinned tabs and history', ticked: true, source: 'zen', path: p.path, profile: p.name }))
+  const chromiumChoices = findChromiumBrowsers().flatMap((b) => {
+    const profiles = listProfiles(b.userDataDir)
+    return profiles.map((p): FoundChoice => ({ id: `chromium:${p.path}`, browser: b.name, name: profiles.length > 1 ? p.name : '', detail: 'Bookmarks and history', ticked: false, source: 'chromium', path: p.path, profile: p.name }))
+  })
+  return [...(await findArcChoices()), ...zenChoices, ...chromiumChoices]
+}
+
+async function findArcChoices(): Promise<FoundChoice[]> {
+  const root = findArcRoot()
+  if (!root || !existsSync(join(root, 'StorableSidebar.json'))) return []
+  try {
+    const src = resolveArcSource(root)
+    const spaces = new Map<string, number>()
+    for (const s of parseArcSidebar(await readJson(src.sidebarFile)).spaces) spaces.set(s.profileKey, (spaces.get(s.profileKey) ?? 0) + 1)
+    const names = src.userData ? readProfileNames(src.userData) : new Map<string, string>()
+    return [...spaces].map(([key, n]) => ({
+      id: `arc:${key}`,
+      browser: 'Arc',
+      name: spaces.size > 1 ? names.get(key) || key : '',
+      detail: `${plural(n, 'space')}, pinned tabs and history`,
+      ticked: true,
+      source: 'arc',
+      path: root,
+      profile: key
+    }))
+  } catch (err) {
+    console.warn('[import] could not read Arc', err)
+    return []
+  }
+}
+
+/** One summary per browser; a failed one doesn't stop the rest. */
+export async function importChoices(browser: Browser, chosen: FoundChoice[]): Promise<string> {
+  const arc = chosen.filter((c) => c.source === 'arc')
+  const jobs = [
+    ...(arc.length ? [() => importArc(browser, arc[0].path, new Set(arc.map((c) => c.profile)))] : []),
+    ...chosen.filter((c) => c.source === 'zen').map((c) => () => importZen(browser, c.path)),
+    ...chosen.filter((c) => c.source === 'chromium').map((c) => () => importChromiumSpace(browser, c))
+  ]
+  const summaries: string[] = []
+  for (const job of jobs) {
+    try {
+      const summary = await job()
+      if (summary) summaries.push(summary)
+    } catch (err) {
+      console.error('[import]', err)
+      summaries.push(`Import failed: ${(err as Error).message}`)
+    }
+  }
+  return summaries.join('. ')
 }
 
 function parentWindow(browser: Browser): BrowserWindow | undefined {
@@ -210,7 +272,15 @@ function addSpaces(browser: Browser, from: string, profiles: SourceProfile[], sp
   return { profileIds, spaceIds, spaces: added, replace, replacedActive }
 }
 
-async function importArc(browser: Browser, path?: string): Promise<string | undefined> {
+function settle(browser: Browser, added: AddedSpaces, active?: string): void {
+  if (added.replace) browser.state.activeSpaceId = active || added.spaces[0].id
+  browser.store.save()
+  browser.emit()
+  if (added.replacedActive) browser.switchSpace(browser.state.activeSpaceId)
+}
+
+/** `profiles`: only the spaces of these Arc profile folders. */
+async function importArc(browser: Browser, path?: string, profiles?: Set<string>): Promise<string | undefined> {
   const src = await chooseArcSource(browser, path)
   if (!src) return undefined
 
@@ -227,40 +297,40 @@ async function importArc(browser: Browser, path?: string): Promise<string | unde
   const parsed = parseArcSidebar(json, { archive, palette: SPACE_COLORS, favicon: arcFavicons(src.root) })
   // Only the count: the warnings name the skipped pages' URLs.
   if (parsed.warnings.length) console.warn(`[import] Arc: skipped ${parsed.warnings.length} items`)
-  if (!parsed.spaces.length) throw new Error(`No spaces found in ${src.sidebarFile}`)
+  const spaces = profiles ? parsed.spaces.filter((s) => profiles.has(s.profileKey)) : parsed.spaces
+  if (!spaces.length) throw new Error(`No spaces found in ${src.sidebarFile}`)
 
   const state = browser.state
   const names = src.userData ? readProfileNames(src.userData) : new Map<string, string>()
-  const used = new Set(parsed.spaces.map((s) => s.profileKey))
-  const { profileIds, spaceIds, spaces: added, replace, replacedActive } = addSpaces(
+  const used = new Set(spaces.map((s) => s.profileKey))
+  const added = addSpaces(
     browser,
     'Arc',
     parsed.profiles.filter((p) => used.has(p.key)).map((p) => ({ key: p.key, name: names.get(p.key) || p.key, favorites: p.favorites })),
-    parsed.spaces.map((s) => ({ ...s, key: s.arcId }))
+    spaces.map((s) => ({ ...s, key: s.arcId }))
   )
+  const { profileIds, spaceIds } = added
 
-  const archived: ArchivedTab[] = (parsed.archive ?? []).map((a) => ({
+  const archived: ArchivedTab[] = (parsed.archive ?? []).filter((a) => !profiles || !a.spaceArcId || spaceIds.has(a.spaceArcId)).map((a) => ({
     id: newId(),
     url: a.url,
     title: a.title,
-    spaceId: (a.spaceArcId && spaceIds.get(a.spaceArcId)) || added[0].id,
+    spaceId: (a.spaceArcId && spaceIds.get(a.spaceArcId)) || added.spaces[0].id,
     archivedAt: a.archivedAt
   }))
   if (archived.length) {
     state.archive = [...state.archive, ...archived].sort((a, b) => b.archivedAt - a.archivedAt).slice(0, MAX_ARCHIVE)
   }
 
-  if (replace) {
+  let focused: string | undefined
+  if (added.replace) {
     const windows = await readJson(join(src.root, 'StorableWindows.json')).catch(() => undefined)
     const prefs = windows as { lastFocusedSpaceID?: unknown; sidebarViewPreferences?: { sidebarWidth?: unknown } } | undefined
-    const focused = typeof prefs?.lastFocusedSpaceID === 'string' ? spaceIds.get(prefs.lastFocusedSpaceID) : undefined
-    state.activeSpaceId = focused ?? added[0].id
+    focused = typeof prefs?.lastFocusedSpaceID === 'string' ? spaceIds.get(prefs.lastFocusedSpaceID) : undefined
     const width = prefs?.sidebarViewPreferences?.sidebarWidth
     if (typeof width === 'number') state.settings.sidebarWidth = Math.round(Math.min(SIDEBAR_WIDTH.max, Math.max(SIDEBAR_WIDTH.min, width)))
   }
-  browser.store.save()
-  browser.emit()
-  if (replacedActive) browser.switchSpace(state.activeSpaceId)
+  settle(browser, added, focused)
 
   let visits = 0
   const failed: string[] = []
@@ -277,9 +347,9 @@ async function importArc(browser: Browser, path?: string): Promise<string | unde
     }
   }
 
-  const pinned = added.reduce((n, s) => n + countTabs(s.pinned), 0)
+  const pinned = added.spaces.reduce((n, s) => n + countTabs(s.pinned), 0)
   const favorites = parsed.profiles.filter((p) => used.has(p.key)).reduce((n, p) => n + p.favorites.length, 0)
-  const parts = [plural(added.length, 'space'), plural(pinned, 'pinned tab'), plural(favorites, 'favorite')]
+  const parts = [plural(added.spaces.length, 'space'), plural(pinned, 'pinned tab'), plural(favorites, 'favorite')]
   if (src.userData) parts.push(plural(visits, 'history entry', 'history entries'))
   let summary = `Imported ${list(parts)} from Arc`
   if (failed.length) summary += ` (couldn't read history of ${list(failed)}; quit Arc and import again)`
@@ -321,17 +391,13 @@ async function importZen(browser: Browser, path?: string): Promise<string | unde
   })
   if (!parsed.spaces.length) throw new Error(`No Zen spaces found in ${profile.path}`)
 
-  const state = browser.state
   const added = addSpaces(
     browser,
     'Zen',
     parsed.profiles,
     parsed.spaces.map((s) => ({ ...s, key: s.zenId }))
   )
-  if (added.replace) state.activeSpaceId = (parsed.activeSpaceId && added.spaceIds.get(parsed.activeSpaceId)) || added.spaces[0].id
-  browser.store.save()
-  browser.emit()
-  if (added.replacedActive) browser.switchSpace(state.activeSpaceId)
+  settle(browser, added, parsed.activeSpaceId && added.spaceIds.get(parsed.activeSpaceId))
 
   // Zen keeps one history for all its spaces.
   let visits = 0
@@ -405,6 +471,26 @@ async function importChromium(browser: Browser, path?: string): Promise<string |
   }
   if (!visits && !bookmarkCount) return `Nothing to import from ${chosen.browserName} — ${chosen.profileName}`
   return `Imported ${list([plural(visits, 'history entry', 'history entries'), plural(bookmarkCount, 'bookmark')])} from ${chosen.browserName}`
+}
+
+async function importChromiumSpace(browser: Browser, c: FoundChoice): Promise<string> {
+  const name = c.name || c.browser
+  const label = c.name ? `${c.browser} · ${c.name}` : c.browser
+  const bookmarks = readBookmarks(c.path)
+  const bookmarkCount = countTabs(bookmarks)
+  const pinned: PinnedNode[] = bookmarks.length ? [{ kind: 'folder', id: newId(), name: 'Bookmarks', open: false, children: bookmarks }] : []
+  const color = SPACE_COLORS[browser.state.spaces.length % SPACE_COLORS.length]
+  const added = addSpaces(browser, c.browser, [{ key: c.profile, name, favorites: [] }], [{ key: c.path, name, color, profileKey: c.profile, pinned, today: [] }])
+  settle(browser, added)
+
+  let visits = 0
+  try {
+    visits = browser.profiles.get(added.spaces[0].profileId).history.import(await readHistory(c.path))
+  } catch (err) {
+    console.warn(`[import] ${c.browser} history`, err)
+    return `Imported ${plural(bookmarkCount, 'bookmark')} from ${label}; couldn't read its history (quit ${c.browser} and import again)`
+  }
+  return `Imported ${list([plural(visits, 'history entry', 'history entries'), plural(bookmarkCount, 'bookmark')])} from ${label}`
 }
 
 function plural(n: number, one: string, many = `${one}s`): string {
