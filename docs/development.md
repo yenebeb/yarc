@@ -90,3 +90,15 @@ Details and gaps are in [docs/electron-notes.md](electron-notes.md#6-security-up
 ## Contributing
 
 Before opening a PR, run `pnpm typecheck && pnpm test && pnpm test:e2e`. `main` only accepts pull requests whose CI (`check`) passes, and every PR needs a `## What's New` section. [arc-reference.md](arc-reference.md) collects what we know about Arc's behavior; corrections are welcome.
+
+## README pictures
+
+The GIFs and screenshots in `docs/screenshots` are recorded from the real app, on demo pages in [`scripts/readme-media/site`](../scripts/readme-media/site) served under invented `.test` domains. On a Mac, with Pillow installed (`pip3 install pillow`):
+
+```bash
+pnpm build
+node scripts/readme-media/record.mjs          # or name some: spaces command split peek canvases hero little floating
+python3 scripts/readme-media/make.py
+```
+
+Leave the window alone while it records: macOS stops redrawing a covered window.

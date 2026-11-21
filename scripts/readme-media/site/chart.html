@@ -1,0 +1,7 @@
+<!doctype html><title>Trip budget · Tally</title><link rel=icon href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📊</text></svg>"><link rel=stylesheet href=_page.css><style>
+#card{width:440px;padding:22px 24px;background:#fff}#card h3{margin:0 0 4px}#card small{color:#888}.bars{display:flex;align-items:flex-end;gap:14px;height:170px;margin-top:18px}
+.bars div{flex:1;border-radius:8px 8px 3px 3px;background:#22c55e;transition:height .8s}.bars div:nth-child(2n){background:#16a34a}.lab{display:flex;gap:14px;font-size:12px;color:#888}.lab span{flex:1;text-align:center}
+</style><header><b>📊 Tally</b><span>Budgets</span><span>Reports</span></header><main><div class=side><div></div><div></div><div></div></div><div id=card><h3>Trip budget</h3><small>Spent per day, €</small>
+<div class=bars><div style=height:60%></div><div style=height:85%></div><div style=height:40%></div><div style=height:70%></div><div style=height:95%></div><div style=height:55%></div></div>
+<div class=lab><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span></div></div></main>
+<script>setInterval(()=>document.querySelectorAll('.bars div').forEach(b=>b.style.height=(15+Math.random()*83)+'%'),900)</script>

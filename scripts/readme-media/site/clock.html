@@ -1,0 +1,6 @@
+<!doctype html><title>Lisbon time · Hourly</title><link rel=icon href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🕰️</text></svg>"><link rel=stylesheet href=_page.css><style>
+#card{width:440px;padding:26px 28px;background:#111827;color:#f9fafb}#card small{color:#9ca3af;font-size:14px}
+.t{font:200 76px/1.1 -apple-system,BlinkMacSystemFont,sans-serif;font-variant-numeric:tabular-nums;margin:8px 0 6px;letter-spacing:-1px}.t span{color:#f59e0b}
+.d{color:#d1d5db}</style><header><b>🕰️ Hourly</b><span>World clock</span><span>Timer</span></header><main><div class=side><div></div><div></div><div></div></div>
+<div id=card><small>Lisbon · WET</small><div class=t id=t></div><div class=d id=d></div></div></main>
+<script>const tick=()=>{const n=new Date();const p=(x)=>String(x).padStart(2,'0');t.innerHTML=p(n.getHours())+':'+p(n.getMinutes())+'<span>:'+p(n.getSeconds())+'</span>';d.textContent=n.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'})};tick();setInterval(tick,250)</script>

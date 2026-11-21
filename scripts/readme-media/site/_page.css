@@ -1,0 +1,5 @@
+*{box-sizing:border-box}body{margin:0;font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f4f2ee;color:#222}
+header{display:flex;align-items:center;gap:28px;padding:18px 40px;background:#fff;border-bottom:1px solid #e6e2da}
+header b{font-size:18px}header span{color:#888}main{padding:48px 40px;display:flex;gap:32px;align-items:flex-start}
+.side{flex:1;display:grid;gap:14px}.side div{height:14px;border-radius:7px;background:#e4e0d8}.side div:nth-child(2n){width:70%}
+#card{border-radius:18px;overflow:hidden;box-shadow:0 10px 30px rgb(0 0 0/.12)}
