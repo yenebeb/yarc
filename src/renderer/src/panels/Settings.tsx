@@ -1,6 +1,7 @@
 import { useState, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react'
 import logo from '../../../../build/icon.svg'
 import { BINDINGS, bindingLabel } from '../../../shared/keymap'
+import { cleanMatch } from '../../../shared/link-routes'
 import { permissionLabel, siteName, type SitePermissionRow } from '../../../shared/permissions'
 import { SIDEBAR_WIDTH, type AppState, type Profile, type SearchEngine, type Settings as SettingsT } from '../../../shared/types'
 import { SEARCH_ENGINES } from '../../../shared/url'
@@ -9,10 +10,11 @@ import { Icon, type IconName } from '../icons'
 import './panels.css'
 import './settings.css'
 
-type Section = 'general' | 'profiles' | 'sites' | 'import' | 'extensions' | 'shortcuts' | 'about'
+type Section = 'general' | 'traffic' | 'profiles' | 'sites' | 'import' | 'extensions' | 'shortcuts' | 'about'
 
 const SECTIONS: { id: Section; label: string; icon?: IconName }[] = [
   { id: 'general', label: 'General', icon: 'settings' },
+  { id: 'traffic', label: 'Traffic Control', icon: 'link' },
   { id: 'profiles', label: 'Profiles', icon: 'profile' },
   { id: 'sites', label: 'Site Permissions', icon: 'lock' },
   { id: 'import', label: 'Import & Export', icon: 'download' },
@@ -85,6 +87,7 @@ export function Settings({ state, close }: { state: AppState; close: () => void 
         </header>
         <div className="set-body" key={section}>
           {section === 'general' && <General state={state} />}
+          {section === 'traffic' && <TrafficControl state={state} />}
           {section === 'profiles' && <Profiles state={state} />}
           {section === 'sites' && <SitePermissions state={state} />}
           {section === 'import' && <Import />}
@@ -259,6 +262,68 @@ function General({ state }: { state: AppState }) {
           checked={s.autoUpdate}
           onChange={(v) => patch({ autoUpdate: v })}
         />
+      </Group>
+    </>
+  )
+}
+
+function TrafficControl({ state }: { state: AppState }) {
+  const routes = state.settings.linkRoutes
+  const [match, setMatch] = useState('')
+  const [spaceId, setSpaceId] = useState(activeSpace(state).id)
+  const site = cleanMatch(match)
+  const add = () => {
+    if (!site) return
+    patch({ linkRoutes: [...routes.filter((r) => r.match !== site), { match: site, spaceId }] })
+    setMatch('')
+  }
+  const spaceSelect = (label: string, value: string, onChange: (id: string) => void) => (
+    <Select label={label} value={value} onChange={onChange}>
+      {state.spaces.map((s) => (
+        <option key={s.id} value={s.id}>
+          {s.emoji ? `${s.emoji} ` : ''}
+          {s.name}
+        </option>
+      ))}
+    </Select>
+  )
+  return (
+    <>
+      <p className="set-note">
+        Links you open from other apps go to the space of the first rule they match. A site also covers its subdomains; a site with a path (
+        <code>github.com/team</code>) only the pages under it. Other links {state.settings.littleArcForExternalLinks ? 'open in a Little Window' : 'open in the current space'}.
+      </p>
+      <Group>
+        {routes.length === 0 && <div className="set-empty">No rules yet.</div>}
+        {routes.map((r, i) => (
+          <Row key={r.match} title={r.match}>
+            {spaceSelect(`Space for ${r.match}`, r.spaceId, (id) => patch({ linkRoutes: routes.map((x, j) => (j === i ? { ...x, spaceId: id } : x)) }))}
+            <button className="icon-btn" title={`Remove the rule for ${r.match}`} onClick={() => patch({ linkRoutes: routes.filter((_, j) => j !== i) })}>
+              <Icon name="x" />
+            </button>
+          </Row>
+        ))}
+      </Group>
+      <Group title="New rule">
+        <div className="set-row">
+          <input
+            className="set-input"
+            aria-label="Site or address"
+            placeholder="figma.com"
+            spellCheck={false}
+            value={match}
+            onChange={(e) => setMatch(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') add()
+            }}
+          />
+          <div className="set-control">
+            {spaceSelect('Space for the new rule', spaceId, setSpaceId)}
+            <button className="btn primary" disabled={!site} onClick={add}>
+              Add
+            </button>
+          </div>
+        </div>
       </Group>
     </>
   )

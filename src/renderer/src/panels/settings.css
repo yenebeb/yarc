@@ -459,6 +459,23 @@
   box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 22%, transparent);
 }
 
+.settings .set-input {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 9px;
+  font: inherit;
+  color: var(--text);
+  background: var(--set-input);
+  border: 1px solid var(--set-input-line);
+  border-radius: 8px;
+  outline: none;
+}
+
+.settings .set-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 22%, transparent);
+}
+
 .settings .used-by {
   flex: 1;
   min-width: 0;

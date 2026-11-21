@@ -1,3 +1,4 @@
+import type { LinkRoute } from './link-routes'
 import type { SitePermissionRow } from './permissions'
 import type { Side } from './split'
 import type { TourStep } from './tour'
@@ -100,6 +101,8 @@ export interface Settings {
   archiveAfterHours: number
   searchEngine: SearchEngine
   littleArcForExternalLinks: boolean
+  /** Checked before `littleArcForExternalLinks`; the first match wins. */
+  linkRoutes: LinkRoute[]
   /** 0 = never. */
   littleCloseAfterHours: number
   /** Empty = profile of the active space. */

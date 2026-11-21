@@ -16,6 +16,7 @@ export const DEFAULT_SETTINGS: Settings = {
   archiveAfterHours: 12,
   searchEngine: 'google',
   littleArcForExternalLinks: true,
+  linkRoutes: [],
   littleCloseAfterHours: 1,
   littleArcProfileId: '',
   peekPinnedLinks: true,

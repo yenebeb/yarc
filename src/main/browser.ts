@@ -42,6 +42,7 @@ import type {
 } from '../shared/types'
 import { appendPaneIn, flipSplit, gatherSplit, layoutPanes, movePane, PANE_BAR, paneIds, placePaneIn, removeFromSplits, resizeGroup, splitOf, type Side } from '../shared/split'
 import { isFloating, nextStep, stepAfter, type TourEvent, type TourStep } from '../shared/tour'
+import { routeFor, validRoutes } from '../shared/link-routes'
 import { resolveInput, SEARCH_ENGINES, withoutTracking } from '../shared/url'
 import { AdBlock, hostOf } from './adblock'
 import { bookmarksHtml } from './bookmarks-export'
@@ -1488,6 +1489,7 @@ export class Browser implements TabHost, FloatingHost {
     for (const canvas of spaceCanvases(space)) this.canvases.delete(canvas.id)
     for (const item of spaceItems(this.state, space)) if (!this.state.profiles.some((p) => p.favorites.includes(item))) this.dropLive(item.id)
     this.state.spaces = this.state.spaces.filter((s) => s.id !== id)
+    this.state.settings.linkRoutes = this.state.settings.linkRoutes.filter((r) => r.spaceId !== id)
     if (!this.state.spaces.some((s) => s.profileId === space.profileId)) {
       const profile = this.store.profile(space.profileId)
       for (const f of profile?.favorites ?? []) this.dropLive(f.id)
@@ -2086,14 +2088,13 @@ export class Browser implements TabHost, FloatingHost {
   /** Links opened from other apps. */
   openExternalUrl(url: string): void {
     if (!/^https?:|^file:/i.test(url)) return
-    if (this.state.settings.littleArcForExternalLinks) void this.openLittle(url)
-    else {
-      this.ensureWindow()
-      this.newTab(url)
-      const win = this.window.win
-      if (win.isMinimized()) win.restore()
-      win.focus()
-    }
+    const route = routeFor(this.state.settings.linkRoutes, url)
+    const space = route && this.store.space(route.spaceId)
+    if (!space && this.state.settings.littleArcForExternalLinks) return void this.openLittle(url)
+    this.ensureWindow()
+    if (space && space.id !== this.state.activeSpaceId) this.switchSpace(space.id)
+    this.newTab(url)
+    this.focusWindow()
   }
 
   private winFor(wc: WebContents): WindowSession | undefined {
@@ -2195,6 +2196,11 @@ function validSettingsPatch(current: Settings, patch: unknown): Partial<Settings
   for (const [key, value] of Object.entries(patch)) {
     if (!Object.hasOwn(current, key)) continue
     const now = (current as unknown as Record<string, unknown>)[key]
+    if (key === 'linkRoutes') {
+      const routes = validRoutes(value)
+      if (routes) clean[key] = routes
+      continue
+    }
     if (Array.isArray(now)) {
       if (Array.isArray(value) && value.every((v) => typeof v === 'string')) clean[key] = value
       continue

@@ -758,6 +758,20 @@ test('links and .html files from other apps open in a Little Window', async () =
   await expect.poll(littles).toBe(0)
 })
 
+test('Traffic Control opens matching links from other apps in their space instead of a Little Window', async () => {
+  const s = await state()
+  const home = s.activeSpaceId
+  const other = s.spaces.find((x) => x.id !== home) ?? s.spaces[0]
+  await dispatch({ type: 'settings', patch: { linkRoutes: [{ match: `${base}/routed/`, spaceId: other.id }] } })
+  expect((await state()).settings.linkRoutes).toEqual([{ match: `${new URL(base).host}/routed`, spaceId: other.id }])
+  launchSecondInstance(`${base}/routed/page`)
+  await expect.poll(async () => (await state()).activeSpaceId, { timeout: 15_000 }).toBe(other.id)
+  expect((await space()).today[0].url).toBe(`${base}/routed/page`)
+  expect(await app.evaluate(() => (globalThis as any).arcBrowser.openLittles().length)).toBe(0)
+  await dispatch({ type: 'settings', patch: { linkRoutes: [] } })
+  await dispatch({ type: 'switchSpace', id: home })
+})
+
 test('updates: command bar check, then a sidebar pill and menu item once one is found', async () => {
   await dispatch({ type: 'overlay', mode: { kind: 'command', target: 'tab' } })
   const overlay = await pageWithUrl('overlay.html')
