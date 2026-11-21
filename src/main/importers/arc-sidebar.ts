@@ -14,6 +14,7 @@ export interface ParsedArcSpace {
   name: string
   emoji?: string
   color: string
+  color2?: string
   appearance?: 'light' | 'dark'
   profileKey: string
   pinned: PinnedNode[]
@@ -176,6 +177,12 @@ function backgroundColor(theme: Obj): string | undefined {
     }
   }
   return undefined
+}
+
+function gradientEnd(theme: Obj): string | undefined {
+  const base = dig(theme, 'background', 'single', '_0', 'style', 'color', '_0', 'blendedGradient', '_0', 'baseColors')
+  const colors = Array.isArray(base) ? base.map(colorToHex).filter((c) => c !== undefined) : []
+  return colors.length > 1 ? colors[colors.length - 1] : undefined
 }
 
 function dig(v: unknown, ...path: string[]): unknown {
@@ -385,6 +392,8 @@ export function parseArcSidebar(json: unknown, opts: ParseArcOptions = {}): Pars
     }
     const emoji = emojiOf(info.iconType)
     if (emoji) space.emoji = emoji
+    const color2 = theme && gradientEnd(theme)
+    if (color2 && color2 !== space.color) space.color2 = color2
     const appearance = theme && dig(theme, 'background', 'single', '_0', 'contentOverBackgroundAppearance')
     if (appearance === 'light' || appearance === 'dark') space.appearance = appearance
     result.spaces.push(space)

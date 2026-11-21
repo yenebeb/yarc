@@ -95,19 +95,32 @@ test("clicking the current space's icon opens its menu", async () => {
   await expect.poll(() => app.evaluate(() => (globalThis as any).poppedMenu)).toContain('Edit Space…')
 })
 
-test("the space editor's own color picker sets a custom color", async () => {
-  await dispatch({ type: 'overlay', mode: { kind: 'space-editor' } })
+test("the space editor's own color picker sets a custom color, and a second color ends the sidebar's gradient", async () => {
+  const s = await space()
+  await dispatch({ type: 'overlay', mode: { kind: 'space-editor', spaceId: s.id } })
   const overlay = await pageWithUrl('overlay.html')
-  await overlay.locator('.custom-sw').click()
-  await expect(overlay.locator('#color-picker')).toBeVisible()
-  await overlay.locator('.cp-hex').fill('#336699')
-  await expect(overlay.locator('.color-row .hex')).toHaveText('#336699')
-  await overlay.locator('.cp-hue').fill('0')
-  await expect(overlay.locator('.color-row .hex')).toHaveText('#993333')
+  const first = overlay.locator('.color-row').first()
+  const picker = overlay.locator('.color-picker').first()
+  await first.locator('.custom-sw').click()
+  await expect(picker).toBeVisible()
+  await picker.locator('.cp-hex').fill('#336699')
+  await expect(first.locator('.hex')).toHaveText('#336699')
+  await picker.locator('.cp-hue').fill('0')
+  await expect(first.locator('.hex')).toHaveText('#993333')
   await overlay.locator('.space-editor header').click()
-  await expect(overlay.locator('#color-picker')).toBeHidden()
-  await expect(overlay.locator('.custom-sw')).toHaveClass(/\bon\b/)
-  await dispatch({ type: 'overlay', mode: { kind: 'none' } })
+  await expect(picker).toBeHidden()
+  await expect(first.locator('.custom-sw')).toHaveClass(/\bon\b/)
+
+  await overlay.locator('.add-color').click()
+  const second = overlay.locator('.color-row').nth(1)
+  await second.locator('.sw[title="#3dbb8a"]').click()
+  await overlay.getByRole('button', { name: 'Save' }).click()
+  await expect.poll(async () => [(await space()).color, (await space()).color2]).toEqual(['#993333', '#3dbb8a'])
+  const ui = await pageWithUrl('index.html')
+  await expect.poll(() => ui.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--space-2'))).toBe('#3dbb8a')
+
+  await dispatch({ type: 'updateSpace', id: s.id, color: s.color, color2: '' })
+  await expect.poll(() => ui.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--space-2'))).toBe(s.color)
 })
 
 test('pages start below the native caption buttons on Windows and Linux', async () => {

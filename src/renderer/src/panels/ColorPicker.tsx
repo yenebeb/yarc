@@ -1,4 +1,4 @@
-import { useEffect, useState, type KeyboardEvent, type PointerEvent } from 'react'
+import { useEffect, useId, useState, type CSSProperties, type KeyboardEvent, type PointerEvent } from 'react'
 import { hexToHsv, hsvToHex, SPACE_COLORS, type Hsv } from '../../../shared/colors'
 import { cx } from '../api'
 
@@ -8,6 +8,7 @@ const STEPS: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight
 
 /** The color row's last swatch: opens a picker for any color. */
 export function CustomColor({ color, onChange }: { color: string; onChange: (hex: string) => void }) {
+  const id = `color-picker-${useId().replace(/\W/g, '')}`
   const custom = HEX.test(color) && !SPACE_COLORS.includes(color.toLowerCase())
   const [hsv, setHsv] = useState(() => hexToHsv(HEX.test(color) ? color : SPACE_COLORS[0]))
   const [text, setText] = useState(color)
@@ -35,16 +36,16 @@ export function CustomColor({ color, onChange }: { color: string; onChange: (hex
   }
 
   return (
-    <>
+    <span className="custom-color" style={{ '--anchor': `--${id}` } as CSSProperties}>
       <button
         type="button"
         className={cx('sw custom-sw', custom && 'on')}
         style={custom ? { background: color } : undefined}
         title="Custom color"
         aria-label="Custom color"
-        popoverTarget="color-picker"
+        popoverTarget={id}
       />
-      <div id="color-picker" className="color-picker" popover="auto">
+      <div id={id} className="color-picker" popover="auto">
         <div
           className="cp-area"
           style={{ background: `linear-gradient(to top, #000, transparent), linear-gradient(to right, #fff, transparent), hsl(${hsv.h} 100% 50%)` }}
@@ -81,6 +82,6 @@ export function CustomColor({ color, onChange }: { color: string; onChange: (hex
           />
         </div>
       </div>
-    </>
+    </span>
   )
 }

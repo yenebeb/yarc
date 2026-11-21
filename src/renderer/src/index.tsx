@@ -15,7 +15,7 @@ if (isMac) document.body.classList.add('vibrant')
 function App() {
   const state = useAppState()
   const space = state ? activeSpace(state) : undefined
-  useSpaceTheme(space?.color, space?.appearance)
+  useSpaceTheme(space, space?.appearance)
   const toast = useToast()
   if (!state || !space) return null
   const s = state.settings

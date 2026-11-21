@@ -1472,6 +1472,7 @@ export class Browser implements TabHost, FloatingHost {
       name: a.name || 'New Space',
       emoji: a.emoji,
       color: a.color || SPACE_COLORS[this.state.spaces.length % SPACE_COLORS.length],
+      color2: a.color2 || undefined,
       profileId,
       pinned: [],
       today: [],
@@ -1731,6 +1732,7 @@ export class Browser implements TabHost, FloatingHost {
         if (a.name !== undefined) s.name = a.name
         if (a.emoji !== undefined) s.emoji = a.emoji || undefined
         if (a.color) s.color = a.color
+        if (a.color2 !== undefined) s.color2 = a.color2 || undefined
         if (a.profileId && a.profileId !== s.profileId && this.store.profile(a.profileId)) {
           for (const n of spaceItems(this.state, s)) this.dropLive(n.id)
           s.profileId = a.profileId

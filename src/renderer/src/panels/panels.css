@@ -285,8 +285,12 @@
   box-shadow: 0 0 0 2px var(--panel), 0 0 0 4px var(--accent);
 }
 
+.color-row .custom-color {
+  display: contents;
+}
+
 .color-row .custom-sw {
-  anchor-name: --custom-color;
+  anchor-name: var(--anchor);
 }
 
 .color-row .custom-sw:not(.on) {
@@ -294,7 +298,7 @@
 }
 
 .color-picker {
-  position-anchor: --custom-color;
+  position-anchor: var(--anchor);
   inset: auto;
   top: anchor(bottom);
   left: anchor(left);
@@ -1288,4 +1292,21 @@
     width: 66px;
     height: 44px;
   }
+}
+
+.space-editor .second-color {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--text-2);
+}
+
+.space-editor .add-color {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
 }

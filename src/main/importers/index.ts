@@ -213,6 +213,7 @@ interface SourceSpace {
   name: string
   emoji?: string
   color: string
+  color2?: string
   appearance?: 'light' | 'dark'
   profileKey: string
   pinned: PinnedNode[]
@@ -259,6 +260,7 @@ function addSpaces(browser: Browser, from: string, profiles: SourceProfile[], sp
       name: s.name,
       emoji: s.emoji,
       color: s.color,
+      color2: s.color2,
       appearance: s.appearance,
       profileId: profileIds.get(s.profileKey)!,
       pinned: s.pinned,

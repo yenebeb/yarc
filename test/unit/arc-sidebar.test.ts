@@ -17,9 +17,11 @@ test('spaces in sidebar order with names, emoji and colors', () => {
   assert.equal(personal.arcId, 'thebrowser.company.defaultPersonalSpaceID')
   assert.equal(personal.emoji, '🏠')
   assert.equal(personal.color, '#55afff') // midTone, blue clamped from 1.027
+  assert.equal(personal.color2, '#ff6a65') // the background gradient's last base color
   assert.equal(work.name, 'Work')
   assert.equal(work.emoji, '💼')
   assert.equal(work.color, '#336699')
+  assert.equal(work.color2, undefined)
 })
 
 test('spaces map to Arc profile dirs', () => {

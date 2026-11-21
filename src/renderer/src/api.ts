@@ -50,10 +50,15 @@ function applyAppearance(): void {
 applyAppearance()
 systemDark.addEventListener('change', applyAppearance)
 
-export function useSpaceTheme(color: string | undefined, appearance?: Space['appearance']): void {
+export function setSpaceColors(color: string, color2 = color): void {
+  document.documentElement.style.setProperty('--space', color)
+  document.documentElement.style.setProperty('--space-2', color2)
+}
+
+export function useSpaceTheme(space: Pick<Space, 'color' | 'color2'> | undefined, appearance: Space['appearance']): void {
   useEffect(() => {
-    if (color) document.documentElement.style.setProperty('--space', color)
-  }, [color])
+    if (space?.color) setSpaceColors(space.color, space.color2)
+  }, [space?.color, space?.color2])
   useEffect(() => {
     spaceAppearance = appearance
     applyAppearance()

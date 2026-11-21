@@ -25,7 +25,7 @@ function App() {
   const mode = useOverlayMode()
   const space = state ? activeSpace(state) : undefined
   // Only the revealed sidebar takes the space's appearance; the command bar and panels follow the system.
-  useSpaceTheme(space?.color, mode.kind === 'sidebar' ? space?.appearance : undefined)
+  useSpaceTheme(space, mode.kind === 'sidebar' ? space?.appearance : undefined)
   // Remount panels each time they open so inputs start fresh.
   const [generation, setGeneration] = useState(0)
   const last = useRef<OverlayMode['kind']>('none')

@@ -69,6 +69,8 @@ export interface Space {
   name: string
   emoji?: string
   color: string
+  /** Where the sidebar's gradient ends; unset is `color` alone. */
+  color2?: string
   /** Sidebar text appearance over the theme color; unset follows the system. */
   appearance?: 'light' | 'dark'
   profileId: ID

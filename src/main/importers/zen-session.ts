@@ -120,6 +120,7 @@ export interface ParsedZenSpace {
   name: string
   emoji?: string
   color: string
+  color2?: string
   profileKey: string
   pinned: PinnedNode[]
   today: TabItem[]
@@ -161,13 +162,15 @@ export function parseZenSession(session: unknown, opts: ParseZenOptions = {}): P
 
   const spaces = zenSpaces.map((space, i): ParsedZenSpace => {
     const zenId = str(space.uuid)!
+    const [color, color2] = themeColors(space.theme)
     const out: ParsedZenSpace = {
       zenId,
       name: str(space.name) ?? `Space ${i + 1}`,
-      color: themeColor(space.theme) ?? palette[i % palette.length],
+      color: color ?? palette[i % palette.length],
       profileKey: String(containerOf(space)),
       ...spaceTabs(zenId, tabs, folders, now)
     }
+    if (color2 && color2 !== color) out.color2 = color2
     const emoji = iconEmoji(space.icon)
     if (emoji) out.emoji = emoji
     return out
@@ -252,9 +255,14 @@ function toTab(tab: Obj, saved: boolean, now: number): TabItem | undefined {
   return item
 }
 
-function themeColor(theme: unknown): string | undefined {
+/** The primary color first. */
+function themeColors(theme: unknown): string[] {
   const colors = objects(isObj(theme) ? theme.gradientColors : undefined)
-  const c = (colors.find((x) => x.isPrimary === true) ?? colors[0])?.c
+  const primary = colors.find((x) => x.isPrimary === true) ?? colors[0]
+  return [primary, ...colors.filter((x) => x !== primary)].map((x) => rgbHex(x?.c)).filter((c) => c !== undefined)
+}
+
+function rgbHex(c: unknown): string | undefined {
   if (!Array.isArray(c) || c.length < 3) return undefined
   const rgb = c.slice(0, 3).map(num)
   if (rgb.some((v) => v === undefined)) return undefined

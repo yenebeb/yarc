@@ -111,7 +111,7 @@ test('parseZenSession turns spaces into spaces with a profile per container', ()
     ]
   )
   const [home, second] = parsed.spaces
-  assert.deepEqual([home.name, home.emoji, home.color, home.profileKey], ['Home', '🏠', '#ff8000', '0'])
+  assert.deepEqual([home.name, home.emoji, home.color, home.color2, home.profileKey], ['Home', '🏠', '#ff8000', '#0a141e', '0'])
   assert.deepEqual([second.name, second.emoji, second.color, second.profileKey], ['Space 2', undefined, '#123456', '2'])
   assert.equal(parsed.activeSpaceId, '{s2}')
 })
