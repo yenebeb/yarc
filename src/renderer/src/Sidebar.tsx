@@ -3,7 +3,7 @@ import type { DropTarget } from '../../shared/actions'
 import type { EditRequest } from '../../shared/ipc'
 import { MAX_PANES, paneIds } from '../../shared/split'
 import { isAwayFromSaved, spaceItems } from '../../shared/tree'
-import { SIDEBAR_WIDTH, type AppState, type ID, type PinnedNode, type Space, type TabItem, type UpdateStatus } from '../../shared/types'
+import { SIDEBAR_WIDTH, type AppState, type ID, type PinnedCanvas, type PinnedNode, type Space, type TabItem, type UpdateStatus } from '../../shared/types'
 import { activeSpace, arc, cx, dispatch, displayHost, isMac } from './api'
 import { Favicon, Icon } from './icons'
 
@@ -409,6 +409,7 @@ function SidebarList({
     <>
       {list.map((n, i) => {
         if ('kind' in n && n.kind === 'folder') return <FolderRow key={n.id} node={n} ctx={ctx} index={i} parentId={folderId} onDrop={onDrop} />
+        if ('kind' in n && n.kind === 'canvas') return <CanvasRow key={n.id} node={n} ctx={ctx} index={i} folderId={folderId} onDrop={onDrop} />
         if (hidden.has(n.id)) return null
         const ids = rows.get(n.id)
         if (!ids) return <TabRow key={n.id} item={n} ctx={ctx} section={section} folderId={folderId} index={i} onDrop={onDrop} />
@@ -617,6 +618,54 @@ function FolderRow({
         </div>
       ) : null}
     </>
+  )
+}
+
+function CanvasRow({
+  node,
+  ctx,
+  index,
+  folderId,
+  onDrop
+}: {
+  node: PinnedCanvas
+  ctx: Ctx
+  index: number
+  folderId?: ID
+  onDrop: (e: DragEvent, to: DropTarget) => void
+}) {
+  const { pos, onDragOver, cls } = useRowDrop(ctx, node.id, undefined)
+  const editing = ctx.edit?.kind === 'renameCanvas' && ctx.edit.id === node.id
+  const active = ctx.space.activeItemId === node.id
+  return (
+    <div
+      className={`row canvas${active ? ' active' : ''}${cls}`}
+      draggable={!editing}
+      onDragStart={(e) => startDrag(e, node.id)}
+      onDragOver={onDragOver}
+      onDrop={(e) => onDrop(e, { section: 'pinned', folderId, index: pos === 'after' ? index + 1 : index })}
+      onClick={(e: MouseEvent) => {
+        if (e.detail > 1) return
+        dispatch({ type: 'activate', id: node.id })
+      }}
+      onDoubleClick={() => ctx.setEdit({ kind: 'renameCanvas', id: node.id })}
+      onContextMenu={() => dispatch({ type: 'canvasMenu', id: node.id })}
+    >
+      <span className="favicon-wrap">
+        <Icon name="canvas" size={16} />
+      </span>
+      {editing ? (
+        <RenameInput
+          initial={node.name}
+          onDone={(v) => {
+            ctx.setEdit(undefined)
+            if (v !== undefined) dispatch({ type: 'renameCanvas', id: node.id, name: v })
+          }}
+        />
+      ) : (
+        <span className="title">{node.name}</span>
+      )}
+    </div>
   )
 }
 

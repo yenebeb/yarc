@@ -1,10 +1,11 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
+import type { CaptureTo } from '../../shared/actions'
 import { bindingLabel, type CommandId } from '../../shared/keymap'
 import { matchSiteSearch, siteSearchUrl, type SiteSearch } from '../../shared/site-search'
 import { MAX_PANES, paneIds, placePane, previewRect, sideAt, type Side } from '../../shared/split'
 import { isFloating } from '../../shared/tour'
-import { findItem } from '../../shared/tree'
+import { findItem, spaceCanvases } from '../../shared/tree'
 import type { AppState, ID, OverlayMode, Rect, SearchResult } from '../../shared/types'
 import { activeSpace, arc, cx, dispatch, displayHost, isMac, useAppState, useOverlayMode, useSpaceTheme } from './api'
 import { Favicon, Icon, type IconName } from './icons'
@@ -93,6 +94,8 @@ function App() {
       return <PeekFrame card={mode.card} />
     case 'split-drop':
       return <SplitDropZones state={state} origin={state.layout.content} />
+    case 'capture':
+      return <Capture key={key} state={state} page={mode.page} />
     case 'tour':
       if (isFloating(mode.step)) return <Tour state={state} step={mode.step} close={endTour} />
       return (
@@ -117,6 +120,162 @@ function App() {
       )
   }
 }
+
+/** Coordinates are in the page's own pixels; `page` is where the page sits in this overlay. */
+function Capture({ state, page }: { state: AppState; page: Rect }) {
+  const [picked, setPicked] = useState<Rect>()
+  const [drag, setDrag] = useState<{ x: number; y: number; x2: number; y2: number }>()
+  const [chosen, setChosen] = useState<Rect>()
+  const depth = useRef(0)
+  const pointer = useRef({ x: 0, y: 0 })
+  const asking = useRef(false)
+  const current = activeSpace(state)
+  const canvases = state.spaces.flatMap((space) => spaceCanvases(space).map((c) => ({ id: c.id, name: c.name, lastActive: c.lastActive, space: space.id === current?.id ? undefined : space.name })))
+
+  const pick = () => {
+    if (asking.current) return
+    asking.current = true
+    void arc.capturePick(pointer.current.x, pointer.current.y, depth.current).then((r) => {
+      asking.current = false
+      setPicked(r)
+    })
+  }
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && close()
+    addEventListener('keydown', onKey)
+    return () => removeEventListener('keydown', onKey)
+  }, [])
+
+  const local = (e: { clientX: number; clientY: number }) => ({
+    x: Math.min(Math.max(e.clientX - page.x, 0), page.width),
+    y: Math.min(Math.max(e.clientY - page.y, 0), page.height)
+  })
+  const dragRect = drag && { x: Math.min(drag.x, drag.x2), y: Math.min(drag.y, drag.y2), width: Math.abs(drag.x2 - drag.x), height: Math.abs(drag.y2 - drag.y) }
+  const dragging = !!dragRect && dragRect.width + dragRect.height > 8
+  const shown = chosen ?? (dragging ? dragRect : picked)
+
+  return (
+    <div
+      className="capture"
+      onMouseMove={(e) => {
+        if (chosen) return
+        const p = local(e)
+        pointer.current = p
+        if (drag) setDrag({ ...drag, x2: p.x, y2: p.y })
+        else pick()
+      }}
+      onWheel={(e) => {
+        if (chosen || drag) return
+        depth.current = Math.max(0, depth.current + (e.deltaY > 0 ? 1 : -1))
+        pick()
+      }}
+      onMouseDown={(e) => {
+        if (chosen || e.button !== 0) return
+        const p = local(e)
+        setDrag({ x: p.x, y: p.y, x2: p.x, y2: p.y })
+      }}
+      onMouseUp={() => {
+        if (chosen || !drag) return
+        setDrag(undefined)
+        const area = dragging ? dragRect : picked
+        if (area && area.width >= 4 && area.height >= 4) setChosen(area)
+      }}
+    >
+      <div className="capture-page" style={{ left: page.x, top: page.y, width: page.width, height: page.height }}>
+        {shown ? (
+          <div className={`capture-area${chosen ? ' chosen' : ''}`} style={{ left: shown.x, top: shown.y, width: shown.width, height: shown.height }} />
+        ) : (
+          <div className="capture-dim" />
+        )}
+        {chosen ? (
+          <CaptureTarget area={chosen} page={page} canvases={canvases} onRetake={() => { setChosen(undefined); setPicked(undefined) }} />
+        ) : (
+          <div className="capture-hint">
+            <Icon name="capture" size={14} /> Click a part of the page or drag an area · scroll for a bigger part · Esc to cancel
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+interface SendChoice {
+  key: string
+  label: string
+  detail?: string
+  icon: IconName
+  run: () => void
+}
+
+function CaptureTarget({ area, page, canvases, onRetake }: { area: Rect; page: Rect; canvases: { id: ID; name: string; lastActive: number; space?: string }[]; onRetake: () => void }) {
+  const [query, setQuery] = useState('')
+  const [showAll, setShowAll] = useState(false)
+  const [at, setAt] = useState(0)
+  const send = (to: CaptureTo) => dispatch({ type: 'capture', rect: area, to })
+  const words = query.trim().toLowerCase()
+  const matching = canvases.filter((c) => c.name.toLowerCase().includes(words)).sort((a, b) => b.lastActive - a.lastActive)
+  const RECENT = 5
+  const listed = showAll || words ? matching : matching.slice(0, RECENT)
+  const actions: SendChoice[] = words
+    ? []
+    : [
+        { key: 'copy', label: 'Copy', icon: 'copy', run: () => send('copy') },
+        { key: 'save', label: 'Save…', icon: 'download', run: () => send('save') },
+        { key: 'retake', label: 'Retake', icon: 'capture', run: onRetake }
+      ]
+  const boards: SendChoice[] = [
+    { key: 'new', label: 'New Canvas', icon: 'plus', run: () => send('new') },
+    ...listed.map((c) => ({ key: c.id, label: c.name, detail: c.space, icon: 'canvas', run: () => send(c.id) }))
+  ]
+  const choices = [...actions, ...boards]
+  const chosen = Math.min(at, choices.length - 1)
+  const more = !showAll && !words && matching.length > RECENT
+
+  const width = 248
+  const height = 52 + 32 * choices.length + (actions.length ? 9 : 0) + (more ? 30 : 0)
+  const below = area.y + area.height + 8
+  const top = below + height <= page.height ? below : Math.max(8, area.y - height - 8)
+  const left = Math.min(Math.max(8, area.x), Math.max(8, page.width - width - 8))
+
+  const row = (c: SendChoice, i: number) => (
+    <button key={c.key} className={i === chosen ? 'active' : ''} onMouseEnter={() => setAt(i)} onClick={c.run}>
+      <Icon name={c.icon} size={14} /> <span className="name">{c.label}</span>
+      {c.detail ? <span className="detail">{c.detail}</span> : null}
+    </button>
+  )
+  return (
+    <div className="capture-target" style={{ left, top, width }} onMouseDown={(e) => e.stopPropagation()} onMouseUp={(e) => e.stopPropagation()}>
+      <input
+        autoFocus
+        placeholder="Send to…"
+        value={query}
+        onChange={(e) => {
+          setQuery(e.target.value)
+          setAt(0)
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+            e.preventDefault()
+            setAt((chosen + (e.key === 'ArrowDown' ? 1 : choices.length - 1)) % choices.length)
+          } else if (e.key === 'Enter') {
+            e.preventDefault()
+            choices[chosen]?.run()
+          }
+        }}
+      />
+      {actions.map(row)}
+      {actions.length ? <div className="capture-target-line" /> : null}
+      {boards.map((c, i) => row(c, actions.length + i))}
+      {more ? (
+        <button className="more" onClick={() => setShowAll(true)}>
+          Show All ({matching.length})
+        </button>
+      ) : null}
+    </div>
+  )
+}
+
 
 const distance = (r: Rect, x: number, y: number) => Math.hypot(Math.max(r.x - x, 0, x - r.x - r.width), Math.max(r.y - y, 0, y - r.y - r.height))
 

@@ -120,6 +120,14 @@ Leave a tab while its video plays and the video keeps going in a small floating 
 
 Music and other sound from a tab you leave gets a card at the bottom of the sidebar instead, with play/pause, mute and the site's icon to go back to the tab. Hover the cards to see them all, each with its title, a button to float its video again and **✕** to close it. You can turn the floating player off in Settings.
 
+### Canvases
+
+A canvas is a freeform board in your sidebar for collecting bits of the web: a moodboard, a research wall, a plan. Make one with **New Canvas** in the command bar. It sits with your pinned tabs, and you can drag it into folders or onto another space. Draw on it, write on it, and paste or drop images on it.
+
+`⌘⇧2` / `Ctrl+Shift+2` (**Capture to Canvas**) captures part of the page you're on. Point at a photo, chart or card and click, or drag an area; scroll to take a bigger part. Then pick the canvas it goes to. Right-click an image on a page and choose **Add Image to Canvas** to keep the image itself at full size. Hovering a capture on the canvas shows the page it came from; click the arrow to open it in Peek. Select a few captures and click **Arrange in Grid** to tidy them up. The menu exports the canvas as a PNG or copies it.
+
+Canvases stay on your computer: there's no sharing. Arc's Easels can't be imported yet: their contents lived on Arc's servers. Export them from Arc's Library (it saves every Easel as web pages) before Arc shuts down; importing that export is planned.
+
 ### Built-in ad and tracker blocking
 
 Ads and trackers are blocked out of the box, in every profile, using the same kind of filter lists as uBlock Origin and EasyList (via [Ghostery's open-source engine](https://github.com/ghostery/adblocker)). That includes network blocking, cosmetic filtering that hides empty ad slots, and the scriptlets used against YouTube-style ads. The shield in the URL pill shows how many requests were blocked on the current page. Click it to allow ads on that site, for example if the site breaks, and click again to block them again. The lists update daily. You can turn blocking off completely in Settings.
@@ -217,7 +225,8 @@ Most features keep the names you know from Arc. One is different: Arc's Little A
 ### What isn't imported
 
 - **Saved passwords, cookies and logins.** Browsers encrypt these with a key tied to the machine, so you'll need to sign in to your sites again. Before Arc goes away, export your passwords from Arc (`arc://settings/passwords` → ⋮ → Export) and import them into a password manager such as Bitwarden or 1Password. Their extensions work in YARC.
-- **Boosts, Easels and Notes.** YARC doesn't have these features yet.
+- **Boosts and Notes.** YARC doesn't have these features yet.
+- **Easels.** Their contents were kept on Arc's servers, not on your computer, so they can't be read from Arc's files. **Before Arc shuts down, export them**: Arc's Library has a button that exports every Easel as web pages, which open offline. YARC has [canvases](#canvases) instead, and importing that export into canvases is planned.
 - **Extensions.** Reinstall them from the Chrome Web Store, in each space that needs them.
 
 ## Keyboard shortcuts
@@ -255,6 +264,7 @@ These are Arc's shortcuts. **Mod** means `⌘` on macOS and `Ctrl` on Windows. T
 | Settings | `⌘,` | `Ctrl+,` |
 | New folder | `⌘⌥⇧N` | `Ctrl+Alt+Shift+N` |
 | Duplicate tab | `⌘⇧D` | `Ctrl+Shift+D` |
+| Capture part of the page to a canvas | `⌘⇧2` | `Ctrl+Shift+2` |
 | Open in Chrome | `⌘⌥O` | `Ctrl+Alt+O` |
 
 In a Little Window: `Mod+O` moves the page into the main window, `Mod+Shift+O` picks the space to move it to, `Mod+W` closes the window, `Mod+Shift+C` copies the URL, and `Mod+[` / `Mod+]` (`Alt+←` / `Alt+→` on Windows) go back and forward.
@@ -292,6 +302,7 @@ No. Blocking is built in (see [Built-in ad and tracker blocking](#built-in-ad-an
 | Sidebar, spaces, settings | `state.json` | `state.json` |
 | Per-profile history | `Profiles/<id>/history.sqlite` | same |
 | Per-profile extensions | `Profiles/<id>/Extensions` | same |
+| Canvases (deleted ones stay in `.trash` for 30 days) | `Profiles/<id>/Canvases` | same |
 | Ad-blocking filter cache | `adblock/engine.bin` | same |
 | Cookies, site storage, cache | `Partitions/profile-<id>` | same |
 | Error log | `logs\main.log` | `~/Library/Logs/YARC/main.log` |
@@ -375,9 +386,10 @@ Details and gaps are in [docs/electron-notes.md](docs/electron-notes.md#6-securi
 | `src/main/adblock.ts` | Built-in ad and tracker blocking for every profile |
 | `src/main/little.ts` | Little Windows |
 | `src/main/peek.ts` | Peek: pages from pinned tabs and favorites floating over the current tab |
+| `src/main/canvas.ts`, `canvas-store.ts` | Canvases: their pages, capture, and their files in the profile folder (`docs/canvas.md`) |
 | `src/main/importers/` | Arc, Zen and Chromium importers |
 | `src/shared/` | State types, actions, keymap, URL helpers (unit tested) |
-| `src/renderer/` | React UI: `index` (sidebar), `overlay` (command bar and panels), `little` |
+| `src/renderer/` | React UI: `index` (sidebar), `overlay` (command bar and panels), `little`, `canvas` (a canvas: a board YARC draws itself) |
 | `docs/` | Research notes: Arc's behavior and shortcuts, Arc's data format, Electron notes |
 
 ## Roadmap and known limitations
@@ -390,7 +402,8 @@ Planned or open for contributions:
 - [ ] Boosts (custom CSS/JS per site)
 - [ ] Multiple main windows
 - [ ] Sync between your own devices
-- [ ] Notes / Easels
+- [ ] Notes
+- [ ] Live captures on canvases (press play to see the page live; [docs/canvas.md](docs/canvas.md))
 - [ ] Code signing and notarization, to remove the install warnings (and keep macOS camera, microphone and screen permissions across updates)
 
 ## Contributing

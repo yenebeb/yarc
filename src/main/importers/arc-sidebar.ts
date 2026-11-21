@@ -271,7 +271,7 @@ function walk(ctx: Ctx, id: string, saved: boolean, depth = 0, seen = new Set<st
 }
 
 function flatTabs(nodes: PinnedNode[]): PinnedTab[] {
-  return nodes.flatMap((n) => (n.kind === 'folder' ? flatTabs(n.children) : [n]))
+  return nodes.flatMap((n) => (n.kind === 'folder' ? flatTabs(n.children) : n.kind === 'tab' ? [n] : []))
 }
 
 const stripKind = ({ kind: _kind, ...rest }: PinnedTab): TabItem => rest

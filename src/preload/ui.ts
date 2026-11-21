@@ -31,13 +31,21 @@ const api: ArcApi = {
   focus: () => ipcRenderer.invoke(IPC.focus),
   onBlur: (cb) => listen(IPC.blur, cb),
   onFloat: (cb) => listen(IPC.float, cb),
-  float: (op) => ipcRenderer.invoke(IPC.floatOp, op)
+  float: (op) => ipcRenderer.invoke(IPC.floatOp, op),
+  canvasLoad: () => ipcRenderer.invoke(IPC.canvasLoad),
+  canvasSave: (scene, newFiles) => ipcRenderer.send(IPC.canvasSave, scene, newFiles),
+  canvasTakeInbox: () => ipcRenderer.invoke(IPC.canvasTakeInbox),
+  onCanvasInbox: (cb) => listen(IPC.canvasInbox, cb),
+  onCanvasRenamed: (cb) => listen(IPC.canvasRenamed, cb),
+  canvasOpenUrl: (url) => ipcRenderer.invoke(IPC.canvasOpenUrl, url),
+  canvasExport: (png, to) => ipcRenderer.invoke(IPC.canvasExport, png, to),
+  capturePick: (x, y, depth) => ipcRenderer.invoke(IPC.capturePick, x, y, depth)
 }
 
 // Never for a web page that ends up in a UI view somehow (main refuses its IPC too: ui-origin.ts).
 const uiOrigin = process.argv.find((a) => a.startsWith('--yarc-ui-origin='))?.slice('--yarc-ui-origin='.length)
 if (uiOrigin && location.origin === uiOrigin) {
   contextBridge.exposeInMainWorld('arc', api)
-  const showsExtensionButtons = !['little.html', 'prompt.html', 'float.html'].some((page) => location.pathname.endsWith(page))
+  const showsExtensionButtons = !['little.html', 'prompt.html', 'float.html', 'canvas.html'].some((page) => location.pathname.endsWith(page))
   if (showsExtensionButtons) injectBrowserAction()
 }

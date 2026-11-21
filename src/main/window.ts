@@ -19,11 +19,11 @@ export interface ViewSlot {
   rect: Rectangle
 }
 
-export type RendererPage = 'index' | 'overlay' | 'little' | 'prompt' | 'float'
+export type RendererPage = 'index' | 'overlay' | 'little' | 'prompt' | 'float' | 'canvas'
 
-export function loadRenderer(wc: WebContents, page: RendererPage): void {
+export function loadRenderer(wc: WebContents, page: RendererPage, query?: Record<string, string>): void {
   guardUi(wc)
-  void wc.loadURL(uiPageUrl(page))
+  void wc.loadURL(uiPageUrl(page, query))
 }
 
 export const preloadPath = (): string => join(__dirname, '../preload/ui.js')

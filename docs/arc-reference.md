@@ -371,6 +371,8 @@ Checked by opening File › New Window in real Arc (System Events for the menus 
 - Freeform canvas: text, images, drawings, links.
 - **Captures** (⇧⌘2) can be static or "live" (refresh with ⌘R).
 - Shareable. Zoom with pinch or ⌘±. Export with ⇧⌘S.
+- **Export all Easels** (Library card; found in Arc for macOS 2026-11-21): writes every Easel as a folder with `index.html`, `easel.json` and `images/`, viewable offline. Format in `docs/canvas.md` section 5.3.
+- A capture is a "web card"; it can be switched to a live web card after a confirmation dialog (the play button).
 
 ### Notes [O]
 - Arc Notes were **fully deprecated in 2024** and are export-only ("Export Arc Notes").

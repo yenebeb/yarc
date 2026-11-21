@@ -21,6 +21,29 @@ const paths: Record<string, ReactNode> = {
   x: <path d="M6 6l12 12M18 6L6 18" />,
   chevron: <path d="M9 6l6 6-6 6" />,
   folder: <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />,
+  canvas: (
+    <>
+      <rect x="3" y="4" width="18" height="16" rx="3" />
+      <rect x="6.5" y="7.5" width="6" height="5" rx="1" />
+      <path d="M14.5 15.5c1-1.5 2-1.5 3 0M7 16.5h5" />
+    </>
+  ),
+  capture: <path d="M4 9V5a1 1 0 0 1 1-1h4M15 4h4a1 1 0 0 1 1 1v4M20 15v4a1 1 0 0 1-1 1h-4M9 20H5a1 1 0 0 1-1-1v-4" />,
+  pointer: <path d="M6 4l12 7-5.5 1.5L10 18z" />,
+  hand: <path d="M8 13V6.5a1.5 1.5 0 0 1 3 0V11m0-5.5a1.5 1.5 0 0 1 3 0V11m0-4a1.5 1.5 0 0 1 3 0V15a5 5 0 0 1-5 5h-1.5a5 5 0 0 1-3.9-1.9L4.8 15a1.5 1.5 0 0 1 2.3-1.9L8 14" />,
+  text: <path d="M5 7V5h14v2M12 5v14M9 19h6" />,
+  rectangle: <rect x="4" y="6" width="16" height="12" rx="2" />,
+  ellipse: <ellipse cx="12" cy="12" rx="8.5" ry="6.5" />,
+  arrow: <path d="M5 19L19 5M10 5h9v9" />,
+  pen: <path d="M4 20c2-1 3-4 5-4s1.5 3 4 3 3-6 7-9M15 5l4 4" />,
+  image: (
+    <>
+      <rect x="3.5" y="5" width="17" height="14" rx="2" />
+      <circle cx="9" cy="10" r="1.6" />
+      <path d="M20.5 15.5l-5-4.5-8 8" />
+    </>
+  ),
+  more: <path d="M5.5 12h.01M12 12h.01M18.5 12h.01" />,
   speaker: (
     <>
       <path d="M11 5L6 9H3v6h3l5 4z" />

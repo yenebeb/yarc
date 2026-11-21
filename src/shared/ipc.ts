@@ -1,5 +1,6 @@
 import type { Action } from './actions'
-import type { AppState, OverlayMode, SearchResult } from './types'
+import type { CanvasImage, CanvasLoad, CanvasScene, InboxItem } from './canvas'
+import type { AppState, OverlayMode, Rect, SearchResult } from './types'
 import type { HistoryRow, LittleState } from './ipc-types'
 import type { PermissionPrompt, PromptOp } from './permissions'
 
@@ -26,11 +27,19 @@ export const IPC = {
   focus: 'arc:focus',
   blur: 'arc:blur',
   float: 'arc:float',
-  floatOp: 'arc:float-op'
+  floatOp: 'arc:float-op',
+  canvasLoad: 'arc:canvas-load',
+  canvasSave: 'arc:canvas-save',
+  canvasInbox: 'arc:canvas-inbox',
+  canvasTakeInbox: 'arc:canvas-take-inbox',
+  canvasRenamed: 'arc:canvas-renamed',
+  canvasOpenUrl: 'arc:canvas-open-url',
+  canvasExport: 'arc:canvas-export',
+  capturePick: 'arc:capture-pick'
 } as const
 
 export interface EditRequest {
-  kind: 'rename' | 'renameFolder'
+  kind: 'rename' | 'renameFolder' | 'renameCanvas'
   id: string
 }
 
@@ -103,4 +112,14 @@ export interface ArcApi {
   onBlur(cb: () => void): () => void
   onFloat(cb: (s: FloatState) => void): () => void
   float(op: FloatOp): Promise<void>
+  canvasLoad(): Promise<CanvasLoad>
+  /** Fire-and-forget, so it still works while the page unloads. */
+  canvasSave(scene: CanvasScene, newFiles: Record<string, CanvasImage>): void
+  canvasTakeInbox(): Promise<InboxItem[]>
+  onCanvasInbox(cb: () => void): () => void
+  onCanvasRenamed(cb: (r: { from: string; to: string }) => void): () => void
+  canvasOpenUrl(url: string): Promise<void>
+  canvasExport(png: Uint8Array, to: 'file' | 'clipboard'): Promise<void>
+  /** In overlay page coordinates; `depth` steps out to the element's ancestors. */
+  capturePick(x: number, y: number, depth: number): Promise<Rect | undefined>
 }

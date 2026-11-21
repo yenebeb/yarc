@@ -1711,3 +1711,132 @@ body.page-little::before {
 .pane-end:hover .split-menu {
   opacity: 1;
 }
+
+.capture {
+  position: absolute;
+  inset: 0;
+  cursor: crosshair;
+}
+
+.capture-page {
+  position: absolute;
+  overflow: hidden;
+  border-radius: 8px;
+}
+
+.capture-dim {
+  position: absolute;
+  inset: 0;
+  background: rgb(0 0 0 / 0.32);
+}
+
+.capture-area {
+  position: absolute;
+  border: 2px solid var(--accent);
+  border-radius: 4px;
+  box-shadow: 0 0 0 9999px rgb(0 0 0 / 0.32);
+  pointer-events: none;
+  transition:
+    left 0.08s ease-out,
+    top 0.08s ease-out,
+    width 0.08s ease-out,
+    height 0.08s ease-out;
+}
+
+.capture-area.chosen {
+  transition: none;
+}
+
+.capture-hint {
+  position: absolute;
+  left: 50%;
+  top: 12px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border-radius: 10px;
+  background: var(--panel);
+  color: var(--text);
+  font-size: 12px;
+  white-space: nowrap;
+  box-shadow: 0 4px 16px rgb(0 0 0 / 0.16);
+  pointer-events: none;
+}
+
+.capture-target {
+  position: absolute;
+  padding: 6px;
+  border-radius: 12px;
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: 0 8px 30px rgb(0 0 0 / 0.22);
+  cursor: default;
+}
+
+.capture-target input {
+  box-sizing: border-box;
+  width: 100%;
+  height: 34px;
+  margin-bottom: 6px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 8px;
+  background: rgb(127 127 127 / 0.12);
+  color: inherit;
+  font: inherit;
+  outline: none;
+}
+
+.capture-target-line {
+  height: 1px;
+  margin: 4px 8px;
+  background: rgb(127 127 127 / 0.2);
+}
+
+.capture-target .detail {
+  margin-left: auto;
+  flex: none;
+  max-width: 40%;
+  font-size: 11px;
+  color: var(--text-2);
+}
+
+.capture-target button.more {
+  height: 30px;
+  color: var(--text-2);
+  font-size: 12px;
+}
+
+.capture-target button.active {
+  background: rgb(127 127 127 / 0.14);
+}
+
+.capture-target button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 32px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.capture-target button span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.capture-target button:hover,
+.capture-target button:focus-visible {
+  background: rgb(127 127 127 / 0.14);
+  outline: none;
+}

@@ -54,6 +54,8 @@ export type CommandId =
   | 'whatsNew'
   | 'tour'
   | 'floatingPlayerDemo'
+  | 'newCanvas'
+  | 'capture'
 
 export interface Binding {
   id: CommandId
@@ -128,7 +130,9 @@ export const BINDINGS: Binding[] = [
   { id: 'installUpdate', title: 'Install Update', mac: [], other: [], palette: true },
   { id: 'whatsNew', title: "What's New in YARC", mac: [], other: [], palette: true },
   { id: 'tour', title: 'Take the YARC Tour', mac: [], other: [], palette: true },
-  { id: 'floatingPlayerDemo', title: 'Try the Floating Player', mac: [], other: [], palette: true }
+  { id: 'floatingPlayerDemo', title: 'Try the Floating Player', mac: [], other: [], palette: true },
+  { id: 'newCanvas', title: 'New Canvas', mac: [], other: [], palette: true },
+  { id: 'capture', title: 'Capture to Canvas', ...both('Mod+Shift+2'), palette: true }
 ]
 
 export const commandTitle = (id: CommandId): string => BINDINGS.find((b) => b.id === id)?.title ?? id

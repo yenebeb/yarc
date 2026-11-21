@@ -235,7 +235,7 @@ an explicit order. Prefer it when present and when it agrees with the set of loc
 | `list` | a **folder**, named by item `title` | `{}` | recurse into children |
 | `splitView` | a split-view group whose children are tabs | `focusItemID`, `layoutOrientation` (`"horizontal"`/`"vertical"`), `timeLastActiveAt`, `itemWidthFactors` (flat id→factor), `customInfo` | flatten children in place (Zen, Nook), or keep as a split group |
 | `itemContainer` | a root container | `containerType`: `{"spaceItems":{"_0":spaceId}}` or `{"topApps":{"_0":profile}}` | root only |
-| `easel` | an Arc Easel | `{}` | skip (warn) |
+| `easel` | an Arc Easel | `easelID` (UUID), `title`, `creatorID`, `shareStatus` (e.g. `"creatorOnly"`), `timeLastActiveAt`; older fixtures show `{}`. No content: that lived on Arc's servers | skip (warn), or match with Arc's own Easel export (`docs/canvas.md` section 5.3) |
 | `sharedObject` | an embedded shared folder or space (live link) | `slug`, `sidebarData` (nested items) | skip, or import the nested items (best effort) |
 | anything else | future or unknown types (e.g. notes) | | skip (warn) |
 
@@ -515,7 +515,7 @@ export type ArcItemData =
   | { itemContainer: { containerType: { spaceItems?: { _0: string };
                                         topApps?: { _0?: ArcProfileDescriptor } | Record<string, never>;
                                         [k: string]: unknown } } }
-  | { easel: unknown }
+  | { easel: { easelID?: string; title?: string; creatorID?: string; shareStatus?: string; timeLastActiveAt?: number } }
   | { sharedObject: { slug?: string; sidebarData?: unknown } }
   | Record<string, unknown>; // unknown future kinds
 

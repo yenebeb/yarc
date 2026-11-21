@@ -1,5 +1,5 @@
 import type { Side } from './split'
-import type { ID, OverlayMode, SearchEngine, Settings, SplitAt } from './types'
+import type { ID, OverlayMode, Rect, SearchEngine, Settings, SplitAt } from './types'
 
 /** `index` is within the target list. */
 export type DropTarget =
@@ -85,3 +85,9 @@ export type Action =
   | { type: 'sharePick'; id: string; sourceId?: string; systemAudio?: boolean }
   /** `reset` forgets the answer so the site asks again. */
   | { type: 'sitePermission'; profileId: ID; origin: string; key: string; setting: 'allow' | 'block' | 'reset' }
+  | { type: 'renameCanvas'; id: ID; name: string }
+  | { type: 'canvasMenu'; id: ID }
+  /** `rect` is in overlay page coordinates. */
+  | { type: 'capture'; rect: Rect; to: CaptureTo }
+
+export type CaptureTo = ID | 'new' | 'copy' | 'save'

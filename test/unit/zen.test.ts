@@ -99,7 +99,7 @@ const session = {
   ]
 }
 
-const outline = (nodes: PinnedNode[]): unknown[] => nodes.map((n) => (n.kind === 'folder' ? { [`${n.name}${n.open ? '' : ' (closed)'}`]: outline(n.children) } : n.title))
+const outline = (nodes: PinnedNode[]): unknown[] => nodes.map((n) => (n.kind === 'folder' ? { [`${n.name}${n.open ? '' : ' (closed)'}`]: outline(n.children) } : n.kind === 'tab' ? n.title : n.name))
 
 test('parseZenSession turns spaces into spaces with a profile per container', () => {
   const parsed = parseZenSession(session, { palette: ['#123456'], containers: new Map([[2, 'Work']]), activeSpace: '{s2}', now: NOW })

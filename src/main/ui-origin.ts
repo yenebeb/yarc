@@ -1,5 +1,5 @@
 // Not file://: the UI gets an origin the preload and IPC handlers check, and file:// tabs run without extra privileges.
-import { app, ipcMain, protocol, type IpcMainInvokeEvent, type WebContents } from 'electron'
+import { app, ipcMain, protocol, type IpcMainEvent, type IpcMainInvokeEvent, type WebContents } from 'electron'
 import { readFile } from 'node:fs/promises'
 import { extname, join, normalize, sep } from 'node:path'
 import { logError } from './log'
@@ -41,8 +41,9 @@ export function uiOrigin(): string {
   return dev ? new URL(dev).origin : ORIGIN
 }
 
-export function uiPageUrl(page: string): string {
-  return `${devServer() ?? ORIGIN}/${page}.html`
+export function uiPageUrl(page: string, query?: Record<string, string>): string {
+  const search = query ? `?${new URLSearchParams(query)}` : ''
+  return `${devServer() ?? ORIGIN}/${page}.html${search}`
 }
 
 /** Before app ready. Electron keeps only the last call, so it repeats electron-chrome-extensions' crx:. */
@@ -71,7 +72,7 @@ export function serveUi(): void {
   })
 }
 
-export function fromUi(e: IpcMainInvokeEvent): boolean {
+export function fromUi(e: IpcMainInvokeEvent | IpcMainEvent): boolean {
   const frame = e.senderFrame
   if (!frame || frame !== e.sender.mainFrame) return false
   return frame.url.startsWith(`${uiOrigin()}/`)
@@ -86,6 +87,18 @@ export function handleUi<A extends unknown[], R>(channel: string, fn: (e: IpcMai
       // Otherwise it only reaches the sidebar's console, which a packaged build can't open.
       logError(`${channel}${actionType(args[0])}`, err)
       throw err
+    }
+  })
+}
+
+/** For messages without an answer; refused like handleUi's. */
+export function onUi<A extends unknown[]>(channel: string, fn: (e: IpcMainEvent, ...args: A) => void): void {
+  ipcMain.on(channel, (e, ...args) => {
+    if (!fromUi(e)) return
+    try {
+      fn(e, ...(args as A))
+    } catch (err) {
+      logError(channel, err)
     }
   })
 }

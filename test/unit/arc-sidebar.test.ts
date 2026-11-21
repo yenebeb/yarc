@@ -9,7 +9,7 @@ const NOW = Date.UTC(2026, 10, 1)
 const parsed = parseArcSidebar(fixture, { now: NOW })
 const [personal, work] = parsed.spaces
 
-const outline = (nodes: PinnedNode[]): unknown[] => nodes.map((n) => (n.kind === 'folder' ? { [n.name]: outline(n.children) } : n.title))
+const outline = (nodes: PinnedNode[]): unknown[] => nodes.map((n) => (n.kind === 'folder' ? { [n.name]: outline(n.children) } : n.kind === 'tab' ? n.title : n.name))
 
 test('spaces in sidebar order with names, emoji and colors', () => {
   assert.equal(parsed.spaces.length, 2)

@@ -21,7 +21,7 @@ import { join } from 'node:path'
 import type { Action, DropTarget } from '../shared/actions'
 import { IPC, type LittleAnchor, type LittleOp } from '../shared/ipc'
 import { commandForInput, type CommandId } from '../shared/keymap'
-import { containsNode, findFolder, findInPinned, findItem, profileOfItem, spaceItems } from '../shared/tree'
+import { containsNode, findCanvas, findFolder, findInPinned, findItem, profileOfItem, spaceCanvases, spaceItems } from '../shared/tree'
 import type {
   AppState,
   ExtensionInfo,
@@ -41,6 +41,7 @@ import { appendPaneIn, flipSplit, gatherSplit, layoutPanes, movePane, PANE_BAR, 
 import { isFloating, stepAfter, type TourEvent, type TourStep } from '../shared/tour'
 import { resolveInput, SEARCH_ENGINES } from '../shared/url'
 import { AdBlock, hostOf } from './adblock'
+import { Canvases } from './canvas'
 import { recentSpotlights, SPOTLIGHTS, unseenSpotlights } from '../shared/spotlights'
 import { recentChanges, startupScreen, type Changelog } from './changelog'
 import { openInChrome } from './chrome'
@@ -55,7 +56,7 @@ import { pauseMedia, probeMedia, toggleMedia } from './media-page'
 import { closeFloating, closed, dismiss, emptyMedia, float, left, minimize, shown, type LeftWith, type MediaState } from './media-state'
 import { Mirror, stillOf } from './mirror'
 import { Peek, sameSite } from './peek'
-import { buildContextMenu, buildFolderMenu, buildItemMenu, buildSpaceMenu, buildSplitMenu } from './menus'
+import { buildCanvasMenu, buildContextMenu, buildFolderMenu, buildItemMenu, buildSpaceMenu, buildSplitMenu } from './menus'
 import { Profiles, type ProfileRuntime } from './profiles'
 import { PROMPT_WIDTH, PromptView, type PromptAnchor } from './prompt-view'
 import { search, suggest } from './search'
@@ -158,6 +159,7 @@ export class Browser implements TabHost, FloatingHost {
   private cur!: WindowSession
   private reportedLost: WindowSession | undefined
   readonly live = new Map<ID, LiveTab>()
+  readonly canvases = new Canvases(this)
   private media: MediaState = emptyMedia()
   private readonly floating = new FloatingPlayer(this)
   private onScreen = new Set<ID>()
@@ -369,7 +371,7 @@ export class Browser implements TabHost, FloatingHost {
       }, 50)
     })
     const active = this.space.activeItemId
-    if (active && findItem(this.state, active)) this.activate(active)
+    if (active && this.hasItem(active)) this.activate(active)
     else this.layout()
     return w
   }
@@ -581,7 +583,7 @@ export class Browser implements TabHost, FloatingHost {
     if (win && !win.isDestroyed()) win.webContents.send(IPC.toast, text)
   }
 
-  private changed(): void {
+  changed(): void {
     this.store.save()
     this.emitSoon()
   }
@@ -616,6 +618,14 @@ export class Browser implements TabHost, FloatingHost {
     return undefined
   }
 
+  private hasItem(id: ID): boolean {
+    return !!findItem(this.state, id) || !!findCanvas(this.state, id)
+  }
+
+  detachEverywhere(view: WebContentsView): void {
+    for (const w of this.wins) if (w.open) w.main.detach(view)
+  }
+
   private dropLive(id: ID): void {
     const t = this.live.get(id)
     if (!t) return
@@ -629,6 +639,8 @@ export class Browser implements TabHost, FloatingHost {
   }
 
   activate(id: ID, focus = true): void {
+    const canvas = findCanvas(this.state, id)
+    if (canvas) return this.activateCanvas(id, focus)
     const found = findItem(this.state, id)
     if (!found) return
     this.closePeek()
@@ -650,6 +662,19 @@ export class Browser implements TabHost, FloatingHost {
     this.changed()
   }
 
+  private activateCanvas(id: ID, focus = true): void {
+    const hit = findCanvas(this.state, id)
+    if (!hit) return
+    this.closePeek()
+    this.state.activeSpaceId = hit.space.id
+    hit.space.activeItemId = id
+    hit.canvas.lastActive = Date.now()
+    const page = this.canvases.page(id)
+    this.layout()
+    if (focus && this.pageInFront()) page.wc.focus()
+    this.changed()
+  }
+
   layout(): void {
     const w = this.window
     if (!w || w.win.isDestroyed()) return
@@ -666,7 +691,11 @@ export class Browser implements TabHost, FloatingHost {
     } else {
       const space = this.space
       const active = space.activeItemId && findItem(this.state, space.activeItemId) ? space.activeItemId : undefined
-      if (!active) {
+      const canvas = !active && space.activeItemId ? findCanvas(this.state, space.activeItemId) : undefined
+      if (canvas) {
+        this.show([{ view: this.canvases.page(canvas.canvas.id).view, rect: content }])
+        views.push({ id: canvas.canvas.id, rect: content })
+      } else if (!active) {
         this.show([])
       } else {
         const split = splitOf(space.splits, active)
@@ -871,6 +900,7 @@ export class Browser implements TabHost, FloatingHost {
       }
       case 'split-drop':
       case 'peek':
+      case 'capture':
         return c
       case 'notice': {
         const w = Math.min(440, c.width - 24)
@@ -1003,9 +1033,9 @@ export class Browser implements TabHost, FloatingHost {
     }, 50)
   }
 
-  openPeek(opener: LiveTab, url: string): void {
+  openPeek(profileId: ID, url: string): void {
     this.dropPeek()
-    this.cur.peek = new Peek(this, this.profiles.get(opener.profileId), url)
+    this.cur.peek = new Peek(this, this.profiles.get(profileId), url)
     this.window.setTop(this.cur.peek.tab.view, this.peekRects().card)
     this.setOverlay(this.peekMode())
     this.cur.peek.tab.wc.focus()
@@ -1069,7 +1099,7 @@ export class Browser implements TabHost, FloatingHost {
     if (!this.state.settings.peekPinnedLinks || !/^https?:/i.test(url)) return false
     const found = findItem(this.state, tab.itemId)
     if (!found || found.loc.kind === 'today' || sameSite(tab.wc.getURL(), url)) return false
-    this.openPeek(tab, url)
+    this.openPeek(tab.profileId, url)
     return true
   }
 
@@ -1107,6 +1137,13 @@ export class Browser implements TabHost, FloatingHost {
   }
 
   close(id: ID): void {
+    const canvas = findCanvas(this.state, id)
+    if (canvas) {
+      // Closing a canvas only deselects it; Delete Canvas is in its menu.
+      if (canvas.space.activeItemId === id) canvas.space.activeItemId = undefined
+      this.layout()
+      return this.changed()
+    }
     const found = findItem(this.state, id)
     if (!found) return
     const loc = found.loc
@@ -1244,7 +1281,8 @@ export class Browser implements TabHost, FloatingHost {
       node = found.item
       fromList = found.loc.list
     }
-    const isFolder = 'kind' in node && node.kind === 'folder'
+    // Folders and canvases move as they are, and only among pinned items.
+    const isFolder = 'kind' in node && (node.kind === 'folder' || node.kind === 'canvas')
     let target: unknown[]
     if (to.section === 'favorites') target = profile.favorites
     else if (to.section === 'today') target = space.today
@@ -1280,6 +1318,8 @@ export class Browser implements TabHost, FloatingHost {
   }
 
   moveToSpace(id: ID, spaceId: ID): void {
+    const canvas = findCanvas(this.state, id)
+    if (canvas) return this.moveCanvasToSpace(id, spaceId)
     const found = findItem(this.state, id)
     const target = this.store.space(spaceId)
     if (!found || !target || found.loc.kind === 'favorite') return
@@ -1382,7 +1422,7 @@ export class Browser implements TabHost, FloatingHost {
     if (!space) return
     this.closePeek()
     this.state.activeSpaceId = id
-    if (space.activeItemId && findItem(this.state, space.activeItemId)) this.activate(space.activeItemId)
+    if (space.activeItemId && this.hasItem(space.activeItemId)) this.activate(space.activeItemId)
     else {
       space.activeItemId = undefined
       this.relayout()
@@ -1413,6 +1453,7 @@ export class Browser implements TabHost, FloatingHost {
     if (this.state.spaces.length <= 1) return this.toast('You need at least one space')
     const space = this.store.space(id)
     if (!space) return
+    for (const canvas of spaceCanvases(space)) this.canvases.delete(canvas.id)
     for (const item of spaceItems(this.state, space)) if (!this.state.profiles.some((p) => p.favorites.includes(item))) this.dropLive(item.id)
     this.state.spaces = this.state.spaces.filter((s) => s.id !== id)
     if (!this.state.spaces.some((s) => s.profileId === space.profileId)) {
@@ -1518,6 +1559,10 @@ export class Browser implements TabHost, FloatingHost {
         return void this.updater.check(true)
       case 'installUpdate':
         return void this.updater.apply()
+      case 'newCanvas':
+        return this.newCanvas()
+      case 'capture':
+        return this.startCapture()
       case 'whatsNew':
         return this.setOverlay({ kind: 'whats-new', releases: recentChanges(CHANGELOG, app.getVersion()), spotlights: recentSpotlights(SPOTLIGHTS) })
       case 'floatingPlayerDemo':
@@ -1798,6 +1843,18 @@ export class Browser implements TabHost, FloatingHost {
         return buildItemMenu(this, a.id)?.popup({ window: this.window.win })
       case 'folderMenu':
         return buildFolderMenu(this, a.id)?.popup({ window: this.window.win })
+      case 'canvasMenu':
+        return buildCanvasMenu(this, a.id)?.popup({ window: this.window.win })
+      case 'renameCanvas':
+        this.canvases.rename(a.id, String(a.name))
+        return this.changed()
+      case 'capture': {
+        const mode = this.window.overlayMode
+        this.setOverlay({ kind: 'none' }, false)
+        const page = this.activeTab()
+        if (mode.kind !== 'capture' || !page || this.incognito) return
+        return this.canvases.capture(page, a.rect, a.to)
+      }
       case 'spaceMenu':
         return buildSpaceMenu(this, a.id)?.popup({ window: this.window.win })
       case 'extensionsStore':
@@ -1872,6 +1929,34 @@ export class Browser implements TabHost, FloatingHost {
       this.mru = [tab.itemId, ...this.mru.filter((m) => m !== tab.itemId)]
       this.changed()
     }
+  }
+
+  private moveCanvasToSpace(id: ID, spaceId: ID): void {
+    const hit = findCanvas(this.state, id)
+    const target = this.store.space(spaceId)
+    if (!hit || !target || hit.space.id === target.id) return
+    this.canvases.moveFiles(id, hit.space.profileId, target.profileId)
+    hit.list.splice(hit.index, 1)
+    target.pinned.push(hit.canvas)
+    if (hit.space.activeItemId === id) hit.space.activeItemId = undefined
+    this.layout()
+    this.changed()
+  }
+
+  newCanvas(): void {
+    if (this.incognito) return this.toast('Canvases aren’t available in incognito windows')
+    const canvas = this.canvases.create(this.space)
+    this.activate(canvas.id)
+    if (this.state.settings.sidebarVisible) this.window.ui.send(IPC.edit, { kind: 'renameCanvas', id: canvas.id })
+  }
+
+  startCapture(): void {
+    if (this.incognito) return this.toast('Canvases aren’t available in incognito windows')
+    const tab = this.activeTab()
+    const pane = tab && !this.cur.peek ? this.cur.layout.views.find((v) => v.id === tab.itemId && !v.elsewhere) : undefined
+    if (!tab || !pane) return this.toast('Open a page to capture part of it')
+    const c = this.cur.layout.content
+    this.setOverlay({ kind: 'capture', page: { x: pane.rect.x - c.x, y: pane.rect.y - c.y, width: pane.rect.width, height: pane.rect.height } })
   }
 
   onTabFullscreen(tab: LiveTab, on: boolean): void {
@@ -2004,6 +2089,18 @@ export class Browser implements TabHost, FloatingHost {
       return b.profiles.get(b.space.profileId).history.deleteUrl(String(url))
     })
     handleUi(IPC.focus, (e) => e.sender.focus())
+    handleUi(IPC.capturePick, (e, x: number, y: number, depth: number) => {
+      const b = of(e)
+      const tab = b.activeTab()
+      return tab && b.window.overlayMode.kind === 'capture' ? b.canvases.pick(tab, x, y, depth) : undefined
+    })
+    Canvases.registerIpc((wc) => {
+      for (const b of Browser.all) {
+        const page = b.canvases.pageOf(wc)
+        if (page) return { canvases: b.canvases, page }
+      }
+      return undefined
+    })
     handleUi(IPC.littleOp, (e, op: LittleOp, at?: LittleAnchor) => {
       for (const l of of(e).openLittles()) if (l.win.webContents === e.sender) return l.op(op, at)
     })

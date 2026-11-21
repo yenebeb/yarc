@@ -1,4 +1,4 @@
-import type { ID, PersistedState, PinnedFolder, PinnedNode, Space, TabItem } from './types'
+import type { ID, PersistedState, PinnedCanvas, PinnedFolder, PinnedNode, Space, TabItem } from './types'
 
 export type ItemLocation =
   | { kind: 'favorite'; profileId: ID; list: TabItem[]; index: number }
@@ -40,6 +40,21 @@ export function findItem(state: PersistedState, id: ID): FoundItem | undefined {
     }
   }
   return undefined
+}
+
+export function findCanvas(state: PersistedState, id: ID): { canvas: PinnedCanvas; space: Space; list: PinnedNode[]; index: number } | undefined {
+  for (const space of state.spaces) {
+    const hit = findInPinned(space.pinned, id)
+    const node = hit?.list[hit.index]
+    if (hit && node?.kind === 'canvas') return { canvas: node, space, list: hit.list, index: hit.index }
+  }
+  return undefined
+}
+
+export function spaceCanvases(space: Space): PinnedCanvas[] {
+  const out: PinnedCanvas[] = []
+  for (const n of walkPinned(space.pinned)) if (n.kind === 'canvas') out.push(n)
+  return out
 }
 
 export function findFolder(space: Space, id: ID): PinnedFolder | undefined {

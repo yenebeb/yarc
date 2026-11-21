@@ -32,7 +32,8 @@ export default defineConfig({
           overlay: resolve('src/renderer/overlay.html'),
           little: resolve('src/renderer/little.html'),
           prompt: resolve('src/renderer/prompt.html'),
-          float: resolve('src/renderer/float.html')
+          float: resolve('src/renderer/float.html'),
+          canvas: resolve('src/renderer/canvas.html')
         }
       }
     }

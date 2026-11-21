@@ -28,7 +28,16 @@ export interface PinnedFolder {
   children: PinnedNode[]
 }
 
-export type PinnedNode = PinnedTab | PinnedFolder
+/** Its contents are files in its profile's folder (src/main/canvas-store.ts), not in state.json. */
+export interface PinnedCanvas {
+  kind: 'canvas'
+  /** Also the name of its folder under Profiles/<profile>/Canvases/. */
+  id: ID
+  name: string
+  lastActive: number
+}
+
+export type PinnedNode = PinnedTab | PinnedFolder | PinnedCanvas
 
 export interface Profile {
   id: ID
@@ -260,6 +269,8 @@ export type OverlayMode =
   /** Spotlight cards first, then the releases since the user's last version, newest first. */
   | { kind: 'whats-new'; releases: ReleaseNotes[]; spotlights: string[] }
   | { kind: 'update' }
+  /** `page`: where the active page sits in the overlay, which covers the content area. */
+  | { kind: 'capture'; page: Rect }
 
 export interface SearchResult {
   /** `pastSearch`: something searched for before, found in history; its `url` is the query. */

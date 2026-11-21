@@ -1,7 +1,7 @@
 import { app, clipboard, dialog, Menu, type ContextMenuParams, type MenuItemConstructorOptions } from 'electron'
 import { IPC, type EditRequest } from '../shared/ipc'
 import { paneIds, splitMenuModel } from '../shared/split'
-import { findFolder, findItem, isAwayFromSaved } from '../shared/tree'
+import { findCanvas, findFolder, findItem, isAwayFromSaved, spaceCanvases } from '../shared/tree'
 import { SEARCH_ENGINES, searchUrl } from '../shared/url'
 import { commandTitle, type CommandId } from '../shared/keymap'
 import type { Browser } from './browser'
@@ -32,6 +32,18 @@ export function buildContextMenu(browser: Browser, tab: LiveTab, p: ContextMenuP
   if (p.mediaType === 'image' && p.srcURL) {
     if (WEB_LINK.test(p.srcURL) || /^(data:image\/|blob:https?:)/i.test(p.srcURL)) {
       items.push({ label: 'Open Image in New Tab', click: () => browser.open(p.srcURL, 'background') })
+    }
+    if (!browser.incognito && (WEB_LINK.test(p.srcURL) || /^data:image\//i.test(p.srcURL))) {
+      const add = (canvasId: string) => () => void browser.canvases.addImage(tab, p.srcURL, canvasId)
+      const canvases = spaceCanvases(browser.space)
+      items.push({
+        label: 'Add Image to Canvas',
+        submenu: [
+          ...canvases.map((c) => ({ label: c.name, click: add(c.id) })),
+          ...(canvases.length ? [{ type: 'separator' as const }] : []),
+          { label: 'New Canvas', click: add('new') }
+        ]
+      })
     }
     items.push(
       { label: 'Save Image As…', click: () => wc.downloadURL(p.srcURL) },
@@ -247,6 +259,40 @@ export function buildSplitMenu(browser: Browser, id: string): Menu | undefined {
     { type: 'separator' },
     { label: 'Share Split View…', enabled: false }
   ])
+}
+
+export function buildCanvasMenu(browser: Browser, id: string): Menu | undefined {
+  const hit = findCanvas(browser.store.state, id)
+  if (!hit) return undefined
+  const state = browser.store.state
+  const items: MenuItemConstructorOptions[] = [{ label: 'Rename…', click: () => requestEdit(browser, { kind: 'renameCanvas', id }) }]
+  if (state.spaces.length > 1) {
+    items.push({
+      label: 'Move to Space',
+      submenu: state.spaces.filter((s) => s.id !== hit.space.id).map((s) => ({ label: `${s.emoji ?? ''} ${s.name}`.trim(), click: () => void browser.dispatch({ type: 'moveToSpace', id, spaceId: s.id }) }))
+    })
+  }
+  items.push(
+    { type: 'separator' },
+    {
+      label: 'Delete Canvas…',
+      click: async () => {
+        const { response } = await dialog.showMessageBox(browser.window.win, {
+          type: 'warning',
+          buttons: ['Delete', 'Cancel'],
+          defaultId: 1,
+          cancelId: 1,
+          message: `Delete the canvas “${hit.canvas.name}”?`,
+          detail: 'Its files stay in the profile’s trash folder for 30 days.'
+        })
+        if (response !== 0) return
+        browser.canvases.delete(id)
+        browser.layout()
+        browser.changed()
+      }
+    }
+  )
+  return Menu.buildFromTemplate(items)
 }
 
 export function buildFolderMenu(browser: Browser, id: string): Menu | undefined {
