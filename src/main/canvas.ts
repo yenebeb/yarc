@@ -177,9 +177,14 @@ export class Canvases {
     return { url: tab.wc.getURL(), title: tab.wc.getTitle(), favicon: tab.favicon }
   }
 
-  /** `rect` is in device-independent pixels of the tab's view. */
-  async capture(tab: LiveTab, rect: Rect, to: CaptureTo): Promise<void> {
+  /** `rect` is in device-independent pixels of the tab's view; `whole` captures the full length of the page instead. */
+  async capture(tab: LiveTab, rect: Rect, to: CaptureTo, whole = false): Promise<void> {
     const wc = tab.wc
+    if (whole) {
+      const shot = await wholePage(wc)
+      if (!shot) return this.browser.toast('Couldn’t capture this page')
+      return this.place(tab, shot.png, to, { width: shot.width, height: shot.height })
+    }
     const bounds = tab.view.getBounds()
     const r = {
       x: Math.max(0, Math.round(rect.x)),
@@ -190,11 +195,8 @@ export class Canvases {
     if (r.width < 4 || r.height < 4) return
     const image = await wc.capturePage(r)
     if (image.isEmpty()) return this.browser.toast('Couldn’t capture this page')
-    if (to === 'copy') {
-      await clipboard.write([new ClipboardItem({ 'image/png': new Blob([new Uint8Array(image.toPNG())], { type: 'image/png' }) })])
-      return this.browser.toast('Copied')
-    }
-    if (to === 'save') return this.savePng(image.toPNG(), tab.wc.getTitle() || 'Capture')
+    const size = { width: r.width, height: r.height }
+    if (to === 'copy' || to === 'save') return this.place(tab, image.toPNG(), to, size)
     const zoom = wc.getZoomFactor()
     let capture: CaptureGeometry | undefined
     try {
@@ -205,9 +207,17 @@ export class Canvases {
         scroll: { x: view.x, y: view.y }
       }
     } catch {}
+    return this.place(tab, image.toPNG(), to, size, capture)
+  }
+
+  private async place(tab: LiveTab, png: Buffer, to: CaptureTo, size: { width: number; height: number }, capture?: CaptureGeometry): Promise<void> {
+    if (to === 'copy') {
+      await clipboard.write([new ClipboardItem({ 'image/png': new Blob([new Uint8Array(png)], { type: 'image/png' }) })])
+      return this.browser.toast('Copied')
+    }
+    if (to === 'save') return this.savePng(png, tab.wc.getTitle() || 'Capture')
     const canvas = this.target(to)
-    if (!canvas) return
-    this.deliver(canvas, image.toPNG(), 'image/png', { width: r.width, height: r.height }, this.sourceOf(tab), capture)
+    if (canvas) this.deliver(canvas, png, 'image/png', size, this.sourceOf(tab), capture)
   }
 
   /** Skips elements too small to be worth a capture or nearly as big as the page; `depth` steps out to ancestors. */
@@ -343,5 +353,28 @@ export class Canvases {
     const { canceled, filePath } = await dialog.showSaveDialog(win, { defaultPath: `${safe}.png`, filters: [{ name: 'PNG image', extensions: ['png'] }] })
     if (canceled || !filePath) return
     writeFileSync(filePath, bytes)
+  }
+}
+
+/** Past this many CSS pixels a screenshot outgrows the GPU's largest texture. */
+const MAX_PAGE_HEIGHT = 12000
+
+/** `capturePage` only sees what's on screen; DevTools' protocol lays the whole page out for one shot. */
+async function wholePage(wc: WebContents): Promise<{ png: Buffer; width: number; height: number } | undefined> {
+  const attached = wc.debugger.isAttached()
+  try {
+    if (!attached) wc.debugger.attach('1.3')
+    const { cssContentSize: content } = await wc.debugger.sendCommand('Page.getLayoutMetrics')
+    const width = Math.ceil(content.width)
+    const height = Math.min(Math.ceil(content.height), MAX_PAGE_HEIGHT)
+    const clip = { x: 0, y: 0, width, height, scale: 1 }
+    const { data } = await wc.debugger.sendCommand('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true, clip })
+    const zoom = wc.getZoomFactor()
+    return { png: Buffer.from(data, 'base64'), width: Math.round(width * zoom), height: Math.round(height * zoom) }
+  } catch (err) {
+    logError('canvas: whole page', err)
+    return undefined
+  } finally {
+    if (!attached && wc.debugger.isAttached()) wc.debugger.detach()
   }
 }

@@ -126,6 +126,7 @@ function Capture({ state, page }: { state: AppState; page: Rect }) {
   const [picked, setPicked] = useState<Rect>()
   const [drag, setDrag] = useState<{ x: number; y: number; x2: number; y2: number }>()
   const [chosen, setChosen] = useState<Rect>()
+  const [whole, setWhole] = useState(false)
   const depth = useRef(0)
   const pointer = useRef({ x: 0, y: 0 })
   const asking = useRef(false)
@@ -189,10 +190,21 @@ function Capture({ state, page }: { state: AppState; page: Rect }) {
           <div className="capture-dim" />
         )}
         {chosen ? (
-          <CaptureTarget area={chosen} page={page} canvases={canvases} onRetake={() => { setChosen(undefined); setPicked(undefined) }} />
+          <CaptureTarget area={chosen} whole={whole} page={page} canvases={canvases} onRetake={() => { setChosen(undefined); setPicked(undefined); setWhole(false) }} />
         ) : (
           <div className="capture-hint">
             <Icon name="capture" size={14} /> Click a part of the page or drag an area · scroll for a bigger part · Esc to cancel
+            <button
+              className="capture-whole"
+              onMouseDown={(e) => e.stopPropagation()}
+              onMouseUp={(e) => e.stopPropagation()}
+              onClick={() => {
+                setWhole(true)
+                setChosen({ x: 0, y: 0, width: page.width, height: page.height })
+              }}
+            >
+              Whole Page
+            </button>
           </div>
         )}
       </div>
@@ -208,11 +220,11 @@ interface SendChoice {
   run: () => void
 }
 
-function CaptureTarget({ area, page, canvases, onRetake }: { area: Rect; page: Rect; canvases: { id: ID; name: string; lastActive: number; space?: string }[]; onRetake: () => void }) {
+function CaptureTarget({ area, whole, page, canvases, onRetake }: { area: Rect; whole: boolean; page: Rect; canvases: { id: ID; name: string; lastActive: number; space?: string }[]; onRetake: () => void }) {
   const [query, setQuery] = useState('')
   const [showAll, setShowAll] = useState(false)
   const [at, setAt] = useState(0)
-  const send = (to: CaptureTo) => dispatch({ type: 'capture', rect: area, to })
+  const send = (to: CaptureTo) => dispatch({ type: 'capture', rect: area, to, whole })
   const words = query.trim().toLowerCase()
   const matching = canvases.filter((c) => c.name.toLowerCase().includes(words)).sort((a, b) => b.lastActive - a.lastActive)
   const RECENT = 5

@@ -1765,6 +1765,22 @@ body.page-little::before {
   pointer-events: none;
 }
 
+.capture-whole {
+  margin-left: 4px;
+  padding: 3px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: rgb(127 127 127 / 0.14);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.capture-whole:hover {
+  background: rgb(127 127 127 / 0.24);
+}
+
 .capture-target {
   position: absolute;
   padding: 6px;

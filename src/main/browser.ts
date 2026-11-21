@@ -1855,7 +1855,7 @@ export class Browser implements TabHost, FloatingHost {
         this.setOverlay({ kind: 'none' }, false)
         const page = this.activeTab()
         if (mode.kind !== 'capture' || !page || this.incognito) return
-        return this.canvases.capture(page, a.rect, a.to)
+        return this.canvases.capture(page, a.rect, a.to, a.whole)
       }
       case 'spaceMenu':
         return buildSpaceMenu(this, a.id)?.popup({ window: this.window.win })

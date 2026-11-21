@@ -88,6 +88,6 @@ export type Action =
   | { type: 'renameCanvas'; id: ID; name: string }
   | { type: 'canvasMenu'; id: ID }
   /** `rect` is in overlay page coordinates. */
-  | { type: 'capture'; rect: Rect; to: CaptureTo }
+  | { type: 'capture'; rect: Rect; to: CaptureTo; whole?: boolean }
 
 export type CaptureTo = ID | 'new' | 'copy' | 'save'

@@ -1046,3 +1046,21 @@ test('an extension popup opens toward the page, whichever side the sidebar is on
     }, extId)
   }
 })
+
+test('Whole Page captures the full length of a page, past what is on screen', async () => {
+  const long = `data:text/html,${encodeURIComponent('<!doctype html><title>Long page</title><body style="margin:0"><div style="height:3000px;background:linear-gradient(red,blue)"></div>')}`
+  await dispatch({ type: 'open', url: long, where: 'tab' })
+  await expect.poll(async () => (await state()).spaces.flatMap((s) => s.today).find((t) => t.title === 'Long page')?.id).toBeTruthy()
+  const size = await app.evaluate(async ({ clipboard, nativeImage }) => {
+    const b = (globalThis as any).arcBrowser
+    const tab = b.activeTab()
+    clipboard.clear()
+    await b.canvases.capture(tab, { x: 0, y: 0, width: 10, height: 10 }, 'copy', true)
+    const png = await (await clipboard.read())[0].getType('image/png')
+    return { image: nativeImage.createFromBuffer(Buffer.from(await png.arrayBuffer())).getSize(), view: tab.view.getBounds(), attached: tab.wc.debugger.isAttached() }
+  })
+  expect(size.image.height).toBeGreaterThan(size.view.height)
+  expect(size.image.height / size.image.width).toBeGreaterThan(2)
+  expect(size.attached).toBe(false)
+  await dispatch({ type: 'close', id: (await space()).activeItemId! })
+})
