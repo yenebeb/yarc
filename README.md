@@ -181,7 +181,7 @@ Yes, including company SSO. Only sites that demand *managed* Google Chrome won't
 Google only lets Chrome use Chrome Sync, so use *Import from Chrome* once instead. Sync between your own computers is planned.
 
 **Why Electron?**
-It's real Chromium, so sites and Chrome extensions work as in Chrome, without a one-person project maintaining a fork. Memory use is about the same as Chrome's.
+It's real Chromium, so sites and Chrome extensions work as in Chrome, and Chromium's security fixes reach you within days, without a one-person project maintaining a fork. Per page it uses the same memory as Chrome: with 8 pages open, Chrome used 746 MB and YARC 844 MB, the difference being YARC's sidebar, panels and ad blocker. [Why Electron, and how we measured](docs/why-electron.md).
 
 **Do I need an ad-blocker extension?**
 No, blocking is built in. Manifest V3 blockers like uBlock Origin Lite can't block in Electron anyway.
