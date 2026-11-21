@@ -1,14 +1,16 @@
 name: release
 
-# Every merge to main is released. The version comes from git tags, not package.json:
-#   the next patch (v0.1.2 -> v0.1.3) by default;
-#   PR label `release:minor` / `release:major` for a bigger bump, `release:skip` (or
-#   "[skip release]" in the commit message) for none;
-#   none either when the merge only changes what isn't in the app: workflows, docs, tests, Markdown
-#   at the top level. It ships with the next release that changes the app.
-# The tag is created on the squashed commit, the three platforms build into a draft release,
+# main is released once a day (05:00 UTC) when something merged since the last release changes the
+# app, so users get at most one update a day. Released at once instead: a merge whose PR has the
+# label `release:now` (urgent fixes), Electron bumps (dependabot-automerge.yml starts this workflow),
+# and a manual run from the Actions tab.
+# The version comes from git tags, not package.json: the biggest bump the unreleased PRs ask for,
+# the next patch (v0.1.2 -> v0.1.3) by default, with PR labels `release:minor` / `release:major`.
+# A PR doesn't count towards a release with the label `release:skip`, "[skip release]" in its commit
+# message, or when it only changes what isn't in the app (workflows, docs, tests, Markdown at the
+# top level); it ships with the next release.
+# The tag is created on main's newest commit, the three platforms build into a draft release,
 # and the release is published once all of them succeed. A failed build leaves the draft.
-# Run it manually from the Actions tab to release main with a chosen bump.
 # Pull requests run it too, as a dry run: the same three builds, tests and packaging, without a
 # tag, a draft, signing secrets or an upload, so a change that would break the release fails on
 # the PR instead of after the merge.
@@ -20,14 +22,16 @@ name: release
 on:
   push:
     branches: [main]
+  schedule:
+    - cron: '0 5 * * *'
   pull_request:
   workflow_dispatch:
     inputs:
       bump:
-        description: Version bump
+        description: Version bump (auto = what the unreleased PRs ask for, nothing if none count)
         type: choice
-        options: [patch, minor, major]
-        default: patch
+        options: [auto, patch, minor, major]
+        default: auto
 
 permissions:
   contents: read
@@ -43,7 +47,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write # the tag and the draft release
-      pull-requests: read # labels of the merged PR
+      pull-requests: read # labels of the merged PRs
     outputs:
       version: ${{ steps.next.outputs.version }}
       changelog: ${{ steps.changelog.outputs.changelog }}
@@ -58,7 +62,6 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           EVENT: ${{ github.event_name }}
           INPUT_BUMP: ${{ inputs.bump }}
-          MESSAGE: ${{ github.event.head_commit.message }}
         run: |
           if [ "$EVENT" = "pull_request" ]; then
             echo "Dry run for a pull request: no tag, no draft."
@@ -74,29 +77,35 @@ jobs:
             exit 0
           fi
 
-          if [ "$EVENT" = "workflow_dispatch" ]; then
-            bump="$INPUT_BUMP"
-          else
-            labels=$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/pulls" --jq '[.[0].labels[]?.name] | join(",")' || true)
-            case ",$labels," in
-              *,release:skip,*) bump=skip ;;
-              *,release:major,*) bump=major ;;
-              *,release:minor,*) bump=minor ;;
-              *) bump=patch ;;
-            esac
-            case "$MESSAGE" in *"[skip release]"*) bump=skip ;; esac
+          latest=$(git tag -l 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -n1)
+          rank=0
+          now=false
+          for sha in $(git rev-list "${latest:+$latest..}HEAD"); do
+            labels=$(gh api "repos/$GITHUB_REPOSITORY/commits/$sha/pulls" --jq '[.[0].labels[]?.name] | join(",")' || true)
+            case ",$labels," in *,release:skip,*) continue ;; *,release:now,*) now=true ;; esac
+            case "$(git log -1 --format=%B "$sha")" in *"[skip release]"*) continue ;; esac
             # A squashed merge has one parent. Every changed path outside the app: nothing to release.
-            if [ "$bump" != skip ] && ! git diff --name-only HEAD^ HEAD | grep -qvE '^(\.github/|\.claude/|docs/|test/|[^/]+\.md$)'; then
-              echo "Only workflows, docs or tests changed."
-              bump=skip
-            fi
+            git diff --name-only "$sha^" "$sha" | grep -qvE '^(\.github/|\.claude/|docs/|test/|[^/]+\.md$)' || continue
+            case ",$labels," in
+              *,release:major,*) r=3 ;;
+              *,release:minor,*) r=2 ;;
+              *) r=1 ;;
+            esac
+            echo "$(git log -1 --format=%s "$sha") -> rank $r"
+            if [ "$r" -gt "$rank" ]; then rank=$r; fi
+          done
+          bump=$(echo "skip patch minor major" | cut -d' ' -f$((rank + 1)))
+          # Any unreleased release:now PR, not just this one: a newer run replaces a pending one.
+          if [ "$EVENT" = "push" ] && [ "$now" = false ]; then
+            echo "Ships with the next daily release; label a PR release:now to release it at once."
+            exit 0
           fi
+          if [ "$EVENT" = "workflow_dispatch" ] && [ "$INPUT_BUMP" != auto ]; then bump="$INPUT_BUMP"; fi
           if [ "$bump" = "skip" ]; then
-            echo "Not releasing this commit."
+            echo "Nothing since ${latest:-the start} changes the app: no release."
             exit 0
           fi
 
-          latest=$(git tag -l 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -n1)
           IFS=. read -r major minor patch <<< "${latest:-v0.0.0}"
           major=${major#v}
           case "$bump" in

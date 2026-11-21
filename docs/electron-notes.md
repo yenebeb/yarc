@@ -694,9 +694,10 @@ are what catch them.
    `ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION` and the auto-merge job gives up. Needs the repo
    setting `allow_auto_merge`.
 5. **Release**: GitHub starts no workflows for a push made with `GITHUB_TOKEN`, so the auto-merge
-   doesn't trigger `release.yml` on its own. The auto-merge job waits for the merge and then runs
-   `gh workflow run release.yml -f bump=patch` (dispatch is the exception to that rule). The
-   release builds Windows, macOS and Linux and publishes once all three pass. The Linux job also
+   doesn't trigger `release.yml` on its own. The auto-merge job labels the PR `release:now`, waits
+   for the merge and then runs `gh workflow run release.yml` (dispatch is the exception to that
+   rule), so an Electron bump doesn't wait for the daily release. The label also gets it released
+   by the next merge if a newer run replaces that pending one. The release builds Windows, macOS and Linux and publishes once all three pass. The Linux job also
    uploads `release.json` (`{ "electron": "<version>" }`).
 6. **Users**: installed copies check GitHub every hour (`CHECK_EVERY` in `src/main/updater.ts`).
    - Windows downloads the update in the background (electron-updater, `latest.yml`), checks the

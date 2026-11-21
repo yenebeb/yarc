@@ -27,9 +27,9 @@ pnpm dev             # start with hot reload
 
 ## Releasing
 
-Releases are automatic: every pull request merged into `main` becomes a release.
+Releases are automatic, once a day: at 05:00 UTC, `main` is released if anything merged since the last release changes the app, so users get at most one update a day. Label a PR `release:now` to release it as soon as it merges (an urgent fix); Electron bumps are released at once too (below).
 
-1. The [release workflow](../.github/workflows/release.yml) tags the squashed commit with the next version: a patch bump by default (`v0.1.2` → `v0.1.3`). Add the PR label `release:minor` or `release:major` for a bigger bump, or `release:skip` (or put `[skip release]` in the commit message) to not release.
+1. The [release workflow](../.github/workflows/release.yml) tags `main`'s newest commit with the next version: the biggest bump the unreleased PRs ask for, a patch by default (`v0.1.2` → `v0.1.3`), or a minor or major with the PR label `release:minor` or `release:major`. A PR labeled `release:skip` (or with `[skip release]` in its commit message), or one that only changes workflows, docs, tests or top-level Markdown, doesn't count towards a release and ships with the next one.
 2. It builds Windows, macOS and Linux from that tag and uploads them to the release, with a `release.json` that names the Electron version, so installed copies can tell a security update from a normal one.
 3. Once all three builds succeed, the release is published. If one fails, the release stays a draft.
 
@@ -37,7 +37,7 @@ So a release can't break unnoticed after a merge, every pull request runs the sa
 
 Each PR's `## What's New` section is also the app's **What's New**: before the builds, [`scripts/changelog.mjs`](../scripts/changelog.mjs) collects those lines from the PRs merged for each release tag into `build/changelog.json`, which the build bakes into the app, so it shows offline. Dependabot PRs, PRs labeled `release:skip` and `none` lines are left out. Local builds have an empty changelog; run `node scripts/changelog.mjs` (needs `gh`) to build one.
 
-The version lives in git tags; `package.json` says `0.0.0-dev` and CI stamps the tag's version into it at build time. To release by hand, run the workflow from the Actions tab and pick the bump.
+The version lives in git tags; `package.json` says `0.0.0-dev` and CI stamps the tag's version into it at build time. To release by hand, run the workflow from the Actions tab: `auto` takes the bump from the unreleased PRs (and releases nothing if none counts), or pick one.
 
 Installed copies only see published releases: Windows downloads the update via `latest.yml` and checks the installer's `.sig`, macOS downloads the `-mac.zip` and checks its `.sig`, and Linux gets a notice that links to the new `.AppImage`.
 
@@ -48,7 +48,7 @@ The macOS zips and the Windows installers are signed with an Ed25519 key, and th
 Chromium and V8 security fixes reach YARC only through a newer Electron, so they ship without waiting for anyone:
 
 1. [Dependabot](../.github/dependabot.yml) checks npm daily and opens a PR once a new Electron version has been out for a day.
-2. If that PR is a **patch** or **minor** bump, [dependabot-automerge](../.github/workflows/dependabot-automerge.yml) merges it once CI passes and starts the release workflow. Other Dependabot patch and minor bumps merge the same way but get the `release:skip` label and no release of their own: they ship with the next real change, so users aren't asked to update for a dev dependency. Majors wait for a person. Every package, Electron included, is only proposed once a version has been out for a day (Dependabot's cooldown), so a hijacked release is usually pulled before it reaches YARC.
+2. If that PR is a **patch** or **minor** bump, [dependabot-automerge](../.github/workflows/dependabot-automerge.yml) labels it `release:now`, merges it once CI passes and starts the release workflow. Other Dependabot patch and minor bumps merge the same way but get the `release:skip` label and no release of their own: they ship with the next real change, so users aren't asked to update for a dev dependency. Majors wait for a person. Every package, Electron included, is only proposed once a version has been out for a day (Dependabot's cooldown), so a hijacked release is usually pulled before it reaches YARC.
 3. Installed copies find the release within the hour. Windows and macOS download it and show *Restart to Update* in the sidebar; because the release's Electron differs from the running one, they ask with the relaunch card if there's no restart within a day. Linux shows *Update Available* with the download.
 
 Details and gaps are in [docs/electron-notes.md](electron-notes.md#6-security-updates-from-an-electron-release-to-users).

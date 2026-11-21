@@ -1,8 +1,8 @@
 name: dependabot-automerge
 
-# Dependabot's patch and minor bumps merge as soon as the `check` CI job passes. Electron's are
-# released right away: they carry Chromium and V8 security fixes, so they shouldn't wait for
-# someone to notice. The others get the `release:skip` label and no release of their own, so users
+# Dependabot's patch and minor bumps merge as soon as the `check` CI job passes. Electron's get the
+# `release:now` label and are released right away, not with the daily release: they carry Chromium
+# and V8 security fixes. The others get the `release:skip` label and no release of their own, so users
 # aren't asked to update for a dev dependency; they ship with the next release of a real change.
 # Majors wait for a person: CI doesn't run the e2e tests, and a major can break the app at runtime.
 # Supply-chain risk is limited by Dependabot's cooldown (.github/dependabot.yml): a new version of
@@ -38,10 +38,9 @@ jobs:
             *,electron,*) electron=true ;;
             *) electron=false ;;
           esac
-          if [ "$electron" = false ]; then
-            # For release.yml if someone merges it by hand: the auto-merge's push starts no workflows.
-            gh api -X POST "repos/$GH_REPO/issues/$PR/labels" -f 'labels[]=release:skip' > /dev/null
-          fi
+          # For release.yml if someone merges it by hand, or when its run below is replaced by a newer one.
+          if [ "$electron" = true ]; then label=release:now; else label=release:skip; fi
+          gh api -X POST "repos/$GH_REPO/issues/$PR/labels" -f "labels[]=$label" > /dev/null
           # Squash: main takes only linear history and signed commits, and GitHub signs a squash.
           gh pr merge "$PR" --auto --squash
           if [ "$electron" = false ]; then
@@ -52,7 +51,7 @@ jobs:
           # trigger release.yml: wait for it, then start the release by hand (dispatch is allowed).
           for _ in $(seq 100); do
             case "$(gh pr view "$PR" --json state --jq .state)" in
-              MERGED) exec gh workflow run release.yml --ref main -f bump=patch ;;
+              MERGED) exec gh workflow run release.yml --ref main ;;
               CLOSED) echo "PR $PR was closed without merging."; exit 0 ;;
             esac
             sleep 30
