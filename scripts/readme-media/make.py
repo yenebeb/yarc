@@ -34,16 +34,21 @@ def gif(name, out):
         previous = im
     # One palette for every frame, so colours don't flicker between them.
     keys = images[:: max(1, len(images) // 8)]
-    mosaic = Image.new('RGB', (WIDTH, keys[0].height * len(keys)))
+    mosaic = Image.new('RGB', (WIDTH, keys[0].height * (len(keys) + 1)))
     for i, k in enumerate(keys):
         mosaic.paste(k, (0, i * k.height))
+    # The traffic lights are a few pixels; without extra weight the palette has no red or green for them.
+    corner = images[0].crop((0, 0, 90, 30))
+    for x in range(0, WIDTH, 90):
+        for y in range(len(keys) * keys[0].height, mosaic.height, 30):
+            mosaic.paste(corner, (x, y))
     palette = mosaic.quantize(colors=255, method=Image.Quantize.MEDIANCUT)
     frames = [i.quantize(palette=palette, dither=Image.Dither.NONE) for i in images]
     frames[0].save(out, save_all=True, append_images=frames[1:], duration=durations, loop=0, optimize=True, disposal=1)
 
 
 def png(im, out):
-    im.quantize(colors=256, method=Image.Quantize.FASTOCTREE if im.mode == 'RGBA' else Image.Quantize.MEDIANCUT).save(out, optimize=True)
+    im.save(out, optimize=True)
 
 
 def floating_player(out):

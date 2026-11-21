@@ -9,7 +9,7 @@ Arc shuts down on 22 December 2026. YARC keeps the sidebar, Spaces, the command 
 macOS · Windows · Linux (experimental)<br>
 <sub>An independent project, not affiliated with The Browser Company.</sub></p>
 
-![YARC's sidebar with favorites, a pinned tab, a canvas and Today tabs](docs/screenshots/sidebar.png)
+![YARC: the sidebar with favorites and tabs, next to a canvas of cards captured from web pages](docs/screenshots/sidebar.png)
 
 ## Contents
 

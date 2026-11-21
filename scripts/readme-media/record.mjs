@@ -81,6 +81,10 @@ async function setUp(s) {
   await s.dispatch({ type: 'addFavorite', id: (await s.item('clock')).id })
   await open('huestudio.test', 'palette')
   await s.dispatch({ type: 'addFavorite', id: (await s.item('palette')).id })
+  for (const [host, page] of [['mailbox.test', 'mail'], ['tunes.test', 'music']]) {
+    await open(host, page)
+    await s.dispatch({ type: 'addFavorite', id: (await s.item(page)).id })
+  }
   await open('trailhead.test', 'photo')
   await s.dispatch({ type: 'togglePin', id: (await s.item('photo')).id })
   await open('tally.test', 'chart')
@@ -121,11 +125,39 @@ const click = (s, target, p) =>
     }
   }, [target, p])
 
+/** Captures the demo cards onto the canvas, opens it and lays the cards out two by two. */
+async function board(s, canvasId, fragments) {
+  for (const fragment of fragments) {
+    await s.ev(async (_e, [id, canvasId, code]) => {
+      const b = globalThis.arcBrowser
+      const tab = b.live.get(id)
+      await b.canvases.capture(tab, await tab.wc.executeJavaScript(code), canvasId)
+    }, [(await s.item(fragment)).id, canvasId, CARD])
+  }
+  await s.dispatch({ type: 'activate', id: canvasId })
+  await sleep(1800)
+  await s.ev((_e, canvasId) => {
+    const b = globalThis.arcBrowser
+    const files = b.canvases.files(canvasId)
+    const scene = files.readScene()
+    const order = ['Skyline', 'Hue Studio', 'Trailhead', 'Hourly']
+    const cards = scene.items.filter((i) => i.kind === 'capture').sort((a, c) => order.findIndex((o) => a.source.title.includes(o)) - order.findIndex((o) => c.source.title.includes(o)))
+    const width = Math.max(cards[0].width, cards[2].width) + 40
+    const height = Math.max(cards[0].height, cards[1].height) + 40
+    cards.forEach((c, i) => Object.assign(c, { x: (i % 2) * width, y: Math.floor(i / 2) * height }))
+    const title = scene.items.find((i) => i.kind === 'text')
+    Object.assign(title, { x: 0, y: -title.height - 24 })
+    delete scene.view
+    files.writeScene(scene)
+    b.canvases.page(canvasId).wc.reload()
+  }, canvasId)
+  await sleep(2000)
+}
+
 const flows = {
   async hero(s) {
-    await s.ev(() => globalThis.arcBrowser.canvases.create(globalThis.arcBrowser.space, 'Lisbon trip'))
-    await s.dispatch({ type: 'activate', id: (await s.item('weather')).id })
-    await sleep(1200)
+    const canvasId = await s.ev(() => globalThis.arcBrowser.canvases.create(globalThis.arcBrowser.space, 'Lisbon trip').id)
+    await board(s, canvasId, ['weather', 'palette', 'photo', 'clock'])
     await s.frame('hero', 1000)
   },
 
@@ -239,31 +271,7 @@ const flows = {
     await click(s, {}, target.local)
     await sleep(900)
     await s.frame('added', 900, [target.x, target.y])
-    for (const fragment of ['palette', 'photo', 'clock']) {
-      await s.ev(async (_e, [id, canvasId, code]) => {
-        const b = globalThis.arcBrowser
-        const tab = b.live.get(id)
-        await b.canvases.capture(tab, await tab.wc.executeJavaScript(code), canvasId)
-      }, [(await s.item(fragment)).id, canvasId, CARD])
-    }
-    await s.dispatch({ type: 'activate', id: canvasId })
-    await sleep(1800)
-    await s.ev((_e, canvasId) => {
-      const b = globalThis.arcBrowser
-      const files = b.canvases.files(canvasId)
-      const scene = files.readScene()
-      const order = ['Skyline', 'Hue Studio', 'Trailhead', 'Hourly']
-      const cards = scene.items.filter((i) => i.kind === 'capture').sort((a, c) => order.findIndex((o) => a.source.title.includes(o)) - order.findIndex((o) => c.source.title.includes(o)))
-      const width = Math.max(cards[0].width, cards[2].width) + 40
-      const height = Math.max(cards[0].height, cards[1].height) + 40
-      cards.forEach((c, i) => Object.assign(c, { x: (i % 2) * width, y: Math.floor(i / 2) * height }))
-      const title = scene.items.find((i) => i.kind === 'text')
-      Object.assign(title, { x: 0, y: -title.height - 24 })
-      delete scene.view
-      files.writeScene(scene)
-      b.canvases.page(canvasId).wc.reload()
-    }, canvasId)
-    await sleep(2000)
+    await board(s, canvasId, ['palette', 'photo', 'clock'])
     const clock = await s.ev(async (_e, canvasId) => {
       const p = globalThis.arcBrowser.canvases.page(canvasId)
       const r = await p.wc.executeJavaScript(`(() => { const r = [...document.querySelectorAll('.card')].find((c) => c.textContent.includes('Hourly')).getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 } })()`)
