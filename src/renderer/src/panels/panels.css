@@ -350,7 +350,8 @@
   backdrop-filter: blur(6px);
 }
 
-.intro {
+/* .panel.intro: styles.css's .panel (translateX only) mustn't win whichever stylesheet loads last. */
+.panel.intro {
   top: 50%;
   transform: translate(-50%, -50%);
   width: min(560px, calc(100vw - 48px));
@@ -488,6 +489,113 @@
 
 .intro .release li + li {
   margin-top: 4px;
+}
+
+/* Feature spotlights: a picture across the top of the card, then what the feature is. */
+.intro.whats-new.spotlit {
+  width: min(520px, calc(100vw - 48px));
+  overflow: hidden;
+}
+
+.spotlight-picture {
+  position: relative;
+  height: 220px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background:
+    radial-gradient(90% 120% at 50% 0%, color-mix(in oklab, var(--space) 60%, transparent), transparent 75%),
+    linear-gradient(180deg, color-mix(in oklab, var(--space) 26%, var(--panel)), var(--panel));
+}
+
+.spotlight-picture > .logo {
+  width: 84px;
+  height: 84px;
+  filter: drop-shadow(0 8px 18px rgb(20 10 40 / 0.28));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spotlight-picture *,
+  .spotlight-picture *::before,
+  .spotlight-picture *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+.spotlight-text {
+  padding: 20px 32px 6px;
+  text-align: center;
+}
+
+.spotlight-text .eyebrow {
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.spotlight-text h1 {
+  margin: 4px 0 0;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.spotlight-text p {
+  max-width: 420px;
+  margin: 8px auto 0;
+  color: var(--text-2);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.spotlight-text .intro-buttons {
+  margin-top: 10px;
+}
+
+/* MiniWindow (spotlight-pictures.tsx): a small YARC window to draw a feature in. */
+.mini-window {
+  position: relative;
+  width: 300px;
+  height: 168px;
+  display: flex;
+  gap: 6px;
+  padding: 6px;
+  border-radius: 10px;
+  background: color-mix(in oklab, var(--space) 22%, var(--panel));
+  box-shadow:
+    0 0 0 1px var(--line),
+    0 12px 30px rgb(20 10 40 / 0.22);
+}
+
+.mini-sidebar {
+  width: 64px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 16px 2px 0;
+}
+
+.mini-sidebar i {
+  height: 9px;
+  border-radius: 3px;
+  background: color-mix(in oklab, var(--text) 10%, transparent);
+}
+
+.mini-sidebar i.on {
+  background: color-mix(in oklab, var(--text) 24%, transparent);
+}
+
+.mini-page {
+  position: relative;
+  flex: 1;
+  overflow: hidden;
+  border-radius: 6px;
+  background: var(--panel);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.08);
 }
 
 /* The relaunch card: a long list of updates scrolls, the buttons stay put. */

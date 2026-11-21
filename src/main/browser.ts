@@ -50,6 +50,7 @@ import { isFloating, stepAfter, type TourEvent, type TourStep } from '../shared/
 import { resolveInput, SEARCH_ENGINES } from '../shared/url'
 import { PERMISSION_KEYS, permissionOrigin, siteName } from '../shared/permissions'
 import { AdBlock, hostOf } from './adblock'
+import { recentSpotlights, SPOTLIGHTS, unseenSpotlights } from '../shared/spotlights'
 import { recentChanges, startupScreen, type Changelog } from './changelog'
 import { openInChrome } from './chrome'
 import { DownloadBurst, isDangerous, markFromInternet } from './downloads'
@@ -244,15 +245,18 @@ export class Browser implements TabHost {
   }
 
   /**
-   * The welcome screen on a first run, What's New on the first launch after an update. Never in
-   * incognito windows (start() returns before this) and, so e2e tests see a plain window, not under
-   * YARC_TEST unless YARC_STARTUP_SCREENS is set too.
+   * The welcome screen on a first run, What's New on the first launch after an update or with
+   * feature spotlights not seen yet. Never in incognito windows (start() returns before this) and,
+   * so e2e tests see a plain window, not under YARC_TEST unless YARC_STARTUP_SCREENS is set too.
+   * Spotlights count as seen once shown, and a first run sees them all: the tour covers the basics.
    */
   private showStartupScreen(): void {
     const current = app.getVersion()
-    const intro = startupScreen(this.store.firstRun, this.state.lastSeenVersion, current, CHANGELOG)
-    if (this.state.lastSeenVersion !== current) {
+    const unseen = unseenSpotlights(SPOTLIGHTS, this.state.seenSpotlights)
+    const intro = startupScreen(this.store.firstRun, this.state.lastSeenVersion, current, CHANGELOG, unseen)
+    if (this.state.lastSeenVersion !== current || unseen.length) {
       this.state.lastSeenVersion = current
+      this.state.seenSpotlights = [...new Set([...(this.state.seenSpotlights ?? []), ...unseen])]
       this.changed()
     }
     if (intro.kind === 'none' || (process.env.YARC_TEST && !process.env.YARC_STARTUP_SCREENS)) return
@@ -1646,7 +1650,7 @@ export class Browser implements TabHost {
       case 'tour':
         return this.setOverlay({ kind: 'tour', step: 'welcome' })
       case 'whatsNew':
-        return this.setOverlay({ kind: 'whats-new', releases: recentChanges(CHANGELOG, app.getVersion()) })
+        return this.setOverlay({ kind: 'whats-new', releases: recentChanges(CHANGELOG, app.getVersion()), spotlights: recentSpotlights(SPOTLIGHTS) })
     }
   }
 

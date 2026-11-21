@@ -70,6 +70,7 @@ export function normalize(raw: Partial<PersistedState>): PersistedState {
     archive: raw.archive ?? [],
     littleArc: { size: raw.littleArc?.size, profileByHost: raw.littleArc?.profileByHost ?? {} },
     lastSeenVersion: raw.lastSeenVersion,
+    seenSpotlights: Array.isArray(raw.seenSpotlights) ? raw.seenSpotlights.filter((id) => typeof id === 'string') : undefined,
     waitingUpdate: raw.waitingUpdate,
     windows: (raw.windows ?? []).filter((w) => w && typeof w.id === 'string').map((w) => ({ ...w, selected: w.selected ?? {}, splits: w.splits ?? {} }))
   }

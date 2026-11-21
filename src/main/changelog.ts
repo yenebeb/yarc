@@ -32,15 +32,16 @@ export function recentChanges(changelog: Changelog, current: string, count = REC
   return notes(changelog, (v) => compareVersions(v, current) <= 0).slice(0, count)
 }
 
-export type StartupScreen = { kind: 'none' } | { kind: 'welcome' } | { kind: 'whats-new'; releases: ReleaseNotes[] }
+export type StartupScreen = { kind: 'none' } | { kind: 'welcome' } | { kind: 'whats-new'; releases: ReleaseNotes[]; spotlights: string[] }
 
 /**
- * What a launch shows: the welcome screen on a first run (no state.json yet), What's New on the
- * first launch of a newer version, else nothing. `lastSeen` is the version the user last ran.
+ * What a launch shows: the welcome screen on a first run (no state.json yet); What's New when there
+ * are spotlights the user hasn't seen (`unseen`, src/shared/spotlights.ts) or on the first launch
+ * of a newer version with changes; else nothing. `lastSeen` is the version the user last ran.
  */
-export function startupScreen(firstRun: boolean, lastSeen: string | undefined, current: string, changelog: Changelog): StartupScreen {
+export function startupScreen(firstRun: boolean, lastSeen: string | undefined, current: string, changelog: Changelog, unseen: string[] = []): StartupScreen {
   if (firstRun) return { kind: 'welcome' }
-  if (lastSeen && compareVersions(current, lastSeen) <= 0) return { kind: 'none' }
-  const releases = changesSince(changelog, lastSeen, current)
-  return releases.length ? { kind: 'whats-new', releases } : { kind: 'none' }
+  const newer = !lastSeen || compareVersions(current, lastSeen) > 0
+  const releases = newer ? changesSince(changelog, lastSeen, current) : []
+  return releases.length || unseen.length ? { kind: 'whats-new', releases, spotlights: unseen } : { kind: 'none' }
 }

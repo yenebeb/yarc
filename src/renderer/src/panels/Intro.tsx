@@ -1,15 +1,18 @@
 // The tour (first run, or Take the Tour) and What's New (first launch after an update, or from the
 // menu and command bar). The tour's setup steps and What's New are cards over the dimmed window;
-// the tour's try-it steps float over the page so the user can do what they describe.
-import { useEffect, useRef, type ReactNode } from 'react'
+// the tour's try-it steps float over the page so the user can do what they describe. What's New
+// opens with feature spotlights, one large card each, before the list of changes.
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import logo from '../../../../build/icon.svg'
 import { bindingLabel, type CommandId } from '../../../shared/keymap'
+import { spotlight, type Spotlight } from '../../../shared/spotlights'
 import { isFloating, nextStep, previousStep, TOUR_STEPS, tryEvent, type TourStep } from '../../../shared/tour'
 import { spaceItems } from '../../../shared/tree'
 import type { AppState, ReleaseNotes, UpdateStatus } from '../../../shared/types'
 import { activeSpace, dispatch, isMac } from '../api'
 import { Icon } from '../icons'
 import './panels.css'
+import { SpotlightPicture } from './spotlight-pictures'
 
 const key = (id: CommandId) => <kbd className="kbd">{bindingLabel(id, isMac)}</kbd>
 
@@ -285,12 +288,82 @@ export function UpdateReady({ update, close }: { update: UpdateStatus; close: ()
   )
 }
 
-export function WhatsNew({ releases, close }: { releases: ReleaseNotes[]; close: () => void }) {
+/**
+ * What's New: a page per feature spotlight (`spotlights`, ids), then the list of changes per version.
+ * After an update the list comes last as "Also in this update"; without spotlights it's the only page.
+ */
+export function WhatsNew({ releases, spotlights, close }: { releases: ReleaseNotes[]; spotlights: string[]; close: () => void }) {
+  const cards = spotlights.flatMap((id) => spotlight(id) ?? [])
+  // The list is a page of its own unless spotlights are all there is.
+  const pages = cards.length + (releases.length || !cards.length ? 1 : 0)
+  const [page, setPage] = useState(0)
+  const primary = useRef<HTMLButtonElement>(null)
+  useEffect(() => primary.current?.focus(), [page])
+  const last = page === pages - 1
+  const card: Spotlight | undefined = cards[page]
+  const turn = (to: number) => setPage(Math.max(0, Math.min(pages - 1, to)))
+
   return (
-    <div className="panel intro whats-new" onMouseDown={(e) => e.stopPropagation()}>
+    <div
+      className={`panel intro whats-new${card ? ' spotlit' : ''}`}
+      onMouseDown={(e) => e.stopPropagation()}
+      onKeyDown={(e) => {
+        if (e.key === 'ArrowRight') turn(page + 1)
+        else if (e.key === 'ArrowLeft') turn(page - 1)
+      }}
+    >
+      {card ? <SpotlightCard key={card.id} card={card} /> : <ReleaseList releases={releases} title={cards.length ? 'Also in this update' : "What's New"} />}
+      <footer className="intro-footer">
+        {page > 0 ? (
+          <button className="btn ghost" onClick={() => turn(page - 1)}>
+            Back
+          </button>
+        ) : null}
+        <span className="spacer" />
+        {pages > 1 ? (
+          <span className="tour-dots" aria-label={`Page ${page + 1} of ${pages}`}>
+            {Array.from({ length: pages }, (_, i) => (
+              <i key={i} className={i === page ? 'on' : i < page ? 'done' : ''} />
+            ))}
+          </span>
+        ) : null}
+        <span className="spacer" />
+        <button ref={primary} className="btn primary" onClick={last ? close : () => turn(page + 1)}>
+          {last ? 'Continue' : 'Next'}
+        </button>
+      </footer>
+    </div>
+  )
+}
+
+function SpotlightCard({ card }: { card: Spotlight }) {
+  return (
+    <>
+      <SpotlightPicture id={card.id} />
+      <div className="spotlight-text">
+        <span className="eyebrow">New in YARC</span>
+        <h1>{card.title}</h1>
+        <p>{card.text}</p>
+        {card.actions?.length ? (
+          <div className="intro-buttons centered">
+            {card.actions.map((a) => (
+              <button key={a.command} className="btn" onClick={() => dispatch({ type: 'command', id: a.command })}>
+                {a.label}
+              </button>
+            ))}
+          </div>
+        ) : null}
+      </div>
+    </>
+  )
+}
+
+function ReleaseList({ releases, title }: { releases: ReleaseNotes[]; title: string }) {
+  return (
+    <>
       <div className="intro-hero compact">
         <img className="logo" src={logo} alt="" />
-        <h1>What's New</h1>
+        <h1>{title}</h1>
         {releases.length ? <p>YARC {releases[0].version}</p> : null}
       </div>
       <div className="intro-body">
@@ -309,12 +382,6 @@ export function WhatsNew({ releases, close }: { releases: ReleaseNotes[]; close:
           <p className="muted">This build has no release notes. Releases from GitHub list their changes here.</p>
         )}
       </div>
-      <footer className="intro-footer">
-        <span className="spacer" />
-        <button className="btn primary" onClick={close}>
-          Continue
-        </button>
-      </footer>
-    </div>
+    </>
   )
 }

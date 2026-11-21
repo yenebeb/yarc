@@ -126,6 +126,8 @@ export interface PersistedState {
   littleArc: LittleArcMemory
   /** The YARC version that last ran with this state, so the next newer one shows What's New. */
   lastSeenVersion?: string
+  /** The feature spotlights this profile has seen in What's New (src/shared/spotlights.ts). */
+  seenSpotlights?: string[]
   /** A downloaded update the user hasn't restarted into yet (src/main/update-escalation.ts). */
   waitingUpdate?: WaitingUpdate
   /** The open main windows (the last focused one last), restored at launch. */
@@ -288,8 +290,11 @@ export type OverlayMode =
   | { kind: 'split-drop' }
   /** The tour: first run, or Take the Tour. Try-it steps float over the page (shared/tour.ts). */
   | { kind: 'tour'; step: TourStep }
-  /** The changes in the versions since the user's last one, newest first. */
-  | { kind: 'whats-new'; releases: ReleaseNotes[] }
+  /**
+   * Feature spotlights (ids, src/shared/spotlights.ts) as large cards, then the changes in the
+   * versions since the user's last one, newest first.
+   */
+  | { kind: 'whats-new'; releases: ReleaseNotes[]; spotlights: string[] }
   | { kind: 'update' }
 
 export interface SearchResult {

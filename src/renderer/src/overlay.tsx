@@ -118,7 +118,7 @@ function App() {
       return (
         <>
           <div className="scrim intro-scrim" onMouseDown={close} />
-          <WhatsNew key={key} releases={mode.releases} close={close} />
+          <WhatsNew key={key} releases={mode.releases} spotlights={mode.spotlights} close={close} />
         </>
       )
   }

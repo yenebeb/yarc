@@ -80,7 +80,7 @@ describe('A launch shows the welcome screen, What\'s New or nothing', () => {
 
   test('an existing profile updating to the first version that remembers: What\'s New for that version', () => {
     const screen = startupScreen(false, undefined, '0.1.13', changelog)
-    assert.deepEqual(screen, { kind: 'whats-new', releases: [{ version: '0.1.13', changes: ['Add incognito windows'] }] })
+    assert.deepEqual(screen, { kind: 'whats-new', releases: [{ version: '0.1.13', changes: ['Add incognito windows'] }], spotlights: [] })
   })
 
   test('same version as last time: nothing', () => {
@@ -93,5 +93,24 @@ describe('A launch shows the welcome screen, What\'s New or nothing', () => {
 
   test('an update with no listed changes (only Dependabot bumps): nothing', () => {
     assert.deepEqual(startupScreen(false, '0.1.10', '0.1.12', changelog), { kind: 'none' })
+  })
+})
+
+describe("Spotlights the user hasn't seen open What's New", () => {
+  test('first run: the welcome screen, even with spotlights', () => {
+    assert.deepEqual(startupScreen(true, undefined, '0.1.13', changelog, ['floating-player']), { kind: 'welcome' })
+  })
+
+  test('after an update: the spotlights, then that update\'s changes', () => {
+    const screen = startupScreen(false, '0.1.10', '0.1.13', changelog, ['floating-player'])
+    assert.deepEqual(screen, { kind: 'whats-new', spotlights: ['floating-player'], releases: [{ version: '0.1.13', changes: ['Add incognito windows'] }] })
+  })
+
+  test('an update whose changes are all "none" still shows its spotlights', () => {
+    assert.deepEqual(startupScreen(false, '0.1.10', '0.1.12', changelog, ['floating-player']), { kind: 'whats-new', spotlights: ['floating-player'], releases: [] })
+  })
+
+  test('the same version as last time (a local build): only the spotlights', () => {
+    assert.deepEqual(startupScreen(false, '0.1.13', '0.1.13', changelog, ['floating-player']), { kind: 'whats-new', spotlights: ['floating-player'], releases: [] })
   })
 })
