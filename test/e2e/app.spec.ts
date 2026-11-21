@@ -650,19 +650,29 @@ test('built-in ad blocking blocks ad requests and can be turned off per site', a
   expect((await state()).settings.adblockAllowlist).not.toContain('127.0.0.1')
 })
 
-test('ad block scriptlets run while the page still loads, and one that throws is caught', async () => {
+// Shaped like Ghostery's: helpers declared at top level, keeping state on the function, wrapping Function.prototype.toString.
+const SCRIPTLET = `class Helper {}
+function wrapToString() {
+  if (wrapToString.native) return
+  wrapToString.native = Function.prototype.toString
+  Function.prototype.toString = new Proxy(wrapToString.native, { apply: (_, self) => wrapToString.native.call(self) })
+}
+wrapToString()
+window.scriptlets = (window.scriptlets ?? 0) + 1`
+
+test('ad block scriptlets run while the page still loads, each in its own scope, and one that throws is caught', async () => {
   test.setTimeout(90_000)
   await expect.poll(() => app.evaluate(() => !!(globalThis as any).arcBrowser.adblock.engine), { timeout: 60_000 }).toBe(true)
-  await app.evaluate(() => {
+  await app.evaluate((_e, scriptlet) => {
     const engine = (globalThis as any).arcBrowser.adblock.engine
     const original = engine.getCosmeticsFilters
     engine.restoreForTest = () => (engine.getCosmeticsFilters = original)
     engine.getCosmeticsFilters = function (request: { url: string; getInjectionRules: boolean }) {
       const result = original.call(this, request)
       if (!request.url.includes('/still-loading') || !request.getInjectionRules) return result
-      return { ...result, scripts: [...Array(12).fill('window.scriptlets = (window.scriptlets ?? 0) + 1'), 'throw new Error("scriptlet")'] }
+      return { ...result, scripts: [...Array(12).fill(scriptlet), 'throw new Error("scriptlet")'] }
     }
-  })
+  }, SCRIPTLET)
   try {
     await dispatch({ type: 'open', url: `${base}/still-loading`, where: 'tab' })
     const ran = () =>
@@ -672,6 +682,7 @@ test('ad block scriptlets run while the page still loads, and one that throws is
       })
     await expect.poll(async () => (await ran()).count).toBe(12)
     expect((await ran()).loading).toBe(true)
+    expect(await app.evaluate(() => (globalThis as any).arcBrowser.activeTab().wc.mainFrame.executeJavaScript('Function.prototype.toString.call(alert)'))).toContain('[native code]')
     const log = readFileSync(join(userData, 'logs', 'main.log'), 'utf8')
     expect(log).not.toContain('Script failed to execute')
     expect(log).not.toContain('MaxListenersExceededWarning')

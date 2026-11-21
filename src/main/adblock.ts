@@ -142,9 +142,14 @@ function inAskingFrame(e: IpcMainInvokeEvent) {
     processId: e.processId,
     sender: {
       insertCSS: (css: string, options: InsertCSSOptions) => e.sender.insertCSS(css, options),
-      executeJavaScript: (code: string) => e.senderFrame?.executeJavaScript(code).catch(() => {})
+      executeJavaScript: (code: string) => e.senderFrame?.executeJavaScript(inOwnBlock(code)).catch(() => {})
     }
   }
+}
+
+// As Ghostery's content script does: at top level each scriptlet's helpers (proxyApplyFn, JSONPath) would overwrite the previous one's, and two Function.prototype.toString proxies then call each other forever.
+export function inOwnBlock(scriptlet: string): string {
+  return `{\n${scriptlet}\n}`
 }
 
 export function hostOf(url: string): string {
