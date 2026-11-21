@@ -1,4 +1,4 @@
-import type { ID, Rect, SplitGroup, SplitNode, SplitPane } from './types'
+import type { ID, PinnedNode, Rect, Space, Split, SplitGroup, SplitNode, SplitPane } from './types'
 
 export const MAX_PANES = 4
 export const SPLIT_GAP = 6
@@ -118,6 +118,36 @@ export function appendPane(root: SplitGroup, added: ID): SplitGroup | undefined 
   return { dir: 'row', children: [root, { itemId: added }], sizes: [0.5, 0.5] }
 }
 
+export function splitOf(splits: Split[], id: ID): Split | undefined {
+  return splits.find((sp) => paneIds(sp.root).includes(id))
+}
+
+export function removeFromSplits(splits: Split[], id: ID, keep?: Split): Split[] {
+  return splits.flatMap((sp) => {
+    if (sp === keep || !paneIds(sp.root).includes(id)) return [sp]
+    const root = removePane(sp.root, id)
+    return root ? [{ ...sp, root }] : []
+  })
+}
+
+/** Right of `target`, in its split or a new one; `added` is left out of a full split. */
+export function appendPaneIn(splits: Split[], target: ID, added: ID, newId: ID): Split[] {
+  const rest = removeFromSplits(splits, added)
+  const split = splitOf(rest, target)
+  if (!split) return [...rest, { id: newId, root: newSplitRoot(target, added, 'right') }]
+  const root = appendPane(split.root, added)
+  return root ? rest.map((sp) => (sp === split ? { ...sp, root } : sp)) : rest
+}
+
+/** Undefined when `target`'s split is full. */
+export function placePaneIn(splits: Split[], target: ID, added: ID, side: Side, newId: ID): Split[] | undefined {
+  const split = splitOf(splits, target)
+  const root = placePane(split?.root, target, added, side)
+  if (!root) return undefined
+  const rest = removeFromSplits(splits, added, split)
+  return split ? rest.map((sp) => (sp === split ? { ...sp, root } : sp)) : [...rest, { id: newId, root }]
+}
+
 function cut(rect: Rect, dir: SplitGroup['dir'], sizes: number[], gap: number): Rect[] {
   const row = dir === 'row'
   const length = row ? rect.width : rect.height
@@ -231,6 +261,13 @@ export function parentOf(root: SplitGroup, id: ID): { group: SplitGroup; index: 
   return visit(root, [])
 }
 
+/** Undefined when `sizes` don't match the group's children. */
+export function resizeGroup(root: SplitGroup, path: number[], sizes: number[]): SplitGroup | undefined {
+  if (sizes.length !== groupAt(root, path)?.children.length) return undefined
+  const sum = sizes.reduce((x, y) => x + y, 0)
+  return updateGroup(root, path, (g) => ({ ...g, sizes: sizes.map((x) => Math.max(0.1, x / sum)) }))
+}
+
 function updateGroup(root: SplitGroup, path: number[], change: (g: SplitGroup) => SplitGroup): SplitGroup {
   if (path.length === 0) return change(root)
   const [i, ...rest] = path
@@ -285,6 +322,13 @@ export function gather<T extends { id: ID }>(list: T[], ids: ID[]): T[] {
     else if (x === members[0]) out.push(...members)
   }
   return out
+}
+
+export function gatherSplit(space: Pick<Space, 'today' | 'pinned' | 'splits'>, id: ID): Pick<Space, 'today' | 'pinned'> {
+  const split = splitOf(space.splits, id)
+  const ids = split ? paneIds(split.root) : []
+  const inFolders = (list: PinnedNode[]): PinnedNode[] => gather(list, ids).map((n) => (n.kind === 'folder' ? { ...n, children: inFolders(n.children) } : n))
+  return { today: gather(space.today, ids), pinned: inFolders(space.pinned) }
 }
 
 /** Reads a split saved by an older version (`itemIds` side by side) or returns it as is. */

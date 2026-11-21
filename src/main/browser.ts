@@ -2,18 +2,12 @@ import {
   app,
   BrowserWindow,
   clipboard,
-  desktopCapturer,
-  dialog,
   nativeTheme,
   screen,
   shell,
-  webContents,
   WebContentsView,
   type BaseWindow,
   type BrowserWindowConstructorOptions,
-  type DesktopCapturerSource,
-  type DisplayMediaRequestHandlerHandlerRequest,
-  type Streams,
   type ContextMenuParams,
   type Event,
   type Input,
@@ -27,10 +21,9 @@ import { join } from 'node:path'
 import type { Action, DropTarget } from '../shared/actions'
 import { IPC, type LittleAnchor, type LittleOp } from '../shared/ipc'
 import { commandForInput, type CommandId } from '../shared/keymap'
-import { containsNode, findFolder, findInPinned, findItem, profileOfItem, spaceItems, walkPinned } from '../shared/tree'
+import { containsNode, findFolder, findInPinned, findItem, profileOfItem, spaceItems } from '../shared/tree'
 import type {
   AppState,
-  DownloadItemInfo,
   ExtensionInfo,
   ID,
   OverlayMode,
@@ -44,15 +37,14 @@ import type {
   TabItem,
   WindowView
 } from '../shared/types'
-import { appendPane, flipSplit, gather, groupAt, layoutPanes, movePane, newSplitRoot, PANE_BAR, paneIds, placePane, removePane, type Side } from '../shared/split'
+import { appendPaneIn, flipSplit, gatherSplit, layoutPanes, movePane, PANE_BAR, paneIds, placePaneIn, removeFromSplits, resizeGroup, splitOf, type Side } from '../shared/split'
 import { isFloating, stepAfter, type TourEvent, type TourStep } from '../shared/tour'
 import { resolveInput, SEARCH_ENGINES } from '../shared/url'
-import { PERMISSION_KEYS, permissionOrigin, siteName } from '../shared/permissions'
 import { AdBlock, hostOf } from './adblock'
 import { recentSpotlights, SPOTLIGHTS, unseenSpotlights } from '../shared/spotlights'
 import { recentChanges, startupScreen, type Changelog } from './changelog'
 import { openInChrome } from './chrome'
-import { DownloadBurst, isDangerous, markFromInternet } from './downloads'
+import { DownloadList } from './download-list'
 import { Extensions } from './extensions'
 import { runImport } from './importers'
 import { FLOATING_DEMO_URL } from './floating-demo'
@@ -67,6 +59,7 @@ import { buildContextMenu, buildFolderMenu, buildItemMenu, buildSpaceMenu, build
 import { Profiles, type ProfileRuntime } from './profiles'
 import { PROMPT_WIDTH, PromptView, type PromptAnchor } from './prompt-view'
 import { search, suggest } from './search'
+import { SharePicker } from './share-picker'
 import { incognitoState, newId, SPACE_COLORS, Store } from './store'
 import { LiveTab, type OpenDisposition, type TabHost } from './tab'
 import { handleUi } from './ui-origin'
@@ -75,7 +68,6 @@ import { MainWindow, PAD, type ViewSlot } from './window'
 import { applyView, captureView, cascade, inAnyView, newView, stateForView, viewFromState } from './window-state'
 
 const isMac = process.platform === 'darwin'
-const hasSystemAudioCapture = process.platform === 'win32'
 
 // Defined by electron.vite.config.ts from build/changelog.json; empty outside release builds.
 declare const __CHANGELOG__: Changelog
@@ -83,9 +75,9 @@ const CHANGELOG: Changelog = __CHANGELOG__
 const MAX_ARCHIVE = 1000
 const UNLOAD_HIDDEN_AFTER = 3600_000
 const HOUSEKEEPING_EVERY = 5 * 60_000
-// Slack past the peeking sidebar's edge: room to grab it to resize, and no enter/leave flicker at the screen's edge.
-const PEEK_GRACE_PX = 32
-const PEEK_HIDE_DELAY_MS = 300
+// Slack past the revealed sidebar's edge: room to grab it to resize, and no enter/leave flicker at the screen's edge.
+const SIDEBAR_REVEAL_GRACE_PX = 32
+const SIDEBAR_REVEAL_HIDE_DELAY_MS = 300
 // Sidebar geometry, kept in step with styles.css.
 const SIDEBAR_PAD = 8
 const FLOATING_SIDEBAR_INSET = 4
@@ -135,11 +127,11 @@ interface ClosedTab {
   spaceId: ID
 }
 
-class Win {
+class WindowSession {
   peek: Peek | undefined
-  sidebarPeek = false
+  sidebarReveal = false
   tabDrag: ID | undefined
-  peekWatch: ReturnType<typeof setInterval> | undefined
+  sidebarRevealWatch: ReturnType<typeof setInterval> | undefined
   fullscreenTab: LiveTab | undefined
   switcher: { order: ID[]; index: number } | undefined
   layout: AppState['layout'] = { content: { x: 0, y: 0, width: 0, height: 0 }, views: [] }
@@ -161,10 +153,10 @@ export class Browser implements TabHost, FloatingHost {
   readonly adblock: AdBlock
   readonly updater: Updater
   readonly main: Browser | undefined
-  private wins: Win[] = []
+  private wins: WindowSession[] = []
   /** The window commands act on; after the last window closes on macOS it stays, closed. */
-  private cur!: Win
-  private reportedLost: Win | undefined
+  private cur!: WindowSession
+  private reportedLost: WindowSession | undefined
   readonly live = new Map<ID, LiveTab>()
   private media: MediaState = emptyMedia()
   private readonly floating = new FloatingPlayer(this)
@@ -174,7 +166,12 @@ export class Browser implements TabHost, FloatingHost {
   private mirror = new Mirror((wc, still) => this.sendStill(wc, still))
   private mru: ID[] = []
   private closed: ClosedTab[] = []
-  downloads: DownloadItemInfo[] = []
+  readonly downloads = new DownloadList({
+    toast: (text) => this.toast(text),
+    startedByPage: (page) => [...this.live.values()].some((t) => t.wc === page && !t.userActivated),
+    changed: () => this.emitSoon(),
+    progressed: () => this.emitSlowly()
+  })
   extensionList: Record<ID, ExtensionInfo[]> = {}
   private emitTimer: NodeJS.Timeout | undefined
   private slowEmitTimer: NodeJS.Timeout | undefined
@@ -204,7 +201,7 @@ export class Browser implements TabHost, FloatingHost {
     this.legacyWindowFile = join(userData, 'window.json')
     this.adblock = new AdBlock(join(userData, 'adblock', 'engine.bin'), () => this.emitSlowly())
     this.updater = new Updater(this)
-    this.syncAdblock()
+    this.adblock.sync(this.state.settings)
     void this.adblock.load()
     nativeTheme.themeSource = this.store.state.settings.theme
   }
@@ -308,8 +305,8 @@ export class Browser implements TabHost, FloatingHost {
     return view
   }
 
-  openWindow(view = this.unopenedOrNewView(), background = false): Win {
-    const w = new Win(new MainWindow(view.bounds, background), view)
+  openWindow(view = this.unopenedOrNewView(), background = false): WindowSession {
+    const w = new WindowSession(new MainWindow(view.bounds, background), view)
     this.wins.push(w)
     logInfo(`${this.incognito ? 'incognito ' : ''}window ${short(view.id)} opened`)
     this.use(w)
@@ -390,10 +387,10 @@ export class Browser implements TabHost, FloatingHost {
     w.main.win.once('show', () => this.inWin(w, () => this.runCommand('newTab')))
   }
 
-  private onWindowClosed(w: Win): void {
+  private onWindowClosed(w: WindowSession): void {
     this.wins = this.wins.filter((x) => x !== w)
     logInfo(`${this.incognito ? 'incognito ' : ''}window ${short(w.view.id)} closed, ${this.wins.length} left`)
-    clearInterval(w.peekWatch)
+    clearInterval(w.sidebarRevealWatch)
     w.peek?.destroy()
     w.peek = undefined
     if (this.wins.length) {
@@ -413,7 +410,7 @@ export class Browser implements TabHost, FloatingHost {
   }
 
   /** Makes `w` current: the state's per-window fields become its own (window-state.ts). */
-  private use(w: Win): void {
+  private use(w: WindowSession): void {
     if (w === this.cur) return
     if (!w.open && this.wins.length) logProblem(`window ${short(w.view.id)} made current after it closed`)
     if (this.cur) captureView(this.state, this.cur.view)
@@ -421,7 +418,7 @@ export class Browser implements TabHost, FloatingHost {
     applyView(this.state, w.view)
   }
 
-  private inWin(w: Win, fn: () => void): void {
+  private inWin(w: WindowSession, fn: () => void): void {
     const prev = this.cur
     this.use(w)
     try {
@@ -452,7 +449,7 @@ export class Browser implements TabHost, FloatingHost {
     return `${this.incognito ? 'incognito' : 'main'}: current ${cur ? short(cur.view.id) + flags : 'none'}, open [${ids(this.wins.map((w) => w.view))}], saved [${ids(this.state.windows)}]`
   }
 
-  private saveAsLastFocused(w: Win): void {
+  private saveAsLastFocused(w: WindowSession): void {
     const list = this.state.windows
     const i = list.indexOf(w.view)
     if (i < 0 || i === list.length - 1) return
@@ -461,7 +458,7 @@ export class Browser implements TabHost, FloatingHost {
     this.store.save()
   }
 
-  private winOf(tab: LiveTab): Win {
+  private winOf(tab: LiveTab): WindowSession {
     return this.wins.find((w) => w.peek?.tab === tab || (w.open && w.main.isShown(tab.view))) ?? this.cur
   }
 
@@ -476,7 +473,7 @@ export class Browser implements TabHost, FloatingHost {
     this.profiles.closeAll()
   }
 
-  private saveBounds(w: Win): void {
+  private saveBounds(w: WindowSession): void {
     const win = w.main.win
     if (win.isDestroyed() || win.isFullScreen()) return
     w.view.bounds = win.getNormalBounds()
@@ -494,104 +491,20 @@ export class Browser implements TabHost, FloatingHost {
     }
   }
 
-  private downloadBurst = new DownloadBurst()
-
-  private sharePick: { id: string; sources: Map<string, DesktopCapturerSource>; audio: boolean; callback: (streams: Streams | null) => void } | undefined
-
-  private async pickShare(req: DisplayMediaRequestHandlerHandlerRequest, callback: (streams: Streams | null) => void): Promise<void> {
-    // macOS shows its own picker (useSystemPicker); YARC has none there.
-    if (!req.videoRequested || isMac) return callback(null)
-    let sources: DesktopCapturerSource[]
-    try {
-      sources = await desktopCapturer.getSources({ types: ['screen', 'window'], thumbnailSize: { width: 320, height: 200 } })
-    } catch (err) {
-      console.warn('[share] no screens or windows to offer', err)
-      return callback(null)
-    }
-    if (!sources.length) return callback(null)
-    if (this.sharePick) this.answerShare(this.sharePick.id, undefined, false, false)
-    const wc = req.frame ? webContents.fromFrame(req.frame) : undefined
-    const tab = wc ? [...this.live.values()].find((t) => t.wc === wc) : undefined
+  private readonly sharePicker = new SharePicker((mode, page) => {
+    const tab = page && [...this.live.values()].find((t) => t.wc === page)
     if (tab) this.use(this.winOf(tab))
-    const id = newId()
-    this.sharePick = { id, sources: new Map(sources.map((s) => [s.id, s])), audio: req.audioRequested, callback }
-    this.setOverlay({
-      kind: 'share-picker',
-      id,
-      site: siteName(req.securityOrigin),
-      systemAudio: req.audioRequested && hasSystemAudioCapture,
-      sources: sources.map((s) => ({
-        id: s.id,
-        name: s.name,
-        screen: s.id.startsWith('screen:'),
-        thumbnail: s.thumbnail.isEmpty() ? '' : `data:image/jpeg;base64,${s.thumbnail.toJPEG(70).toString('base64')}`
-      }))
-    })
-  }
-
-  private answerShare(id: string, sourceId: string | undefined, systemAudio: boolean, closePicker = true): void {
-    const pick = this.sharePick
-    if (!pick || pick.id !== id) return
-    this.sharePick = undefined
-    const source = sourceId ? pick.sources.get(sourceId) : undefined
-    let streams: Streams | null = null
-    if (source) {
-      streams = { video: source }
-      if (systemAudio && pick.audio && hasSystemAudioCapture) streams.audio = 'loopback'
-    }
-    try {
-      pick.callback(streams)
-    } catch (err) {
-      console.warn('[share] the page is gone', err)
-    }
-    if (closePicker && this.window.overlayMode.kind === 'share-picker') this.setOverlay({ kind: 'none' })
-  }
+    this.setOverlay(mode)
+  })
 
   private onProfileCreated(rt: ProfileRuntime): void {
-    rt.session.on('will-download', (e, item, wc) => {
-      const site = hostOf(wc && !wc.isDestroyed() ? wc.getURL() : item.getURL())
-      const tab = wc ? [...this.live.values()].find((t) => t.wc === wc) : undefined
-      const startedByPage = tab && !tab.userActivated
-      if (startedByPage && !this.downloadBurst.allow(`${rt.id}|${site}`)) {
-        e.preventDefault()
-        this.toast(`Blocked more downloads from ${site || 'this page'}`)
-        return
-      }
-      const info: DownloadItemInfo = {
-        id: newId(),
-        filename: item.getFilename(),
-        path: '',
-        url: item.getURL(),
-        state: 'progressing',
-        received: 0,
-        total: item.getTotalBytes(),
-        startedAt: Date.now()
-      }
-      item.setSavePath(uniquePath(app.getPath('downloads'), item.getFilename()))
-      info.path = item.getSavePath()
-      this.downloads.unshift(info)
-      this.toast(`Downloading ${info.filename}`)
-      item.on('updated', (_ev, state) => {
-        info.received = item.getReceivedBytes()
-        info.total = item.getTotalBytes()
-        info.state = state === 'interrupted' ? 'interrupted' : 'progressing'
-        this.emitSlowly()
-      })
-      item.once('done', (_ev, state) => {
-        info.state = state
-        info.received = item.getReceivedBytes()
-        if (state === 'completed') markFromInternet(info.path, info.url)
-        if (state === 'completed') this.toast(`Downloaded ${info.filename}`)
-        this.emitSoon()
-      })
-      this.emitSoon()
-    })
-    rt.session.setDisplayMediaRequestHandler((req, callback) => void this.pickShare(req, callback), { useSystemPicker: true })
+    this.downloads.watch(rt.session, rt.id)
+    rt.session.setDisplayMediaRequestHandler((req, reply) => void this.sharePicker.pick(req, reply), { useSystemPicker: true })
     this.adblock.attach(rt.session)
     if (!this.incognito) void this.extensions.setup(rt)
   }
 
-  snapshot(w: Win = this.cur, mode = w.main.overlayMode): AppState {
+  snapshot(w: WindowSession = this.cur, mode = w.main.overlayMode): AppState {
     return this.withPanelData(this.snapshotWith(w, this.liveInfo()), mode)
   }
 
@@ -613,19 +526,19 @@ export class Browser implements TabHost, FloatingHost {
     return live
   }
 
-  private snapshotWith(w: Win, live: AppState['live']): AppState {
+  private snapshotWith(w: WindowSession, live: AppState['live']): AppState {
     const win = w.main.win
     const open = !win.isDestroyed()
     const mode = w.main.overlayMode
     return {
       ...(w === this.cur ? this.state : stateForView(this.state, w.view)),
       live,
-      downloads: this.downloads,
+      downloads: this.downloads.items,
       extensions: this.extensionList,
       platform: process.platform,
       maximized: open && win.isMaximized(),
       fullscreen: open && win.isFullScreen(),
-      sidebarPeek: w.sidebarPeek,
+      sidebarReveal: w.sidebarReveal,
       tabDrag: w.tabDrag,
       newTabOpen: mode.kind === 'command' && (mode.target ?? 'tab') === 'tab',
       peek: w.peek && !w.peek.tab.destroyed ? w.peek.tab.info() : undefined,
@@ -756,7 +669,7 @@ export class Browser implements TabHost, FloatingHost {
       if (!active) {
         this.show([])
       } else {
-        const split = this.splitOf(space, active)
+        const split = splitOf(space.splits, active)
         splitId = split?.id
         const panes = split ? layoutPanes(split.root, content) : [{ id: active, rect: content }]
         const slots = []
@@ -791,7 +704,7 @@ export class Browser implements TabHost, FloatingHost {
     for (const other of this.wins) if (other !== this.cur && this.waitsForPage(other)) this.inWin(other, () => this.layout())
   }
 
-  private waitsForPage(w: Win): boolean {
+  private waitsForPage(w: WindowSession): boolean {
     if (!w.open) return false
     return w.layout.views.some((v) => {
       const view = v.elsewhere ? this.live.get(v.id)?.view : undefined
@@ -811,7 +724,7 @@ export class Browser implements TabHost, FloatingHost {
     this.window.show(slots)
   }
 
-  private lend(w: Win, view: WebContentsView): void {
+  private lend(w: WindowSession, view: WebContentsView): void {
     w.main.detach(view)
     const pane = w.layout.views.find((v) => this.live.get(v.id)?.view === view)
     if (!pane) return
@@ -986,12 +899,12 @@ export class Browser implements TabHost, FloatingHost {
       if (closingCenteredCard) this.tour = undefined
       else mode = { kind: 'tour', step: this.tour }
     }
-    if (current.kind === 'share-picker' && mode.kind !== 'share-picker') this.answerShare(current.id, undefined, false, false)
+    if (current.kind === 'share-picker' && mode.kind !== 'share-picker') this.sharePicker.answer(current.id)
     if (mode.kind !== 'peek') this.dropPeek()
     if (current.kind === 'find' && mode.kind !== 'find') this.activeTab()?.wc.stopFindInPage('keepSelection')
-    if (mode.kind !== 'sidebar') this.cur.sidebarPeek = false
+    if (mode.kind !== 'sidebar') this.cur.sidebarReveal = false
     if (mode.kind !== 'sidebar' && mode.kind !== 'split-drop') this.cur.tabDrag = undefined
-    this.watchPeek(mode.kind === 'sidebar' && !this.cur.tabDrag)
+    this.watchSidebarReveal(mode.kind === 'sidebar' && !this.cur.tabDrag)
     if (mode.kind !== 'switcher') this.cur.switcher = undefined
     if (mode.kind !== 'none' && mode.kind !== current.kind) this.window.sendToOverlay(IPC.state, this.snapshot(this.cur, mode))
     this.window.setOverlay(mode, this.overlayRect(mode))
@@ -1070,23 +983,23 @@ export class Browser implements TabHost, FloatingHost {
     if (!this.window.prompt?.visible && this.window.overlayMode.kind === 'none') this.activeTab()?.wc.focus()
   }
 
-  private watchPeek(on: boolean): void {
+  private watchSidebarReveal(on: boolean): void {
     const w = this.cur
-    clearInterval(w.peekWatch)
-    w.peekWatch = undefined
+    clearInterval(w.sidebarRevealWatch)
+    w.sidebarRevealWatch = undefined
     if (!on) return
     let awaySince = 0
-    w.peekWatch = setInterval(() => {
+    w.sidebarRevealWatch = setInterval(() => {
       const win = w.main.win
-      if (win.isDestroyed()) return clearInterval(w.peekWatch)
+      if (win.isDestroyed()) return clearInterval(w.sidebarRevealWatch)
       const b = win.getContentBounds()
       const s = this.state.settings
       const p = screen.getCursorScreenPoint()
-      const reach = s.sidebarWidth + PAD + PEEK_GRACE_PX
+      const reach = s.sidebarWidth + PAD + SIDEBAR_REVEAL_GRACE_PX
       const near = s.sidebarRight ? p.x >= b.x + b.width - reach : p.x <= b.x + reach
-      if (near && p.y >= b.y - PEEK_GRACE_PX && p.y <= b.y + b.height + PEEK_GRACE_PX) awaySince = 0
+      if (near && p.y >= b.y - SIDEBAR_REVEAL_GRACE_PX && p.y <= b.y + b.height + SIDEBAR_REVEAL_GRACE_PX) awaySince = 0
       else if (!awaySince) awaySince = Date.now()
-      else if (Date.now() - awaySince >= PEEK_HIDE_DELAY_MS) this.inWin(w, () => this.setOverlay({ kind: 'none' }, false))
+      else if (Date.now() - awaySince >= SIDEBAR_REVEAL_HIDE_DELAY_MS) this.inWin(w, () => this.setOverlay({ kind: 'none' }, false))
     }, 50)
   }
 
@@ -1184,18 +1097,6 @@ export class Browser implements TabHost, FloatingHost {
     this.newTab(url, { activate: where === 'tab' })
   }
 
-  private splitOf(space: Space, id: ID): Split | undefined {
-    return space.splits.find((sp) => paneIds(sp.root).includes(id))
-  }
-
-  private removeFromSplits(space: Space, id: ID, except?: Split): void {
-    space.splits = space.splits.flatMap((sp) => {
-      if (sp === except || !paneIds(sp.root).includes(id)) return [sp]
-      const root = removePane(sp.root, id)
-      return root ? [{ ...sp, root }] : []
-    })
-  }
-
   private nextActiveAfter(space: Space, closedId: ID, splitPartner?: ID): ID | undefined {
     if (splitPartner) return splitPartner
     const visible = new Set(spaceItems(this.state, space).map((i) => i.id))
@@ -1210,10 +1111,10 @@ export class Browser implements TabHost, FloatingHost {
     if (!found) return
     const loc = found.loc
     const space = loc.kind === 'favorite' ? this.space : this.store.space(loc.spaceId)!
-    const split = this.splitOf(space, id)
+    const split = splitOf(space.splits, id)
     const partner = split && paneIds(split.root).find((x) => x !== id)
     const wasActive = space.activeItemId === id
-    this.removeFromSplits(space, id)
+    space.splits = removeFromSplits(space.splits, id)
     this.dropLive(id)
     this.mru = this.mru.filter((m) => m !== id)
     if (loc.kind === 'today') {
@@ -1281,7 +1182,7 @@ export class Browser implements TabHost, FloatingHost {
     const space = this.space
     for (const t of [...space.today]) {
       this.archiveClosed(t, space.id)
-      this.removeFromSplits(space, t.id)
+      space.splits = removeFromSplits(space.splits, t.id)
       this.dropLive(t.id)
     }
     const wasToday = space.today.some((t) => t.id === space.activeItemId)
@@ -1353,7 +1254,7 @@ export class Browser implements TabHost, FloatingHost {
       target = folder ? folder.children : space.pinned
     }
     if (isFolder && to.section !== 'pinned') return
-    const split = isFolder || to.section === 'favorites' ? undefined : this.splitOf(space, id)
+    const split = isFolder || to.section === 'favorites' ? undefined : splitOf(space.splits, id)
     const ids = split ? paneIds(split.root) : [id]
     const group = fromList.filter((n) => ids.includes(n.id))
     const profileBefore = new Map(group.map((n) => [n.id, profileOfItem(this.state, n.id)]))
@@ -1385,7 +1286,7 @@ export class Browser implements TabHost, FloatingHost {
     const from = this.store.space(found.loc.spaceId)!
     if (from.id === target.id) return
     found.loc.list.splice(found.loc.index, 1)
-    this.removeFromSplits(from, id)
+    from.splits = removeFromSplits(from.splits, id)
     const item = stripKind(found.item)
     if (found.loc.kind === 'pinned') target.pinned.push({ ...item, kind: 'tab' })
     else target.today.unshift(item)
@@ -1404,17 +1305,7 @@ export class Browser implements TabHost, FloatingHost {
     if (found.loc.kind !== 'favorite' && found.loc.spaceId !== space.id) this.moveToSpace(id, space.id)
     if (at && findItem(this.state, at.target) && at.target !== id) return this.placeInSplit(id, at.target, at.side)
     if (!active || active === id || !findItem(this.state, active)) return this.activate(id)
-    this.removeFromSplits(space, id)
-    const split = this.splitOf(space, active)
-    if (!split) {
-      space.splits.push({ id: newId(), root: newSplitRoot(active, id, 'right') })
-    } else {
-      const root = appendPane(split.root, id)
-      if (root) split.root = root
-    }
-    this.gatherSplit(space, id)
-    this.activate(id)
-    this.tourEvent('split')
+    this.showSplit(space, appendPaneIn(space.splits, active, id, newId()), id)
   }
 
   /** Shows `id` on `side` of `target`, joining or moving within target's split; does nothing when that split is full. */
@@ -1422,13 +1313,13 @@ export class Browser implements TabHost, FloatingHost {
     const space = this.space
     const visible = new Set(spaceItems(this.state, space).map((i) => i.id))
     if (id === target || !visible.has(id) || !visible.has(target)) return
-    const split = this.splitOf(space, target)
-    const root = placePane(split?.root, target, id, side)
-    if (!root) return
-    this.removeFromSplits(space, id, split)
-    if (split) split.root = root
-    else space.splits.push({ id: newId(), root })
-    this.gatherSplit(space, id)
+    const splits = placePaneIn(space.splits, target, id, side, newId())
+    if (splits) this.showSplit(space, splits, id)
+  }
+
+  private showSplit(space: Space, splits: Split[], id: ID): void {
+    space.splits = splits
+    Object.assign(space, gatherSplit(space, id))
     this.activate(id)
     this.tourEvent('split')
   }
@@ -1442,17 +1333,8 @@ export class Browser implements TabHost, FloatingHost {
     })
   }
 
-  private gatherSplit(space: Space, id: ID): void {
-    const split = this.splitOf(space, id)
-    if (!split) return
-    const ids = paneIds(split.root)
-    space.today = gather(space.today, ids)
-    space.pinned = gather(space.pinned, ids)
-    for (const node of walkPinned(space.pinned)) if (node.kind === 'folder') node.children = gather(node.children, ids)
-  }
-
   moveInSplit(id: ID, delta: -1 | 1): void {
-    const split = this.splitOf(this.space, id)
+    const split = splitOf(this.space.splits, id)
     const root = split && movePane(split.root, id, delta)
     if (!split || !root) return
     split.root = root
@@ -1460,7 +1342,7 @@ export class Browser implements TabHost, FloatingHost {
   }
 
   flipSplit(id: ID): void {
-    const split = this.splitOf(this.space, id)
+    const split = splitOf(this.space.splits, id)
     if (!split) return
     split.root = flipSplit(split.root)
     this.relayout()
@@ -1468,8 +1350,8 @@ export class Browser implements TabHost, FloatingHost {
 
   separateFromSplit(id: ID): void {
     const space = this.space
-    if (!this.splitOf(space, id)) return
-    this.removeFromSplits(space, id)
+    if (!splitOf(space.splits, id)) return
+    space.splits = removeFromSplits(space.splits, id)
     this.activate(id)
   }
 
@@ -1795,7 +1677,7 @@ export class Browser implements TabHost, FloatingHost {
       case 'moveInSplit':
         return this.moveInSplit(a.id, a.delta)
       case 'addSplit':
-        if (!this.splitOf(space, a.id)) return
+        if (!splitOf(space.splits, a.id)) return
         return this.setOverlay({ kind: 'command', target: 'split', splitAt: { target: a.id, side: a.side } })
       case 'separateFromSplit':
         return this.separateFromSplit(a.id)
@@ -1810,25 +1692,24 @@ export class Browser implements TabHost, FloatingHost {
         return this.setTabDrag(a.id)
       case 'resizeSplit': {
         const sp = space.splits.find((x) => x.id === a.splitId)
-        const group = sp && groupAt(sp.root, a.path)
-        if (!group || a.sizes.length !== group.children.length) return
-        const sum = a.sizes.reduce((x, y) => x + y, 0)
-        group.sizes = a.sizes.map((x) => Math.max(0.1, x / sum))
+        const root = sp && resizeGroup(sp.root, a.path, a.sizes)
+        if (!sp || !root) return
+        sp.root = root
         return this.relayout()
       }
       case 'toggleSidebar': {
         const s = this.state.settings
         s.sidebarVisible = !s.sidebarVisible
-        this.cur.sidebarPeek = false
+        this.cur.sidebarReveal = false
         if (this.window.overlayMode.kind === 'sidebar') this.window.setOverlay({ kind: 'none' }, undefined)
         this.window.setTrafficLights(s.sidebarVisible)
         this.relayout()
         if (this.tour && this.window.overlayMode.kind === 'none') this.setOverlay({ kind: 'tour', step: this.tour }, false)
         return this.tourEvent('toggleSidebar')
       }
-      case 'sidebarPeek': {
-        if (this.state.settings.sidebarVisible || this.cur.sidebarPeek === a.show || this.panelInFront()) return
-        this.cur.sidebarPeek = a.show
+      case 'sidebarReveal': {
+        if (this.state.settings.sidebarVisible || this.cur.sidebarReveal === a.show || this.panelInFront()) return
+        this.cur.sidebarReveal = a.show
         return this.setOverlay(a.show ? { kind: 'sidebar' } : { kind: 'none' }, false)
       }
       case 'overlay':
@@ -1838,7 +1719,7 @@ export class Browser implements TabHost, FloatingHost {
         return this.setOverlay({ kind: 'none' })
       case 'settings': {
         Object.assign(this.state.settings, validSettingsPatch(this.state.settings, a.patch))
-        this.syncAdblock()
+        this.adblock.sync(this.state.settings)
         if (a.patch.theme) nativeTheme.themeSource = a.patch.theme
         if (a.patch.sidebarVisible !== undefined) this.window.setTrafficLights(a.patch.sidebarVisible)
         if (a.patch.autoUpdate !== undefined) this.updater.sync()
@@ -1869,33 +1750,13 @@ export class Browser implements TabHost, FloatingHost {
       case 'stopFind':
         tab?.wc.stopFindInPage('keepSelection')
         return this.setOverlay({ kind: 'none' })
-      case 'downloadOpen': {
-        const d = this.downloads.find((x) => x.id === a.id)
-        if (!d) return
-        if (a.reveal) return shell.showItemInFolder(d.path)
-        if (d.state !== 'completed') return
-        if (isDangerous(d.filename)) {
-          const from = hostOf(d.url)
-          const { response } = await dialog.showMessageBox(this.window.win, {
-            type: 'warning',
-            title: 'YARC',
-            noLink: true,
-            message: `Open “${d.filename}”?`,
-            detail: `This kind of file can run programs on your computer${from ? `. It came from ${from}` : ''}. Only open it if you trust where it came from.`,
-            buttons: ['Cancel', 'Open'],
-            defaultId: 0,
-            cancelId: 0
-          })
-          if (response !== 1) return
-        }
-        void shell.openPath(d.path)
-        return
-      }
+      case 'downloadOpen':
+        return this.downloads.open(a.id, a.reveal, this.window.win)
       case 'sharePick':
-        return this.answerShare(a.id, a.sourceId, a.systemAudio === true)
+        if (this.sharePicker.answer(a.id, a.sourceId, a.systemAudio === true) && this.window.overlayMode.kind === 'share-picker') this.setOverlay({ kind: 'none' })
+        return
       case 'downloadsClear':
-        this.downloads = this.downloads.filter((d) => d.state === 'progressing')
-        return this.emitSoon()
+        return this.downloads.clearFinished()
       case 'archiveRestore': {
         const entry = this.state.archive.find((x) => x.id === a.id)
         if (!entry) return
@@ -1925,26 +1786,14 @@ export class Browser implements TabHost, FloatingHost {
         return this.runCommand(a.id)
       case 'adblockToggleSite': {
         const t = a.id ? this.live.get(a.id) : tab
-        const host = t ? hostOf(t.wc.getURL()) : ''
-        if (!host) return
-        const list = this.state.settings.adblockAllowlist
-        const allowed = list.includes(host)
-        this.state.settings.adblockAllowlist = allowed ? list.filter((h) => h !== host) : [...list, host]
-        this.syncAdblock()
-        this.toast(allowed ? `Blocking ads on ${host}` : `Ads allowed on ${host}`)
-        this.reloadSoon(t!)
+        const toggled = t && this.adblock.toggleSite(this.state.settings, t.wc)
+        if (!toggled) return
+        this.toast(toggled.allowed ? `Ads allowed on ${toggled.host}` : `Blocking ads on ${toggled.host}`)
         return this.changed()
       }
-      case 'sitePermission': {
-        if (!this.store.profile(a.profileId) || typeof a.origin !== 'string' || typeof a.key !== 'string') return
-        const settable = permissionOrigin(a.origin) === a.origin && (PERMISSION_KEYS as readonly string[]).includes(a.key) && ['allow', 'block'].includes(a.setting)
-        if (a.setting !== 'reset' && !settable) return
-        const decisions = this.profiles.decisions(a.profileId)
-        if (a.setting === 'reset') decisions.reset(a.origin, a.key)
-        else decisions.set(a.origin, a.key, a.setting)
-        this.profiles.permissionQueue.settle()
-        return this.emitSoon()
-      }
+      case 'sitePermission':
+        if (this.store.profile(a.profileId) && this.profiles.setSitePermission(a.profileId, a.origin, a.key, a.setting)) this.emitSoon()
+        return
       case 'itemMenu':
         return buildItemMenu(this, a.id)?.popup({ window: this.window.win })
       case 'folderMenu':
@@ -2017,7 +1866,7 @@ export class Browser implements TabHost, FloatingHost {
     this.use(this.winOf(tab))
     const space = this.space
     if (space.activeItemId === tab.itemId) return
-    const split = this.splitOf(space, tab.itemId)
+    const split = splitOf(space.splits, tab.itemId)
     if (split && paneIds(split.root).includes(space.activeItemId ?? '')) {
       space.activeItemId = tab.itemId
       this.mru = [tab.itemId, ...this.mru.filter((m) => m !== tab.itemId)]
@@ -2089,17 +1938,8 @@ export class Browser implements TabHost, FloatingHost {
     return known(this.state.littleArc.profileByHost[hostOf(url ?? '')]) ?? known(s.littleArcProfileId) ?? this.space.profileId
   }
 
-  switchLittleProfile(little: LittleWindow, profileId: ID): void {
-    const url = little.url
-    const host = hostOf(url)
-    if (host) this.state.littleArc.profileByHost[host] = profileId
-    this.store.save()
-    this.openLittle(url, profileId, little.win.getBounds())
-    little.discard()
-  }
-
-  archiveLittle(profileId: ID, page: Pick<TabItem, 'url' | 'title' | 'favicon'>): void {
-    this.archiveClosed(page, this.littleTargetSpace(profileId).id)
+  archiveLittle(page: Pick<TabItem, 'url' | 'title' | 'favicon'>, spaceId: ID): void {
+    this.archiveClosed(page, spaceId)
     this.changed()
     // Little Windows close after the state was written for quitting.
     if (this.quitting) this.store.flush()
@@ -2110,20 +1950,7 @@ export class Browser implements TabHost, FloatingHost {
     for (const l of this.openLittles()) if (l.expired(now, this.state.settings.littleCloseAfterHours)) l.win.close()
   }
 
-  rememberLittleSize(width: number, height: number): void {
-    this.state.littleArc.size = { width, height }
-    this.store.save()
-  }
-
-  littleTargetSpace(profileId: ID): Space {
-    if (this.space.profileId === profileId) return this.space
-    return this.state.spaces.find((s) => s.profileId === profileId) ?? this.space
-  }
-
-  adoptLittle(little: LittleWindow, spaceId?: ID): void {
-    this.ensureWindow()
-    const space = (spaceId && this.store.space(spaceId)) || this.littleTargetSpace(little.profile.id)
-    const tab = little.release()
+  adoptTab(tab: LiveTab, space: Space): void {
     this.extensions.moveTab(tab, this.window.win)
     tab.host = this
     this.activate(this.takeInAsTodayTab(tab, space))
@@ -2143,7 +1970,7 @@ export class Browser implements TabHost, FloatingHost {
     }
   }
 
-  private winFor(wc: WebContents): Win | undefined {
+  private winFor(wc: WebContents): WindowSession | undefined {
     return this.wins.find((w) => w.open && (w.main.ui === wc || w.main.overlay.webContents === wc))
   }
 
@@ -2182,27 +2009,6 @@ export class Browser implements TabHost, FloatingHost {
     })
   }
 
-  private pendingReloads = new Map<LiveTab, NodeJS.Timeout>()
-
-  /** Coalesces rapid reloads (double-clicking the shield): overlapping ones while the ad blocker rewrites requests can crash Electron. */
-  private reloadSoon(tab: LiveTab): void {
-    clearTimeout(this.pendingReloads.get(tab))
-    this.pendingReloads.set(
-      tab,
-      setTimeout(() => {
-        this.pendingReloads.delete(tab)
-        if (tab.destroyed) return
-        if (tab.wc.isLoading()) tab.wc.stop()
-        tab.wc.reload()
-      }, 250)
-    )
-  }
-
-  private syncAdblock(): void {
-    this.adblock.enabled = this.state.settings.adblock
-    this.adblock.allowlist = new Set(this.state.settings.adblockAllowlist)
-  }
-
   makeDefaultBrowser(): void {
     // Windows doesn't let apps claim the default themselves.
     if (process.platform === 'win32') {
@@ -2238,15 +2044,6 @@ export class Browser implements TabHost, FloatingHost {
 function stripKind<T extends TabItem>(item: T): TabItem {
   const { kind: _kind, ...rest } = item as T & { kind?: string }
   return { ...rest }
-}
-
-function uniquePath(dir: string, filename: string): string {
-  const dot = filename.lastIndexOf('.')
-  const base = dot > 0 ? filename.slice(0, dot) : filename
-  const ext = dot > 0 ? filename.slice(dot) : ''
-  let candidate = join(dir, filename)
-  for (let i = 1; existsSync(candidate); i++) candidate = join(dir, `${base} (${i})${ext}`)
-  return candidate
 }
 
 const ENUMS: Partial<Record<keyof Settings, readonly string[]>> = {

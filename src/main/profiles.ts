@@ -6,7 +6,7 @@ import { PermissionQueue, type MediaType } from './permission-queue'
 import { SessionCookies, type Cipher } from './session-cookies'
 import { SiteDecisions } from './site-permissions'
 import { CHROME_UA_HOSTS, userAgentFor } from './useragent'
-import { permissionOrigin } from '../shared/permissions'
+import { PERMISSION_KEYS, permissionOrigin } from '../shared/permissions'
 import type { ID } from '../shared/types'
 import { originOf } from '../shared/url'
 
@@ -16,7 +16,7 @@ export interface ProfileRuntime {
   history: History
 }
 
-/** display-capture: a page can only ask after a click, and the screen picker it opens is the user's consent (browser.ts pickShare). */
+/** display-capture: a page can only ask after a click, and the screen picker it opens is the user's consent (share-picker.ts). */
 const AUTO_GRANT = new Set(['fullscreen', 'clipboard-sanitized-write', 'pointerLock', 'speaker-selection', 'display-capture'])
 const PROMPT = new Set(['media', 'geolocation', 'notifications', 'midi', 'midiSysex', 'clipboard-read', 'idle-detection', 'hid', 'serial', 'usb', 'window-management'])
 
@@ -79,6 +79,18 @@ export class Profiles {
     }
     this.siteDecisions.set(id, d)
     return d
+  }
+
+  /** False for a setting the settings page can't make. */
+  setSitePermission(profileId: ID, origin: string, key: string, setting: 'allow' | 'block' | 'reset'): boolean {
+    if (typeof origin !== 'string' || typeof key !== 'string') return false
+    const settable = permissionOrigin(origin) === origin && (PERMISSION_KEYS as readonly string[]).includes(key) && ['allow', 'block'].includes(setting)
+    if (setting !== 'reset' && !settable) return false
+    const decisions = this.decisions(profileId)
+    if (setting === 'reset') decisions.reset(origin, key)
+    else decisions.set(origin, key, setting)
+    this.permissionQueue.settle()
+    return true
   }
 
   private permissionsFile(id: ID): string {

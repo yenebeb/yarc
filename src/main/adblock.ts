@@ -4,6 +4,7 @@ import { ipcMain, type IpcMainInvokeEvent, type OnBeforeRequestListenerDetails, 
 import { mkdir, readFile, stat, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { dirname } from 'node:path'
+import type { Settings } from '../shared/types'
 
 const PRELOAD = createRequire(__filename).resolve('@ghostery/adblocker-electron-preload')
 const FILTERS_MAX_AGE = 24 * 3600_000
@@ -12,6 +13,7 @@ export class AdBlock {
   private engine: ElectronBlocker | undefined
   private sessions = new WeakSet<Session>()
   private blocked = new Map<number, number>()
+  private pendingReloads = new Map<WebContents, NodeJS.Timeout>()
   enabled = true
   allowlist = new Set<string>()
 
@@ -82,6 +84,37 @@ export class AdBlock {
 
   resetCount(wc: WebContents): void {
     if (this.blocked.delete(wc.id)) this.onChange()
+  }
+
+  sync(settings: Pick<Settings, 'adblock' | 'adblockAllowlist'>): void {
+    this.enabled = settings.adblock
+    this.allowlist = new Set(settings.adblockAllowlist)
+  }
+
+  /** Undefined for a page without a host. */
+  toggleSite(settings: Pick<Settings, 'adblock' | 'adblockAllowlist'>, page: WebContents): { allowed: boolean; host: string } | undefined {
+    const host = hostOf(page.getURL())
+    if (!host) return undefined
+    const list = settings.adblockAllowlist
+    const allowed = !list.includes(host)
+    settings.adblockAllowlist = allowed ? [...list, host] : list.filter((h) => h !== host)
+    this.sync(settings)
+    this.reloadSoon(page)
+    return { allowed, host }
+  }
+
+  /** Overlapping reloads (double-clicking the shield) while requests are rewritten can crash Electron. */
+  private reloadSoon(page: WebContents): void {
+    clearTimeout(this.pendingReloads.get(page))
+    this.pendingReloads.set(
+      page,
+      setTimeout(() => {
+        this.pendingReloads.delete(page)
+        if (page.isDestroyed()) return
+        if (page.isLoading()) page.stop()
+        page.reload()
+      }, 250)
+    )
   }
 
   isAllowed(url: string): boolean {

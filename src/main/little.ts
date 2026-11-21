@@ -11,6 +11,8 @@ import {
 } from 'electron'
 import { IPC, type LittleAnchor, type LittleOp, type LittleState } from '../shared/ipc'
 import { matches } from '../shared/keymap'
+import type { ID, Space } from '../shared/types'
+import { hostOf } from './adblock'
 import type { Browser } from './browser'
 import { littleBarColor, littleBounds, littleExpired } from './little-layout'
 import { buildContextMenu } from './menus'
@@ -76,14 +78,15 @@ export class LittleWindow implements TabHost {
     this.win.on('resize', () => this.layout())
     this.win.on('resized', () => {
       const [width, height] = this.win.getSize()
-      browser.rememberLittleSize(width, height)
+      browser.state.littleArc.size = { width, height }
+      browser.store.save()
     })
     this.win.on('focus', () => (this.lastActive = Date.now()))
     this.win.on('blur', () => (this.lastActive = Date.now()))
     this.win.on('close', () => {
       if (this.released || this.discarded || !this.tab || this.tab.destroyed) return
       const { url, title, favicon } = this.tab.info()
-      this.browser.archiveLittle(this.profile.id, { url, title, favicon })
+      this.browser.archiveLittle({ url, title, favicon }, this.targetSpace.id)
     })
     this.win.on('closed', () => {
       if (!this.released) this.tab?.destroy()
@@ -110,6 +113,27 @@ export class LittleWindow implements TabHost {
     return this.tab && !this.tab.destroyed && !this.released ? this.tab.wc.id : undefined
   }
 
+  get targetSpace(): Space {
+    const { store } = this.browser
+    if (store.activeSpace.profileId === this.profile.id) return store.activeSpace
+    return store.state.spaces.find((s) => s.profileId === this.profile.id) ?? store.activeSpace
+  }
+
+  switchProfile(profileId: ID): void {
+    const url = this.url
+    const host = hostOf(url)
+    if (host) this.browser.state.littleArc.profileByHost[host] = profileId
+    this.browser.store.save()
+    this.browser.openLittle(url, profileId, this.win.getBounds())
+    this.discard()
+  }
+
+  private openInMain(spaceId?: ID): void {
+    this.browser.ensureWindow()
+    const space = (spaceId && this.browser.store.space(spaceId)) || this.targetSpace
+    this.browser.adoptTab(this.release(), space)
+  }
+
   syncPrompt(queue: PermissionQueue): void {
     if (this.win.isDestroyed()) return
     const id = this.pageId
@@ -134,7 +158,7 @@ export class LittleWindow implements TabHost {
       loading,
       barColor: littleBarColor(this.browser.store.activeSpace.color),
       profileName: this.browser.store.profile(this.profile.id)?.name ?? '',
-      spaceName: this.browser.littleTargetSpace(this.profile.id).name,
+      spaceName: this.targetSpace.name,
       moreSpaces: spaces.length > 1
     }
     this.win.webContents.send(IPC.little, state)
@@ -156,7 +180,7 @@ export class LittleWindow implements TabHost {
       case 'sync':
         return this.push()
       case 'openInMain':
-        return this.browser.adoptLittle(this)
+        return this.openInMain()
       case 'close':
         return this.win.close()
       case 'copyUrl':
@@ -181,7 +205,7 @@ export class LittleWindow implements TabHost {
       type: 'radio' as const,
       checked: p.id === this.profile.id,
       click: () => {
-        if (p.id !== this.profile.id) this.browser.switchLittleProfile(this, p.id)
+        if (p.id !== this.profile.id) this.switchProfile(p.id)
       }
     }))
     Menu.buildFromTemplate(items).popup({ window: this.win, x: at?.x, y: at?.y })
@@ -191,7 +215,7 @@ export class LittleWindow implements TabHost {
     const spaces = this.browser.state.spaces.filter((s) => s.profileId === this.profile.id)
     const items = spaces.map((s) => ({
       label: s.emoji ? `${s.emoji}  ${s.name}` : s.name,
-      click: () => this.browser.adoptLittle(this, s.id)
+      click: () => this.openInMain(s.id)
     }))
     Menu.buildFromTemplate(items).popup({ window: this.win, x: at?.x, y: at?.y })
   }

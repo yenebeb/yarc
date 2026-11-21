@@ -131,6 +131,8 @@ export const BINDINGS: Binding[] = [
   { id: 'floatingPlayerDemo', title: 'Try the Floating Player', mac: [], other: [], palette: true }
 ]
 
+export const commandTitle = (id: CommandId): string => BINDINGS.find((b) => b.id === id)?.title ?? id
+
 export interface KeyInput {
   type: string
   code: string

@@ -3,7 +3,7 @@ import { IPC, type EditRequest } from '../shared/ipc'
 import { paneIds, splitMenuModel } from '../shared/split'
 import { findFolder, findItem, isAwayFromSaved } from '../shared/tree'
 import { SEARCH_ENGINES, searchUrl } from '../shared/url'
-import type { CommandId } from '../shared/keymap'
+import { commandTitle, type CommandId } from '../shared/keymap'
 import type { Browser } from './browser'
 import type { LiveTab } from './tab'
 
@@ -111,9 +111,9 @@ export function installDockMenu(browser: Browser): void {
     const open = littles().length > 0
     app.dock?.setMenu(
       Menu.buildFromTemplate([
-        { label: 'New Window', click: () => browser.openNewWindow() },
-        { label: 'New Incognito Window', click: () => browser.openIncognito() },
-        { label: 'New Little Window', click: () => browser.openLittle() },
+        { label: commandTitle('newWindow'), click: () => browser.openNewWindow() },
+        { label: commandTitle('newIncognitoWindow'), click: () => browser.openIncognito() },
+        { label: commandTitle('littleArc'), click: () => browser.openLittle() },
         { type: 'separator' },
         { label: 'Show Little Windows', enabled: open, click: () => littles().forEach((l) => l.win.show()) },
         { label: 'Close Little Windows', enabled: open, click: () => littles().forEach((l) => l.win.close()) }
@@ -133,11 +133,13 @@ export function installAppMenu(browser: Browser): void {
     return
   }
   const run = commandRunner(browser)
+  const item = (id: CommandId, label = commandTitle(id)): MenuItemConstructorOptions => ({ label, click: run(id) })
+  const opensDialog = (id: CommandId) => item(id, `${commandTitle(id)}…`)
   const updateItem = (): MenuItemConstructorOptions => {
     const { state } = browser.updater.status
-    if (state === 'available') return { label: 'Update Available…', click: run('installUpdate') }
-    if (state === 'ready') return { label: 'Restart to Update', click: run('installUpdate') }
-    return { label: 'Check for Updates…', click: run('checkForUpdates') }
+    if (state === 'available') return item('installUpdate', 'Update Available…')
+    if (state === 'ready') return item('installUpdate', 'Restart to Update')
+    return item('checkForUpdates')
   }
   const template: MenuItemConstructorOptions[] = [
     {
@@ -145,10 +147,10 @@ export function installAppMenu(browser: Browser): void {
       submenu: [
         { role: 'about' },
         updateItem(),
-        { label: "What's New", click: run('whatsNew') },
-        { label: 'Take the Tour', click: run('tour') },
+        item('whatsNew', "What's New"),
+        item('tour', 'Take the Tour'),
         { type: 'separator' },
-        { label: 'Settings…', click: run('settings') },
+        opensDialog('settings'),
         { type: 'separator' },
         { role: 'services' },
         { type: 'separator' },
@@ -162,25 +164,21 @@ export function installAppMenu(browser: Browser): void {
     {
       label: 'File',
       submenu: [
-        { label: 'New Tab', click: run('newTab') },
-        { label: 'New Window', click: () => browser.openNewWindow() },
-        { label: 'New Incognito Window', click: () => browser.openIncognito() },
-        { label: 'New Little Window', click: run('littleArc') },
-        { label: 'New Space', click: run('newSpace') },
+        item('newTab'),
+        { label: commandTitle('newWindow'), click: () => browser.openNewWindow() },
+        { label: commandTitle('newIncognitoWindow'), click: () => browser.openIncognito() },
+        item('littleArc'),
+        item('newSpace'),
         { type: 'separator' },
-        { label: 'Import from Arc…', click: run('importArc') },
-        { label: 'Import from Zen…', click: run('importZen') },
-        { label: 'Import from Chrome…', click: run('importChrome') }
+        opensDialog('importArc'),
+        opensDialog('importZen'),
+        item('importChrome', 'Import from Chrome…')
       ]
     },
     { role: 'editMenu' },
     {
       label: 'View',
-      submenu: [
-        { label: 'Toggle Sidebar', click: run('toggleSidebar') },
-        { role: 'togglefullscreen' },
-        { label: 'Developer Tools', click: run('devtools') }
-      ]
+      submenu: [item('toggleSidebar'), { role: 'togglefullscreen' }, item('devtools')]
     },
     { role: 'windowMenu' }
   ]

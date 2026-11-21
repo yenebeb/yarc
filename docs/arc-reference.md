@@ -138,7 +138,7 @@ Notation: on macOS, ⌘ = Command, ⌥ = Option, ⌃ = Control, ⇧ = Shift. On 
   - ⌘S, or drag the sidebar to zero width.
   - The content then fills the window edge-to-edge; only a small window margin remains [U].
   - **Hovering the left screen/window edge reveals the sidebar as a floating overlay** with rounded corners and a shadow, over the content [O: Windows notes on "unanchored Sidebar appears on hover", "Sidebar corners become unrounded when undocked" bug].
-  - The overlay hides again once the pointer has left it, but not right at its edge: there is some room past the edge (enough to grab it and resize), and a short delay [user report 2026-11-06]. YARC: 32 px past the edge, 300 ms (`PEEK_GRACE`, `PEEK_HIDE_DELAY` in `src/main/browser.ts`); the exact values in Arc are [U]. The edge can be dragged to resize while it is out.
+  - The overlay hides again once the pointer has left it, but not right at its edge: there is some room past the edge (enough to grab it and resize), and a short delay [user report 2026-11-06]. YARC: 32 px past the edge, 300 ms (`SIDEBAR_REVEAL_GRACE_PX`, `SIDEBAR_REVEAL_HIDE_DELAY_MS` in `src/main/browser.ts`); the exact values in Arc are [U]. The edge can be dragged to resize while it is out.
   - When a new tab is created while the sidebar is hidden, a clickable "New Tab Created" toast appears [O].
   - With the sidebar hidden and no Toolbar, the URL is reachable via ⌘L, which opens a centered bar [U].
 - **Window focus.** The sidebar dims slightly when the Arc window is not focused [O].

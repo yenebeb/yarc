@@ -200,7 +200,7 @@ export interface AppState extends PersistedState {
   maximized: boolean
   fullscreen: boolean
   /** True while the collapsed sidebar is temporarily shown over the page. */
-  sidebarPeek: boolean
+  sidebarReveal: boolean
   /** While set, the page area shows split drop zones. */
   tabDrag?: ID
   /** The command bar is open to make a new tab, so the sidebar highlights "New Tab". */

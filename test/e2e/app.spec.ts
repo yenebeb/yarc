@@ -573,7 +573,7 @@ test('Little Window reopens a page with the profile picked on its chip, remember
 
   await app.evaluate((_e, url) => {
     const b = (globalThis as any).arcBrowser
-    b.switchLittleProfile(b.openLittles().find((l: any) => l.url === url), 'p-little')
+    b.openLittles().find((l: any) => l.url === url).switchProfile('p-little')
   }, url)
   await expect.poll(async () => (await littles()).filter((l) => l.url === url).map((l) => l.profile)).toEqual(['p-little'])
   const chips = () => Promise.all(app.windows().filter((w) => w.url().includes('little.html') && !w.isClosed()).map((w) => w.locator('.little-profile').textContent()))
@@ -761,11 +761,11 @@ test('dragging a tab inside the peeking sidebar drops in the sidebar, not on the
   // The hidden sidebar slides out on hover; keep it out although the real pointer is elsewhere.
   await app.evaluate(() => {
     const b = (globalThis as any).arcBrowser
-    b.realWatchPeek = b.watchPeek
-    b.watchPeek = () => {}
+    b.realWatchSidebarReveal = b.watchSidebarReveal
+    b.watchSidebarReveal = () => {}
   })
   await dispatch({ type: 'toggleSidebar' })
-  await dispatch({ type: 'sidebarPeek', show: true })
+  await dispatch({ type: 'sidebarReveal', show: true })
   const overlay = await pageWithUrl('overlay.html')
   await expect(overlay.locator('.sidebar.floating .row .title', { hasText: 'Page peek-tube' })).toBeVisible()
   // Start dragging the tab: the overlay grows over the whole window for the split zones.
@@ -790,11 +790,11 @@ test('dragging a tab inside the peeking sidebar drops in the sidebar, not on the
   expect(hit).toBe(true)
   await expect.poll(async () => (await state()).profiles[0].favorites.map((f) => f.id)).toContain(tube.id)
   expect((await space()).splits).toHaveLength(0)
-  await dispatch({ type: 'sidebarPeek', show: false })
+  await dispatch({ type: 'sidebarReveal', show: false })
   await dispatch({ type: 'toggleSidebar' })
   await app.evaluate(() => {
     const b = (globalThis as any).arcBrowser
-    b.watchPeek = b.realWatchPeek
+    b.watchSidebarReveal = b.realWatchSidebarReveal
   })
 })
 

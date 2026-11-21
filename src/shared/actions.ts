@@ -58,7 +58,7 @@ export type Action =
   /** Starts with an `id`, ends without one. */
   | { type: 'tabDrag'; id?: ID }
   | { type: 'toggleSidebar' }
-  | { type: 'sidebarPeek'; show: boolean }
+  | { type: 'sidebarReveal'; show: boolean }
   | { type: 'overlay'; mode: OverlayMode }
   | { type: 'endTour' }
   | { type: 'settings'; patch: Partial<Settings> }

@@ -32,7 +32,7 @@ function App() {
           <div
             className="peek-strip"
             style={s.sidebarRight ? { right: 0 } : { left: 0 }}
-            onMouseEnter={() => dispatch({ type: 'sidebarPeek', show: true })}
+            onMouseEnter={() => dispatch({ type: 'sidebarReveal', show: true })}
           />
         </>
       ) : null}
