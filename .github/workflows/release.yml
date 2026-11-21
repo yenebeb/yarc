@@ -3,7 +3,9 @@ name: release
 # Every merge to main is released. The version comes from git tags, not package.json:
 #   the next patch (v0.1.2 -> v0.1.3) by default;
 #   PR label `release:minor` / `release:major` for a bigger bump, `release:skip` (or
-#   "[skip release]" in the commit message) for none.
+#   "[skip release]" in the commit message) for none;
+#   none either when the merge only changes what isn't in the app: workflows, docs, tests, Markdown
+#   at the top level. It ships with the next release that changes the app.
 # The tag is created on the squashed commit, the three platforms build into a draft release,
 # and the release is published once all of them succeed. A failed build leaves the draft.
 # Run it manually from the Actions tab to release main with a chosen bump.
@@ -83,6 +85,11 @@ jobs:
               *) bump=patch ;;
             esac
             case "$MESSAGE" in *"[skip release]"*) bump=skip ;; esac
+            # A squashed merge has one parent. Every changed path outside the app: nothing to release.
+            if [ "$bump" != skip ] && ! git diff --name-only HEAD^ HEAD | grep -qvE '^(\.github/|\.claude/|docs/|test/|[^/]+\.md$)'; then
+              echo "Only workflows, docs or tests changed."
+              bump=skip
+            fi
           fi
           if [ "$bump" = "skip" ]; then
             echo "Not releasing this commit."
@@ -107,8 +114,9 @@ jobs:
           gh release create "v$version" --draft --verify-tag --title "YARC v$version" --generate-notes \
             --notes "Downloads: Windows \`YARC-Setup-*-x64.exe\` (or \`-arm64.exe\`), macOS \`YARC-*-arm64.dmg\` (Apple silicon) or \`-x64.dmg\` (Intel), Linux \`.AppImage\`. Not code-signed: on Windows click More info > Run anyway; on macOS open it once, then System Settings > Privacy & Security > Open Anyway."
           echo "version=$version" >> "$GITHUB_OUTPUT"
-      # What's New in the app: PR titles per release tag, including the one just made, so an update
-      # that skips versions still lists them all. One JSON line, written into each build below.
+      # What's New in the app: each PR's "What's New" lines (or its title, for older PRs) per release
+      # tag, including the one just made, so an update that skips versions still lists them all. One
+      # JSON line, written into each build below and uploaded with the release for the update card.
       - id: changelog
         name: Build the What's New changelog
         if: steps.next.outputs.version != ''
@@ -195,6 +203,10 @@ jobs:
         # rejects the whole workflow, so no job runs at all.
         run: |
           node -e 'require("fs").writeFileSync("release/release.json", JSON.stringify({ electron: require("electron/package.json").version }) + "\n")'
+      # Installed copies list what a downloaded update brings from it (src/main/update-notes.ts).
+      - name: Add the changelog to the release
+        if: runner.os == 'Linux'
+        run: if [ -f build/changelog.json ]; then cp build/changelog.json release/changelog.json; fi
       # What mac-update.ts checks before installing, plus: signed with the certificate if there is one.
       # Not for a pull request: without the secrets it signs ad-hoc, which --strict rejects
       # ("code has no resources but signature indicates they must be present").
@@ -223,8 +235,8 @@ jobs:
         run: |
           shopt -s nullglob
           # Only patterns: nullglob drops one that matches nothing, but keeps a plain path even when
-          # the file isn't there (release.json is only written on Linux).
-          files=(release/*.exe release/*.dmg release/*.zip release/*.AppImage release/*.blockmap release/latest*.yml release/release*.json)
+          # the file isn't there (release.json and changelog.json are only written on Linux).
+          files=(release/*.exe release/*.dmg release/*.zip release/*.AppImage release/*.blockmap release/latest*.yml release/release*.json release/changelog*.json)
           if [ ${#files[@]} -eq 0 ]; then
             echo "::error::No installers in release/"
             exit 1

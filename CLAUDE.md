@@ -7,7 +7,8 @@ Open-source Arc-browser replacement (Electron 45 / Chromium 156, React 19, TypeS
 - `pnpm install` (postinstall downloads the Electron binary) · `pnpm dev` · `pnpm build`
 - `pnpm typecheck` · `pnpm test` (unit, `node --test`) · `pnpm test:e2e` (builds, then Playwright drives the real app)
 - Icons: edit `build/icon.svg` (and `icon-small.svg` for 16–32px), then `pnpm exec electron scripts/render-icons.mjs` and commit the PNG/ICO it writes.
-- `pnpm dist:mac` / `dist:win` → installers in `release/`. Releases are automatic: each merge to `main` gets the next semver tag (patch; PR labels `release:minor` / `release:major` / `release:skip`), CI builds it and publishes once all platforms pass. The version comes from the tag (`package.json` is `0.0.0-dev`).
+- `pnpm dist:mac` / `dist:win` → installers in `release/`. Releases are automatic: each merge to `main` gets the next semver tag (patch; PR labels `release:minor` / `release:major` / `release:skip`; no release when the merge only touches `.github/`, `docs/`, `test/` or top-level Markdown), CI builds it and publishes once all platforms pass. The version comes from the tag (`package.json` is `0.0.0-dev`).
+- Every PR description needs a `## What's New` section (`.github/pull_request_template.md`, checked by `whats-new.yml`): one line per change in words for users, or `none` for what they won't notice (CI, tests, docs, refactors, logging). That's what What's New and the update card show (`scripts/changelog.mjs`); the title is only for GitHub. No "like Arc" in it.
 
 ## Architecture (see README "How it works")
 

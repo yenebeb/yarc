@@ -3,7 +3,7 @@
 import type { ReleaseNotes } from '../shared/types'
 import { compareVersions } from './release.ts'
 
-/** Version → PR titles merged in it (scripts/changelog.mjs). Versions without changes may be missing. */
+/** Version → the changes for users merged in it (scripts/changelog.mjs). A version may have none. */
 export type Changelog = Record<string, string[]>
 
 /** How many versions "What's New" from the menu or the command bar lists. */

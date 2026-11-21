@@ -15,7 +15,7 @@ import { cleanUpStaging, installStaged, stageUpdate, updatableBundle, UpdateReje
 import { installAppMenu } from './menus'
 import { isNewer, LATEST_RELEASE_API, pickDownload, pickMacUpdate, releasePage, type GithubRelease, type MacUpdate } from './release'
 import { isSecurityUpdate, releaseInfoUrl, shouldAsk, startWaiting } from './update-escalation'
-import { pendingReleases, RELEASES_API, type GithubReleaseNotes } from './update-notes'
+import { changelogUrl, parseChangelog, pendingReleases } from './update-notes'
 import { stillSigned, verifyInstaller } from './windows-update'
 
 const CHECK_EVERY = 60 * 60_000
@@ -172,9 +172,9 @@ export class Updater {
 
   private async notesUpTo(version: string): Promise<ReleaseNotes[]> {
     try {
-      const res = await net.fetch(RELEASES_API, { headers: { accept: 'application/vnd.github+json' } })
+      const res = await net.fetch(changelogUrl(version))
       if (!res.ok) throw new Error(`GitHub answered ${res.status}`)
-      return pendingReleases((await res.json()) as GithubReleaseNotes[], app.getVersion(), version)
+      return pendingReleases(parseChangelog(await res.json()), app.getVersion(), version)
     } catch (err) {
       // The card still offers the relaunch, just without the list.
       console.warn('[updater] release notes unavailable', err)
