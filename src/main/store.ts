@@ -118,8 +118,7 @@ export class Store {
   }
 
   save(): void {
-    clearTimeout(this.timer)
-    this.timer = setTimeout(() => this.flush(), 400)
+    this.timer ??= setTimeout(() => this.flush(), 2000)
   }
 
   flush(): void {

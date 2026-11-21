@@ -37,6 +37,7 @@ export class History {
     if (dir) chmodSync(file, 0o600)
     this.db.exec(`
       PRAGMA journal_mode = WAL;
+      PRAGMA synchronous = NORMAL;
       CREATE TABLE IF NOT EXISTS urls (
         url TEXT PRIMARY KEY,
         title TEXT NOT NULL DEFAULT '',
@@ -77,7 +78,7 @@ export class History {
    * Pages for the command bar: every word of the query in the title or URL. The pages whose title or
    * address starts with the query come first, then the most visited; the caller ranks them.
    */
-  search(query: string, limit = 500): HistoryEntry[] {
+  search(query: string, limit = 100): HistoryEntry[] {
     const words = query.trim().split(/\s+/).filter(Boolean)
     if (!words.length) return []
     const start = `${query.trim().replace(/[\\%_]/g, (m) => `\\${m}`)}%`

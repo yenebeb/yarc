@@ -3,6 +3,7 @@
 // A Peek page sits above even the overlay, which draws its backdrop and buttons.
 import { BrowserWindow, WebContentsView, nativeTheme, screen, type BrowserWindowConstructorOptions, type Rectangle, type WebContents } from 'electron'
 import { join } from 'node:path'
+import { IPC } from '../shared/ipc'
 import { isFloating } from '../shared/tour'
 import type { OverlayMode } from '../shared/types'
 import type { PromptView } from './prompt-view'
@@ -106,6 +107,13 @@ export class MainWindow {
     this.overlay = new WebContentsView({ webPreferences: uiWebPreferences() })
     this.overlay.setBackgroundColor('#00000000')
     loadRenderer(this.overlay.webContents, 'overlay')
+    this.win.once('closed', () => {
+      if (!this.overlay.webContents.isDestroyed()) this.overlay.webContents.close()
+    })
+  }
+
+  sendToOverlay(channel: string, data: unknown): void {
+    if (!this.overlay.webContents.isDestroyed()) this.overlay.webContents.send(channel, data)
   }
 
   get ui(): WebContents {
@@ -191,7 +199,7 @@ export class MainWindow {
 
   setOverlay(mode: OverlayMode, rect: Rectangle | undefined): void {
     this.overlayMode = mode
-    this.overlay.webContents.send('arc:overlay', mode)
+    this.sendToOverlay(IPC.overlay, mode)
     if (mode.kind === 'none' || !rect) {
       if (this.overlayAttached) {
         this.win.contentView.removeChildView(this.overlay)

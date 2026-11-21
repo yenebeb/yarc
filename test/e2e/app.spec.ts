@@ -244,6 +244,7 @@ test('dragging the sidebar edge resizes the sidebar and the page', async () => {
   await drag(60)
   await expect.poll(async () => (await state()).settings.sidebarWidth).toBe(before + 60)
   await expect.poll(async () => (await state()).layout.content.x).toBe(before + 60)
+  await expect.poll(async () => (await ui.locator('.sidebar').boundingBox())?.width).toBe(before + 60)
   // Clamped at the minimum width.
   await drag(-1000)
   await expect.poll(async () => (await state()).settings.sidebarWidth).toBe(200)
@@ -504,7 +505,7 @@ test('closing a Today tab archives it and it can be reopened', async () => {
   const left = s.today.find((t) => t.url.endsWith('/left'))!
   await dispatch({ type: 'close', id: left.id })
   expect((await space()).today.some((t) => t.id === left.id)).toBe(false)
-  expect((await state()).archive[0].url).toBe(`${base}/left`)
+  expect(await app.evaluate(() => (globalThis as any).arcBrowser.store.state.archive[0].url)).toBe(`${base}/left`)
   await dispatch({ type: 'reopenClosed' })
   await expect.poll(async () => (await space()).today[0]?.url).toBe(`${base}/left`)
 })
@@ -828,6 +829,7 @@ test('a tab selected in two windows is live in one and mirrored, greyed, in the 
       return send(channel, ...args)
     }
   })
+  await expect.poll(async () => (await state()).live[shared]?.loading).toBe(false)
   await app.evaluate((_e, { id, url }) => (globalThis as any).arcBrowser.live.get(id).wc.loadURL(url), { id: shared, url: `${base}/moved` })
   await expect.poll(() => app.evaluate(() => (globalThis as any).stills), { timeout: 10_000 }).toBeGreaterThan(0)
 

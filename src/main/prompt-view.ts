@@ -1,7 +1,7 @@
 // The site permission prompt: a small popover pointing at the URL field, over the
 // page. Its own little view (not the overlay), so the page stays usable around it and the command
 // bar can open without losing the question.
-import { WebContentsView, type BrowserWindow, type Rectangle } from 'electron'
+import { WebContentsView, type BrowserWindow, type Event, type Input, type Rectangle } from 'electron'
 import { IPC } from '../shared/ipc'
 import type { PermissionPrompt, PromptOp } from '../shared/permissions'
 import type { PermissionRequest, PromptAnswer } from './permission-queue'
@@ -30,7 +30,7 @@ export type PromptAnchor =
 const views = new Map<number, PromptView>()
 
 export class PromptView {
-  readonly view: WebContentsView
+  private view: WebContentsView | undefined
   private current: PermissionRequest | undefined
   private anchor: PromptAnchor | undefined
   private height = 0
@@ -42,24 +42,26 @@ export class PromptView {
   constructor(
     private win: BrowserWindow,
     private onAnswer: (id: string, answer: PromptAnswer) => void,
+    private onShortcut: (e: Event, input: Input) => void,
     /** Called after the view (re)joins the window, so the owner can keep its z-order. */
     private onAttach: () => void = () => {}
   ) {
     PromptView.registerIpc()
-    this.view = new WebContentsView({ webPreferences: uiWebPreferences() })
-    this.view.setBackgroundColor('#00000000')
-    const wc = this.view.webContents
+  }
+
+  private createView(): WebContentsView {
+    const view = new WebContentsView({ webPreferences: uiWebPreferences() })
+    view.setBackgroundColor('#00000000')
+    const wc = view.webContents
     const id = wc.id
     views.set(id, this)
     wc.once('destroyed', () => views.delete(id))
-    win.once('closed', () => {
+    wc.on('before-input-event', (e, input) => input.key !== 'Escape' && this.onShortcut(e, input))
+    this.win.once('closed', () => {
       if (!wc.isDestroyed()) wc.close()
     })
     loadRenderer(wc, 'prompt')
-  }
-
-  get webContents() {
-    return this.view.webContents
+    return view
   }
 
   get visible(): boolean {
@@ -70,6 +72,7 @@ export class PromptView {
   show(req: PermissionRequest | undefined, anchor?: PromptAnchor): void {
     if (this.win.isDestroyed()) return
     if (!req || !anchor) return this.hide()
+    this.view ??= this.createView()
     const changed = req.id !== this.current?.id
     const moved = JSON.stringify(anchor) !== JSON.stringify(this.anchor)
     this.current = req
@@ -88,16 +91,16 @@ export class PromptView {
     this.anchor = undefined
     this.height = 0
     this.detach()
-    if (this.ready && !this.view.webContents.isDestroyed()) this.view.webContents.send(IPC.prompt, null)
+    this.sendToView(null)
   }
 
   /** Puts the view back on top of the window's other views. */
   raise(): void {
-    if (this.attached) this.win.contentView.addChildView(this.view)
+    if (this.attached && this.view) this.win.contentView.addChildView(this.view)
   }
 
   private detach(): void {
-    if (!this.attached) return
+    if (!this.attached || !this.view) return
     this.attached = false
     if (!this.win.isDestroyed()) this.win.contentView.removeChildView(this.view)
   }
@@ -126,12 +129,17 @@ export class PromptView {
   }
 
   private send(): void {
-    if (this.ready && !this.view.webContents.isDestroyed()) this.view.webContents.send(IPC.prompt, this.info())
+    this.sendToView(this.info())
+  }
+
+  private sendToView(prompt: PermissionPrompt | null): void {
+    const wc = this.view?.webContents
+    if (this.ready && wc && !wc.isDestroyed()) wc.send(IPC.prompt, prompt)
   }
 
   private place(): void {
     const rect = this.rect()
-    if (!rect || this.win.isDestroyed()) return
+    if (!rect || !this.view || this.win.isDestroyed()) return
     this.view.setBounds(rect)
     const first = !this.attached
     if (first) this.shownAt = Date.now()

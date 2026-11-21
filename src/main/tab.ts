@@ -316,7 +316,7 @@ function wirePopup(win: BrowserWindow, session: Session): void {
 }
 
 /** Larger icons stay URLs: each data: URL is stored with its tab and sent to the UI with every update. */
-const FAVICON_MAX = 16_000
+export const FAVICON_MAX = 16_000
 const IMAGE_TYPES: Record<string, string> = { ico: 'image/x-icon', png: 'image/png', svg: 'image/svg+xml', gif: 'image/gif', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp' }
 
 /**

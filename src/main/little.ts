@@ -65,13 +65,14 @@ export class LittleWindow implements TabHost {
     this.tab.view.setBorderRadius(0)
     this.browser.extensions.addTab(this.tab, this.win)
     this.win.contentView.addChildView(this.tab.view)
-    this.prompt = new PromptView(this.win, (id, answer) => {
-      browser.profiles.permissionQueue.answer(id, answer)
-      if (!this.prompt.visible) this.tab?.wc.focus()
-    })
-    this.prompt.webContents.on('before-input-event', (e, input) => {
-      if (input.key !== 'Escape') this.onTabInput(undefined, e, input)
-    })
+    this.prompt = new PromptView(
+      this.win,
+      (id, answer) => {
+        browser.profiles.permissionQueue.answer(id, answer)
+        if (!this.prompt.visible) this.tab?.wc.focus()
+      },
+      (e, input) => this.onTabInput(undefined, e, input)
+    )
     this.layout()
     this.win.on('resize', () => this.layout())
     // 'resized' fires once the user lets go, not for programmatic resizes.

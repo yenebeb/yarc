@@ -7,6 +7,7 @@ import { readFile } from 'node:fs/promises'
 import { basename, dirname, join } from 'node:path'
 import type { Browser } from '../browser'
 import { newId, SPACE_COLORS } from '../store'
+import { FAVICON_MAX } from '../tab'
 import { SIDEBAR_WIDTH, type ArchivedTab, type PersistedState, type PinnedNode, type Profile, type Space, type TabItem } from '../../shared/types'
 import { parseArcSidebar, readArcJson } from './arc-sidebar'
 import { countTabs, findArcRoot, findChromiumBrowsers, listProfiles, readBookmarks, readHistory, readProfileNames } from './chromium'
@@ -126,7 +127,8 @@ function arcFavicons(root: string): (arcItemId: string) => string | undefined {
   return (id) => {
     const file = join(dir, createHash('md5').update(id).digest('hex'))
     try {
-      return `data:image/png;base64,${readFileSync(file).toString('base64')}`
+      const png = readFileSync(file)
+      return png.length <= FAVICON_MAX ? `data:image/png;base64,${png.toString('base64')}` : undefined
     } catch {
       return undefined
     }

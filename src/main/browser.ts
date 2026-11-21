@@ -81,6 +81,7 @@ const isMac = process.platform === 'darwin'
 declare const __CHANGELOG__: Changelog
 const CHANGELOG: Changelog = __CHANGELOG__
 const MAX_ARCHIVE = 1000
+const UNLOAD_HIDDEN_AFTER = 3600_000
 /**
  * The hidden sidebar stays out while the cursor is within this many pixels past its edge, and
  * goes away once the cursor has been further for PEEK_HIDE_DELAY ms, like Arc. Room to grab the
@@ -145,6 +146,7 @@ export class Browser implements TabHost, FloatingHost {
   private onScreen = new Set<ID>()
   /** Tabs found playing a video when they left: their card offers to float it again. */
   private videoTabs = new Set<ID>()
+  private hiddenSince = new Map<ID, number>()
   /** Streams pages one window shows live to the other windows that show them too (as stills). */
   private mirror = new Mirror((wc, still) => this.sendStill(wc, still))
   private mru: ID[] = []
@@ -152,6 +154,7 @@ export class Browser implements TabHost, FloatingHost {
   downloads: DownloadItemInfo[] = []
   extensionList: Record<ID, ExtensionInfo[]> = {}
   private emitTimer: NodeJS.Timeout | undefined
+  private slowEmitTimer: NodeJS.Timeout | undefined
   readonly littles = new Set<LittleWindow>()
 
   /**
@@ -188,7 +191,7 @@ export class Browser implements TabHost, FloatingHost {
     const userData = app.getPath('userData')
     this.store = new Store(join(userData, 'state.json'))
     this.legacyWindowFile = join(userData, 'window.json')
-    this.adblock = new AdBlock(join(userData, 'adblock', 'engine.bin'), () => this.emitSoon())
+    this.adblock = new AdBlock(join(userData, 'adblock', 'engine.bin'), () => this.emitSlowly())
     this.updater = new Updater(this)
     this.syncAdblock()
     void this.adblock.load()
@@ -248,6 +251,7 @@ export class Browser implements TabHost, FloatingHost {
     if (this.incognito) return
     setInterval(() => {
       this.autoArchive()
+      this.unloadHiddenTabs()
       this.closeIdleLittles()
     }, 5 * 60_000)
     this.autoArchive()
@@ -320,16 +324,17 @@ export class Browser implements TabHost, FloatingHost {
         this.handleInput(e, input)
       })
     }
-    w.main.prompt = new PromptView(win, (id, answer) => {
-      this.use(w)
-      this.answerPrompt(id, answer)
-    })
-    // Shortcuts work while the prompt has the keyboard; Escape is the prompt's own (dismiss).
-    w.main.prompt.webContents.on('before-input-event', (e, input) => {
-      if (input.key === 'Escape') return
-      this.use(w)
-      this.handleInput(e, input)
-    })
+    w.main.prompt = new PromptView(
+      win,
+      (id, answer) => {
+        this.use(w)
+        this.answerPrompt(id, answer)
+      },
+      (e, input) => {
+        this.use(w)
+        this.handleInput(e, input)
+      }
+    )
     win.on('focus', () => {
       this.use(w)
       this.toFront(w)
@@ -600,7 +605,7 @@ export class Browser implements TabHost, FloatingHost {
         info.received = item.getReceivedBytes()
         info.total = item.getTotalBytes()
         info.state = state === 'interrupted' ? 'interrupted' : 'progressing'
-        this.emitSoon()
+        this.emitSlowly()
       })
       item.once('done', (_ev, state) => {
         info.state = state
@@ -622,8 +627,14 @@ export class Browser implements TabHost, FloatingHost {
   // ---------------------------------------------------------------- state out
 
   /** What window `w`'s sidebar and overlay show: the shared state with that window's own view of it. */
-  snapshot(w: Win = this.cur): AppState {
-    return this.snapshotWith(w, this.liveInfo())
+  snapshot(w: Win = this.cur, mode = w.main.overlayMode): AppState {
+    return this.withPanelData(this.snapshotWith(w, this.liveInfo()), mode)
+  }
+
+  private withPanelData(snap: AppState, mode: OverlayMode): AppState {
+    if (mode.kind === 'library') return { ...snap, archive: this.state.archive }
+    if (mode.kind === 'settings') return { ...snap, sitePermissions: Object.fromEntries(this.state.profiles.map((p) => [p.id, this.profiles.decisions(p.id).list()])) }
+    return snap
   }
 
   private liveInfo(): AppState['live'] {
@@ -657,25 +668,32 @@ export class Browser implements TabHost, FloatingHost {
       peek: w.peek && !w.peek.tab.destroyed ? w.peek.tab.info() : undefined,
       layout: w.layout,
       update: this.updater.status,
-      sitePermissions: Object.fromEntries(this.state.profiles.map((p) => [p.id, this.profiles.decisions(p.id).list()])),
+      archive: [],
+      sitePermissions: {},
       media: { cards: [...this.media.cards], floating: this.media.floating, videos: this.media.cards.filter((id) => this.videoTabs.has(id)) }
     }
   }
 
   emit(): void {
     clearTimeout(this.emitTimer)
-    this.emitTimer = undefined
+    clearTimeout(this.slowEmitTimer)
+    this.emitTimer = this.slowEmitTimer = undefined
     const live = this.liveInfo()
     for (const w of this.wins) {
       if (!w.open) continue
       const snap = this.snapshotWith(w, live)
       w.main.ui.send(IPC.state, snap)
-      w.main.overlay.webContents.send(IPC.state, snap)
+      const mode = w.main.overlayMode
+      if (mode.kind !== 'none') w.main.sendToOverlay(IPC.state, this.withPanelData(snap, mode))
     }
   }
 
   emitSoon(): void {
-    if (!this.emitTimer) this.emitTimer = setTimeout(() => this.emit(), 30)
+    this.emitTimer ??= setTimeout(() => this.emit(), 30)
+  }
+
+  private emitSlowly(): void {
+    this.slowEmitTimer ??= setTimeout(() => this.emit(), 1000)
   }
 
   /** Re-render every window, incognito ones too: for state they share, like the updater's. */
@@ -1038,6 +1056,7 @@ export class Browser implements TabHost, FloatingHost {
     if (mode.kind !== 'sidebar' && mode.kind !== 'split-drop') this.cur.tabDrag = undefined
     this.watchPeek(mode.kind === 'sidebar' && !this.cur.tabDrag)
     if (mode.kind !== 'switcher') this.cur.switcher = undefined
+    if (mode.kind !== 'none' && mode.kind !== this.window.overlayMode.kind) this.window.sendToOverlay(IPC.state, this.snapshot(this.cur, mode))
     this.window.setOverlay(mode, this.overlayRect(mode))
     if (!this.state.settings.sidebarVisible) this.window.setTrafficLights(mode.kind === 'sidebar')
     if (mode.kind === 'none' && refocus) this.activeTab()?.wc.focus()
@@ -1312,6 +1331,21 @@ export class Browser implements TabHost, FloatingHost {
       space.today = keep
     }
     if (any) this.changed()
+  }
+
+  private unloadHiddenTabs(): void {
+    const now = Date.now()
+    this.captureCurrent()
+    for (const [id, t] of [...this.live]) {
+      if (t.destroyed) continue
+      const inUse = inAnyView(this.state.windows, id) || t.wc.isCurrentlyAudible() || this.media.cards.includes(id) || this.floating.tabId === id
+      const since = this.hiddenSince.get(id)
+      if (inUse) this.hiddenSince.delete(id)
+      else if (since === undefined) this.hiddenSince.set(id, now)
+      else if (now - since >= UNLOAD_HIDDEN_AFTER) this.dropLive(id)
+    }
+    for (const id of this.hiddenSince.keys()) if (!this.live.has(id)) this.hiddenSince.delete(id)
+    this.emitSoon()
   }
 
   clearToday(): void {
@@ -1720,7 +1754,7 @@ export class Browser implements TabHost, FloatingHost {
         return this.setOverlay({ kind: 'find' })
       case 'findNext':
       case 'findPrev':
-        this.window.overlay.webContents.send(IPC.find, { step: cmd === 'findNext' ? 1 : -1 })
+        this.window.sendToOverlay(IPC.find, { step: cmd === 'findNext' ? 1 : -1 })
         return
       case 'history':
         return this.setOverlay({ kind: 'library', tab: 'history' })
@@ -2113,7 +2147,6 @@ export class Browser implements TabHost, FloatingHost {
     }
     if (change.title && change.title !== item.title) {
       item.title = change.title
-      persist = true
       this.recordHistory(tab, (h) => h.setTitle(tab.wc.getURL(), change.title!))
     }
     if (change.favicon && change.favicon !== item.favicon) {
@@ -2192,7 +2225,7 @@ export class Browser implements TabHost, FloatingHost {
   }
 
   onFoundInPage(tab: LiveTab, result: Result): void {
-    this.winOf(tab).main.overlay.webContents.send(IPC.find, { matches: result.matches, active: result.activeMatchOrdinal })
+    this.winOf(tab).main.sendToOverlay(IPC.find, { matches: result.matches, active: result.activeMatchOrdinal })
   }
 
   adoptOpenedPage(opener: LiveTab, options: BrowserWindowConstructorOptions | undefined, disposition: OpenDisposition, url: string): WebContents {
