@@ -1,5 +1,5 @@
 import type { Action } from './actions'
-import type { CanvasImage, CanvasLoad, CanvasScene, InboxItem } from './canvas'
+import type { CanvasImage, CanvasLoad, CanvasScene, InboxItem, LiveCard } from './canvas'
 import type { AppState, OverlayMode, Rect, SearchResult } from './types'
 import type { HistoryRow, LittleState } from './ipc-types'
 import type { PermissionPrompt, PromptOp } from './permissions'
@@ -35,6 +35,8 @@ export const IPC = {
   canvasRenamed: 'arc:canvas-renamed',
   canvasOpenUrl: 'arc:canvas-open-url',
   canvasExport: 'arc:canvas-export',
+  canvasLive: 'arc:canvas-live',
+  canvasShown: 'arc:canvas-shown',
   capturePick: 'arc:capture-pick'
 } as const
 
@@ -120,6 +122,10 @@ export interface ArcApi {
   onCanvasRenamed(cb: (r: { from: string; to: string }) => void): () => void
   canvasOpenUrl(url: string): Promise<void>
   canvasExport(png: Uint8Array, to: 'file' | 'clipboard'): Promise<void>
+  /** Every live card, each time one moves, resizes or is hidden; none while the page isn't shown. */
+  canvasLive(cards: LiveCard[]): void
+  /** Taking the page out of the window doesn't hide its document. */
+  onCanvasShown(cb: (shown: boolean) => void): () => void
   /** In overlay page coordinates; `depth` steps out to the element's ancestors. */
   capturePick(x: number, y: number, depth: number): Promise<Rect | undefined>
 }

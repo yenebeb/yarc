@@ -751,6 +751,7 @@ export class Browser implements TabHost, FloatingHost {
       for (const { view } of slots) if (other.main.isShown(view)) this.lend(other, view)
     }
     this.window.show(slots)
+    this.canvases.showing((view) => this.wins.some((w) => w.open && w.main.isShown(view)))
   }
 
   private lend(w: WindowSession, view: WebContentsView): void {

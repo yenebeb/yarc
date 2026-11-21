@@ -1,7 +1,7 @@
 import { BrowserWindow, clipboard, ClipboardItem, dialog, nativeImage, WebContentsView, type Event, type Input, type IpcMainEvent, type WebContents } from 'electron'
 import { existsSync, mkdirSync, renameSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { FILE_ID, IMAGE_TYPES, type CanvasImage, type CanvasLoad, type CanvasScene, type CaptureGeometry, type CaptureSource } from '../shared/canvas'
+import { FILE_ID, IMAGE_TYPES, type CanvasImage, type CanvasLoad, type CanvasScene, type CaptureGeometry, type CaptureSource, type LiveCard } from '../shared/canvas'
 import { IPC } from '../shared/ipc'
 import { commandForInput, type CommandId } from '../shared/keymap'
 import { findCanvas } from '../shared/tree'
@@ -9,6 +9,7 @@ import type { CaptureTo } from '../shared/actions'
 import type { ID, PinnedCanvas, Rect, Space } from '../shared/types'
 import type { Browser } from './browser'
 import { CanvasFiles, emptyOldTrash } from './canvas-store'
+import { isLiveCard, LiveCapture } from './capture-live'
 import { logError } from './log'
 import { newId } from './store'
 import type { LiveTab } from './tab'
@@ -24,6 +25,9 @@ const PICK_WORLD = 1847
 
 export class CanvasPage {
   readonly view: WebContentsView
+  /** Child views, so they're clipped to the page and leave the window with it. */
+  readonly live = new Map<string, LiveCapture>()
+  private shown = true
 
   constructor(
     readonly id: ID,
@@ -39,7 +43,22 @@ export class CanvasPage {
     return this.view.webContents
   }
 
+  setShown(shown: boolean): void {
+    if (shown === this.shown || this.wc.isDestroyed()) return
+    this.shown = shown
+    this.wc.send(IPC.canvasShown, shown)
+  }
+
+  stop(cardId: string): void {
+    const live = this.live.get(cardId)
+    if (!live) return
+    this.live.delete(cardId)
+    this.view.removeChildView(live.box)
+    live.close()
+  }
+
   destroy(): void {
+    for (const id of [...this.live.keys()]) this.stop(id)
     if (!this.wc.isDestroyed()) this.wc.close()
   }
 }
@@ -67,6 +86,10 @@ export class Canvases {
     })
     this.pages.set(id, page)
     return page
+  }
+
+  showing(isShown: (view: WebContentsView) => boolean): void {
+    for (const page of this.pages.values()) page.setShown(isShown(page.view))
   }
 
   pageOf(wc: WebContents): CanvasPage | undefined {
@@ -250,6 +273,10 @@ export class Canvases {
     })
     handleUi(IPC.canvasTakeInbox, (e) => of(e).canvases.files(of(e).page.id)?.takeInbox() ?? [])
     handleUi(IPC.canvasOpenUrl, (e, url: string) => of(e).canvases.openUrl(of(e).page.id, String(url)))
+    onUi(IPC.canvasLive, (e: IpcMainEvent, cards: LiveCard[]) => {
+      const hit = find(e.sender)
+      if (hit && Array.isArray(cards)) hit.canvases.play(hit.page, cards.filter(isLiveCard))
+    })
     handleUi(IPC.canvasExport, (e, png: Uint8Array, to: 'file' | 'clipboard') => of(e).canvases.export(of(e).page.id, png, to))
   }
 
@@ -269,6 +296,22 @@ export class Canvases {
       files.writeImage(fileId, Buffer.from(m[2], 'base64'), m[1])
     }
     files.writeScene({ items: scene.items, view: scene.view, snapping: scene.snapping })
+  }
+
+  private play(page: CanvasPage, cards: LiveCard[]): void {
+    const hit = findCanvas(this.browser.state, page.id)
+    if (!hit || this.browser.incognito) return
+    const wanted = new Map(cards.map((c) => [c.id, c]))
+    for (const [id, live] of page.live) if (wanted.get(id)?.url !== live.url) page.stop(id)
+    for (const card of wanted.values()) {
+      const live = page.live.get(card.id)
+      if (live) live.update(card)
+      else {
+        const added = new LiveCapture(this.browser, hit.space.profileId, card)
+        page.live.set(card.id, added)
+        page.view.addChildView(added.box)
+      }
+    }
   }
 
   private openUrl(id: ID, url: string): void {

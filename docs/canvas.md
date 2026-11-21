@@ -1,10 +1,12 @@
-# Canvas: a freeform board with page captures (design, not built)
+# Canvas: a freeform board with page captures (phase 1 and live view built)
 
-Status (2026-11-21): phase 1 (MVP) is built on our own board (section 2), on branch `claude/canvas-design-doc`, and was tried in the running app through `YARC_TEST` (captures, Add Image, the Send To list, drawing a rectangle and typing a text with input events, rename, saving); not yet with a real keyboard and trackpad, and the unit tests haven't run since the rebuild; live captures (phase 2) and more export formats (phase 3) are not started. This doc answers a Windows user who asked for Arc's Easels, which only ever shipped on macOS.
+Status (2026-11-21): phase 1 (MVP) is built on our own board (section 2), released in v0.2.0, and was tried in the running app through `YARC_TEST` (captures, Add Image, the Send To list, drawing a rectangle and typing a text with input events, rename, saving); not yet with a real keyboard and trackpad. Phase 2a, the live view (section 4.1), is built; the rest of phase 2 (refresh, anchoring, the memory guard) and more export formats (phase 3) are not started. This doc answers a Windows user who asked for Arc's Easels, which only ever shipped on macOS.
 
 **What phase 1 has** (`src/main/canvas.ts`, `src/main/canvas-store.ts`, `src/renderer/src/canvas.tsx`): canvases as pinned sidebar items (`PinnedCanvas`), shown in the content area by `canvas.html`, a board YARC draws itself (section 2); files per profile with the inbox and trash below; ⌘⇧2 capture with hover-to-pick or drag and a Send To list; Add Image to Canvas; captures as cards whose footer opens the page in Peek; Arrange in Grid; a hint under the title, while a canvas holds nothing else, naming ⌘⇧2, Add Image to Canvas and paste or drop (no tutorial or example canvas); PNG export and copy; rename, move to space, delete to trash. The title follows a sidebar rename while it still reads the old name. A focused canvas keeps ⌘D (duplicate) and ⌘± / ⌘0 (zoom) for itself.
 
 **Built differently from below:** main never writes board items. A capture is stored as an image plus an entry in the canvas's `inbox.json`; the canvas page places inbox items when it opens (or at once, if open) and saves. Saving never deletes an image that's still in the inbox.
+
+**What phase 2a has** (`src/main/capture-live.ts`): ▶ in a capture card's footer (cards with capture geometry only) plays the real page in the card's picture box, ⏸ goes back to the still; saved as `CardItem.live`, so a live card plays again when its canvas opens. Section 4.1 says what's built and what's left. Tried in the running app through `YARC_TEST` (play, wheel pan, zoom, dragging the card by its footer, a menu, switching to a tab and back, a link opening in Peek, pause); not with a real trackpad, and not whether clicks just outside a live card's box reach the board.
 
 **Not in phase 1:** canvases in the command bar's search results, a still of a canvas shown in a second window (the other window shows nothing there), canvases in split view, an undo toast for Delete.
 
@@ -61,7 +63,7 @@ From the user's own Arc (its translator notes and type names, read for the featu
 |---|---|---|
 | Tools | pointer, image, text, rectangle, ellipse, triangle, line, arrow, freehand, zoom | **Now:** select, image (from a file), text, rectangle, ellipse, arrow, freehand, hand, zoom. Later: triangle, plain line. |
 | Objects | text, rich text, shapes, images, web cards (captures), embedded live pages, link cards, video | **Now:** text (title, heading, body), shapes, arrows, drawings, images, captures as cards. Later: live captures (phase 2), link cards, rich text. Not planned: video, embedded pages. |
-| Capture card | a framed card; on hover or selection a footer with the site's icon, page title, ▶ live view and ↗ open | **Now:** card with footer (icon, title, ↗ opens Peek). ▶ comes with phase 2. |
+| Capture card | a framed card; on hover or selection a footer with the site's icon, page title, ▶ live view and ↗ open | **Now:** card with footer (icon, title, ▶ live view, ↗ opens Peek). |
 | Object menu | cut, copy, paste, duplicate, delete, bring to front, send to back, make the title, alignment guides on/off, image description, copy or open a capture's URL, set as thumbnail | **Now:** cut, copy, paste, duplicate, delete, bring to front, send to back, make the title, snapping on/off, open page, copy page address. Later: image description (alt text), thumbnail. |
 | Styles | a named palette (black, white, grey, red, pink, yellow, two greens, two blues, purple), fill styles, fonts, text styles | **Now:** an 8-color palette, fill on/off for shapes, three text sizes. |
 | After a capture | "Send To…": a search field, saved to Library, Copy, Save…, share, Edit, Retake, New Easel, recent Easels, See Older | **Now:** filter field, Copy, Save…, Retake, New Canvas, canvases most recent first, five shown with "Show all". Not planned: a captures library, sharing. |
@@ -109,6 +111,12 @@ Two mechanisms do this:
 - **Refresh** (4.2): load the page hidden, capture the region again, store the picture. Used for playing captures that can't have a live view right now (scrolled off screen, too small to read, or closed by the memory guard), for the picture a capture shows while its live view loads, and for "Refresh picture" on a paused capture.
 
 ### 4.1 Live view (play)
+
+**Built (phase 2a), and how it differs from the plan below.** The canvas page sends main every live card's picture box on screen (board coordinates × zoom + pan, in the page's CSS pixels), its zoom and whether it's hidden, each time that changes (`canvasLive`, fire-and-forget). Main keeps one `LiveCapture` per card: a plain `View` at the card's box, a child of the canvas's `CanvasPage.view`, which clips a `WebContentsView` laid out exactly as the tab was at capture time: the viewport emulated with `enableDeviceEmulation({ viewSize: capture.viewport, scale })`, scrolled to `capture.scroll`, and placed so the captured rect fills the box (`scale` = box width / rect width, set again on zoom). The profile's session, the tab's web preferences, muted, shortcuts through `before-input-event`, new windows and links clicked after load in Peek, page pinch-zoom off. It shows once the page has loaded and scrolled, plus 400 ms; until then the still is visible. A live card always shows its footer, so it can be dragged by it. Hidden (the view stays loaded): smaller than 80 × 60 on screen, off the board, or while a canvas menu is open. Closed: on pause, when the card is deleted, while the canvas is out of every window (main tells the page with `canvasShown`, since taking a view out of a window doesn't hide its document), and with the canvas page.
+
+Not yet: the first-play explanation, swapping to a still during pans, selection, drags and resizes (the view follows the card instead, and covers the selection handles), the live view drawing over the toolbars when a card sits under them, pause saving the last frame (the capture-time still comes back), closing rather than hiding a view that's off screen or too small, "Back to region", ⌘R, unmuting, live views on a canvas whose window closed, and the guards in 4.4. Refresh (4.2), selector anchoring (4.3) and the memory guard (rule 3 below) come later.
+
+The plan:
 
 1. Create a `WebContentsView` in the profile's session (`Profiles.partition(profileId)`), so the page sees the user's logins and the profile's ad blocker and extensions apply. Sandboxed, no preload, muted until the user unmutes it from the source chip. It is not a `Tab`: no history entry, no archive, no sidebar row.
 2. Add it as a child of the window, above the canvas page, with its bounds set to the capture's box on screen. The canvas page sends the card's box on screen (its element's `getBoundingClientRect()`) to main whenever it changes.
@@ -307,6 +315,7 @@ Sizes are for one person who knows the codebase, including unit and e2e tests, a
 - **Import Easels** reads the folder Arc's Library exports (`easel.json` per Easel, section 5.3) into canvases. Do this before 2026-12-22 so users know to export.
 
 ### Phase 2: live captures (about 3–4 weeks)
+- **Phase 2a (built):** play / pause with live views placed over the card, as described at the top of 4.1.
 - Play / pause with live views (4.1): placement over the canvas, swap to a still during gestures and menus, closing views off screen and under memory pressure (measure 10 live dashboards on an 8 GB machine to set the thresholds), mute, links to Peek.
 - Selector anchoring (4.3), `capture-refresher.ts` with the queue, the guards in 4.4.
 - Load on show, ⌘R, "Refresh picture", age on the chip, "Sign in needed", "may have moved", "Re-pick region".

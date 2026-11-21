@@ -19,6 +19,7 @@ import {
   type Guide,
   type ImageItem,
   type InboxItem,
+  type LiveCard,
   type TextItem,
   type TextSize
 } from '../../shared/canvas'
@@ -33,6 +34,7 @@ const MIN_ZOOM = 0.1
 const MAX_ZOOM = 4
 const SNAP_SCREEN_PX = 6
 const CARD_FRAME = 6
+const LIVE_MIN = { width: 80, height: 60 }
 const STROKE = 2.5
 const DRAW_STROKE = 3
 const LINE_HEIGHT = 1.25
@@ -283,7 +285,8 @@ function ItemView({
   dark,
   files,
   nodeRef,
-  onEdited
+  onEdited,
+  onPlay
 }: {
   item: BoardItem
   selected: boolean
@@ -292,19 +295,25 @@ function ItemView({
   files: Map<string, CanvasImage>
   nodeRef: (node: HTMLElement | null) => void
   onEdited: (text: string) => void
+  onPlay: () => void
 }) {
   const place: CSSProperties = { left: item.x, top: item.y, width: item.width, height: item.height }
   const cls = cx('item', item.kind, selected && 'selected')
   if (item.kind === 'capture') {
     const source = item.source
     return (
-      <div className={cx(cls, 'card')} data-id={item.id} style={place}>
+      <div className={cx(cls, 'card', item.live && 'live')} data-id={item.id} style={place}>
         <div className="frame" />
         <img src={files.get(item.fileId)?.dataURL} alt={source?.title ?? ''} draggable={false} />
         {source ? (
           <div className="footer">
             {source.favicon ? <img className="favicon" src={source.favicon} alt="" draggable={false} /> : <Icon name="globe" size={15} />}
             <span className="title">{source.title || source.url}</span>
+            {item.capture ? (
+              <button title={item.live ? 'Show the picture' : 'Show the live page'} onPointerDown={(e) => e.stopPropagation()} onClick={onPlay}>
+                <Icon name={item.live ? 'pause' : 'play'} size={14} />
+              </button>
+            ) : null}
             <button title="Open the page" onPointerDown={(e) => e.stopPropagation()} onClick={() => void arc.canvasOpenUrl(source.url)}>
               <Icon name="external" size={14} />
             </button>
@@ -438,6 +447,7 @@ function Board({ loaded }: { loaded: CanvasLoad }) {
   const [draft, setDraft] = useState<number[]>()
   const [menu, setMenu] = useState<{ at: Point; board: boolean }>()
   const [panning, setPanning] = useState(false)
+  const [shown, setShown] = useState(true)
 
   // The latest state, for event handlers registered once.
   const itemsRef = useRef(items)
@@ -1029,6 +1039,27 @@ function Board({ loaded }: { loaded: CanvasLoad }) {
 
 
   const onScreen = (b: Box): Box => ({ x: b.x * view.zoom + view.x, y: b.y * view.zoom + view.y, width: b.width * view.zoom, height: b.height * view.zoom })
+
+  useEffect(() => arc.onCanvasShown(setShown), [])
+  const togglePlay = (id: string) => setItems(itemsRef.current.map((i) => (i.id === id && i.kind === 'capture' ? { ...i, live: !i.live || undefined } : i)))
+  const lastLive = useRef('')
+  useEffect(() => {
+    const board = boardRef.current?.getBoundingClientRect()
+    if (!board) return
+    const visible = { x: 0, y: 0, width: board.width, height: board.height }
+    const cards: LiveCard[] = !shown
+      ? []
+      : items.flatMap((i) => {
+          if (i.kind !== 'capture' || !i.live || !i.capture || !i.source) return []
+          const box = onScreen(i)
+          const hidden = !!menu || box.width < LIVE_MIN.width || box.height < LIVE_MIN.height || !intersects(box, visible)
+          return [{ id: i.id, url: i.source.url, capture: i.capture, box: { ...box, x: box.x + board.left, y: box.y + board.top }, zoom: view.zoom, hidden }]
+        })
+    const json = JSON.stringify(cards)
+    if (json === lastLive.current) return
+    lastLive.current = json
+    arc.canvasLive(cards)
+  })
   const single = selected.length === 1 ? items.find((i) => i.id === selected[0]) : undefined
   const handles: Handle[] = !single || single.kind === 'text' || editing ? [] : keepsShape(single) ? ['nw', 'ne', 'sw', 'se'] : ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']
   const chosenItems = items.filter((i) => selected.includes(i.id))
@@ -1079,6 +1110,7 @@ function Board({ loaded }: { loaded: CanvasLoad }) {
               files={files.current}
               nodeRef={(node) => (node ? nodes.current.set(item.id, node) : nodes.current.delete(item.id))}
               onEdited={(text) => finishEdit(item.id, text)}
+              onPlay={() => togglePlay(item.id)}
             />
           ))}
           {draft ? (

@@ -39,6 +39,8 @@ const api: ArcApi = {
   onCanvasRenamed: (cb) => listen(IPC.canvasRenamed, cb),
   canvasOpenUrl: (url) => ipcRenderer.invoke(IPC.canvasOpenUrl, url),
   canvasExport: (png, to) => ipcRenderer.invoke(IPC.canvasExport, png, to),
+  canvasLive: (cards) => ipcRenderer.send(IPC.canvasLive, cards),
+  onCanvasShown: (cb) => listen(IPC.canvasShown, cb),
   capturePick: (x, y, depth) => ipcRenderer.invoke(IPC.capturePick, x, y, depth)
 }
 

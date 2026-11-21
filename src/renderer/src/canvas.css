@@ -105,7 +105,8 @@ body {
 }
 
 .card:hover .frame,
-.card.selected .frame {
+.card.selected .frame,
+.card.live .frame {
   bottom: -40px;
 }
 
@@ -125,7 +126,8 @@ body {
 }
 
 .card:hover .footer,
-.card.selected .footer {
+.card.selected .footer,
+.card.live .footer {
   display: flex;
 }
 

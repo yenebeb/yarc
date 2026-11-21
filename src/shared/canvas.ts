@@ -57,6 +57,18 @@ export interface CardItem extends ItemBox {
   source?: CaptureSource
   capture?: CaptureGeometry
   imageUrl?: string
+  /** Shows the real page in its picture box (docs/canvas.md 4.1). */
+  live?: boolean
+}
+
+/** A live card's picture box in the canvas page's CSS pixels; `hidden` while it's too small to read or something is drawn over it. */
+export interface LiveCard {
+  id: string
+  url: string
+  capture: CaptureGeometry
+  box: Box
+  zoom: number
+  hidden: boolean
 }
 
 export interface ImageItem extends ItemBox {
