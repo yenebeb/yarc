@@ -80,6 +80,7 @@ const TOOLS: { tool: Tool; icon: IconName; label: string; key: string }[] = [
 ]
 
 const newId = () => crypto.randomUUID()
+const titleOf = (items: BoardItem[]) => items.find((i): i is TextItem => i.kind === 'text' && !!i.title)
 const paint = (color: Color, dark: boolean) => PALETTE[color][dark ? 'dark' : 'light']
 const toWorld = (p: Point, v: View): Point => ({ x: (p.x - v.x) / v.zoom, y: (p.y - v.y) / v.zoom })
 const clampZoom = (z: number) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, z))
@@ -483,6 +484,7 @@ function Board({ loaded }: { loaded: CanvasLoad }) {
   const lastDown = useRef<{ at: number; id: string | undefined }>({ at: 0, id: undefined })
   const spaceDown = useRef(false)
   const lastPlaced = useRef<string>(undefined)
+  const centerTitle = useRef(!loaded.scene)
   const pasteCount = useRef(0)
   const nodes = useRef(new Map<string, HTMLElement>())
 
@@ -545,6 +547,13 @@ function Board({ loaded }: { loaded: CanvasLoad }) {
       return { ...item, width, height }
     })
     if (changed) setItems(next)
+  })
+  useLayoutEffect(() => {
+    const title = titleOf(itemsRef.current)
+    if (!centerTitle.current || !title?.width) return
+    centerTitle.current = false
+    const { width, height } = viewSize()
+    setView({ ...viewRef.current, x: Math.round(width / 2 - (title.width / 2) * viewRef.current.zoom), y: Math.round(height / 2 - (title.height / 2) * viewRef.current.zoom) })
   })
 
 
@@ -747,7 +756,9 @@ function Board({ loaded }: { loaded: CanvasLoad }) {
             )
       const size = placedSize(natural.width, natural.height)
       const previous = [...itemsRef.current, ...added].find((i) => i.id === lastPlaced.current)
-      const spot = placeNext(previous, size, center())
+      const title = titleOf(itemsRef.current)
+      const onlyTitle = !previous && title && itemsRef.current.every((i) => i === title)
+      const spot = onlyTitle ? { x: Math.round(title.x + (title.width - size.width) / 2), y: Math.round(title.y + title.height + 32) } : placeNext(previous, size, center())
       files.current.set(q.fileId, { mimeType: q.mimeType, dataURL: q.dataURL })
       const card: CardItem = { id: newId(), kind: 'capture', fileId: q.fileId, ...spot, ...size, source: q.data.source, capture: q.data.capture, imageUrl: q.data.imageUrl }
       added.push(card)
@@ -1072,9 +1083,9 @@ function Board({ loaded }: { loaded: CanvasLoad }) {
   const currentFill = firstShape && (firstShape.kind === 'rect' || firstShape.kind === 'ellipse') ? firstShape.fill : style.fill
   const currentSize = chosenItems.find((i): i is TextItem => i.kind === 'text')?.size ?? style.textSize
 
-  const title = items.find((i): i is TextItem => i.kind === 'text' && !!i.title)
+  const title = titleOf(items)
   const empty = items.every((i) => i === title) && !editing
-  const hintAt = title ? { left: title.x * view.zoom + view.x, top: (title.y + title.height) * view.zoom + view.y + 14 } : undefined
+  const hintAt = title ? { left: (title.x + title.width / 2) * view.zoom + view.x, top: (title.y + title.height) * view.zoom + view.y + 14 } : undefined
 
   return (
     <div className="canvas-page">
