@@ -30,7 +30,7 @@ The Browser Company is shutting Arc down on **22 December 2026**. After that dat
 
 ### Nothing collected
 
-YARC collects nothing about you. There's no telemetry, no usage counting, no crash reporting, no account and no YARC server, so the project never learns who you are, what you browse or even that you opened it. The only requests YARC makes on its own are update checks for itself and a daily download of the ad-blocking filter lists (both from GitHub), search suggestions from the search engine you chose, a site's icon when you use Tab to Search with it, and Chrome Web Store update checks for extensions you installed. Update checks can be turned off in Settings. The only numbers the project has are GitHub's public download counts for each release.
+YARC collects nothing about you: no telemetry, no account, no servers of its own. Besides the sites you visit, it only goes online to check for updates and refresh its ad-blocking lists.
 
 ### The sidebar
 
