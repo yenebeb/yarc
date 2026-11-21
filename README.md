@@ -30,7 +30,13 @@ The Browser Company is shutting Arc down on **22 December 2026**. After that dat
 
 ### Nothing collected
 
-YARC collects nothing about you: no telemetry, no account, no servers of its own. On its own, it only goes online to check for updates and refresh its ad-blocking lists.
+YARC collects nothing about you:
+
+- no telemetry
+- no account
+- no servers
+
+The only thing it needs is a ping to check for updates and to refresh its ad-blocking lists.
 
 ### The sidebar
 
