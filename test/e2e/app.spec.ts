@@ -955,3 +955,49 @@ test('extensions get the chrome.* APIs on browser.* too', async () => {
   }, dir)
   expect(logged).toBe('browser.windows: object, browser.tabs.query: function')
 })
+
+test('an extension popup opens toward the page, whichever side the sidebar is on', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'yarc-ext-'))
+  writeFileSync(join(dir, 'manifest.json'), JSON.stringify({ manifest_version: 3, name: 'popup side', version: '1.0', action: { default_popup: 'popup.html' } }))
+  writeFileSync(join(dir, 'popup.html'), 'popup')
+  const extId = await app.evaluate(async (_e, extDir) => {
+    const b = (globalThis as any).arcBrowser
+    return (await b.profiles.get(b.store.activeSpace.profileId).session.extensions.loadExtension(extDir)).id
+  }, dir)
+  await dispatch({ type: 'open', url: `${base}/popup-anchor`, where: 'tab' })
+  const tabId = (await space()).activeItemId!
+  const ui = app.windows().find((w) => w.url().endsWith('index.html'))!
+  const popupInsideWindow = async () => {
+    await app.evaluate(() => {
+      const b = (globalThis as any).arcBrowser
+      b.extensions.byProfile.get(b.store.activeSpace.profileId).once('browser-action-popup-created', (popup: unknown) => ((globalThis as any).popup = popup))
+    })
+    await ui.locator(`browser-action-list button[id="${extId}"]`).click()
+    await expect.poll(() => app.evaluate(() => !!(globalThis as any).popup)).toBe(true)
+    const inside = await app.evaluate(() => {
+      const g = globalThis as any
+      const popup = g.popup
+      g.popup = undefined
+      // A hidden window doesn't render under test, so the popup never reports a size: size and place it as the library then would.
+      popup.setSize({ width: 300, height: 200 })
+      popup.updatePosition()
+      const p = popup.browserWindow.getBounds()
+      const m = g.arcBrowser.window.win.getBounds()
+      popup.destroy()
+      return p.x >= m.x && p.x + p.width <= m.x + m.width
+    })
+    expect(inside).toBe(true)
+  }
+  try {
+    await popupInsideWindow()
+    await dispatch({ type: 'settings', patch: { sidebarRight: true } })
+    await popupInsideWindow()
+  } finally {
+    await dispatch({ type: 'settings', patch: { sidebarRight: false } })
+    await dispatch({ type: 'close', id: tabId })
+    await app.evaluate((_e, id) => {
+      const b = (globalThis as any).arcBrowser
+      b.profiles.get(b.store.activeSpace.profileId).session.extensions.removeExtension(id)
+    }, extId)
+  }
+})

@@ -130,7 +130,7 @@ export function Sidebar({ state, floating }: { state: AppState; floating?: boole
           </button>
         ) : null}
         <span onClick={(e) => e.stopPropagation()}>
-          {state.extensions[space.profileId]?.length ? <browser-action-list partition={`persist:profile-${space.profileId}`} tab={live ? String(live.wcId) : undefined} alignment="bottom left" /> : null}
+          {state.extensions[space.profileId]?.length ? <browser-action-list partition={`persist:profile-${space.profileId}`} tab={live ? String(live.wcId) : undefined} alignment={state.settings.sidebarRight ? 'bottom left' : 'bottom right'} /> : null}
         </span>
       </div>
 
