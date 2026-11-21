@@ -68,6 +68,8 @@ export class LiveTab {
   readonly wc: WebContents
   fullscreen = false
   crashed = false
+  /** The page's media plays (from Chromium's media events; it may be silent). */
+  playing = false
   /** When the user last clicked in the page; navigations right after it are link clicks, not redirects. */
   private lastClick = 0
   /** When the user last clicked or pressed a key in the page. */
@@ -120,6 +122,7 @@ export class LiveTab {
       loading: wc.isLoading(),
       audible: wc.isCurrentlyAudible(),
       muted: wc.isAudioMuted(),
+      playing: this.playing,
       canGoBack: wc.navigationHistory.canGoBack(),
       canGoForward: wc.navigationHistory.canGoForward(),
       zoom: wc.getZoomLevel(),
@@ -161,6 +164,12 @@ export class LiveTab {
     }, 200)
   }
 
+  private setPlaying(on: boolean): void {
+    if (this.playing === on) return
+    this.playing = on
+    this.host.onTabChanged(this, {})
+  }
+
   destroy(): void {
     if (!this.wc.isDestroyed()) this.wc.close()
   }
@@ -194,6 +203,11 @@ export class LiveTab {
       if (isMainFrame) this.host.onTabChanged(this, { url })
     })
     wc.on('audio-state-changed', () => this.host.onTabChanged(this, {}))
+    wc.on('media-started-playing', () => this.setPlaying(true))
+    wc.on('media-paused', () => this.setPlaying(false))
+    wc.on('did-start-navigation', (details) => {
+      if (details.isMainFrame && !details.isSameDocument) this.setPlaying(false)
+    })
     wc.on('before-input-event', (e, input) => this.host.onTabInput(this, e, input))
     wc.on('focus', () => this.host.onTabFocus(this))
     wc.on('context-menu', (_e, params) => this.host.showContextMenu(this, params))

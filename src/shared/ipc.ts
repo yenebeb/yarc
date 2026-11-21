@@ -24,7 +24,9 @@ export const IPC = {
   prompt: 'arc:prompt',
   promptOp: 'arc:prompt-op',
   focus: 'arc:focus',
-  blur: 'arc:blur'
+  blur: 'arc:blur',
+  float: 'arc:float',
+  floatOp: 'arc:float-op'
 } as const
 
 /** Main asks the sidebar to start inline editing (after a native context menu choice). */
@@ -58,6 +60,20 @@ export type LittleOp =
   | 'reload'
   | 'profileMenu'
   | 'spaceMenu'
+
+/** What the floating player's controls show. */
+export interface FloatState {
+  url: string
+  title: string
+  playing: boolean
+  muted: boolean
+}
+
+/** The floating player's controls; 'sync' asks for the state once they listen. Drag positions are screen points. */
+export type FloatOp =
+  | { kind: 'sync' | 'back' | 'toggle' | 'minimize' | 'close' }
+  | { kind: 'skip'; seconds: number }
+  | { kind: 'drag'; phase: 'start' | 'move' | 'end'; x: number; y: number }
 
 /** Where a Little Window toolbar menu opens, in window coordinates. */
 export interface LittleAnchor {
@@ -93,4 +109,7 @@ export interface ArcApi {
    * told: its focused element stays focused and gets no blur event.
    */
   onBlur(cb: () => void): () => void
+  /** The floating player's controls (float.html). */
+  onFloat(cb: (s: FloatState) => void): () => void
+  float(op: FloatOp): Promise<void>
 }

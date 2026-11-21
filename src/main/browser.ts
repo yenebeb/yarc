@@ -56,8 +56,11 @@ import { openInChrome } from './chrome'
 import { DownloadBurst, isDangerous, markFromInternet } from './downloads'
 import { Extensions } from './extensions'
 import { runImport } from './importers'
+import { FloatingPlayer, type FloatAnchor, type FloatingHost } from './floating-player'
 import { LittleWindow } from './little'
 import { logInfo, logProblem, setLogContext } from './log'
+import { pauseMedia, probeMedia, toggleMedia } from './media-page'
+import { closeFloating, closed, dismiss, emptyMedia, float, left, minimize, shown, type LeftWith, type MediaState } from './media-state'
 import { Mirror, stillOf } from './mirror'
 import { Peek, sameSite } from './peek'
 import { buildContextMenu, buildFolderMenu, buildItemMenu, buildSpaceMenu, buildSplitMenu } from './menus'
@@ -116,7 +119,7 @@ class Win {
   }
 }
 
-export class Browser implements TabHost {
+export class Browser implements TabHost, FloatingHost {
   readonly store: Store
   readonly profiles: Profiles
   readonly extensions: Extensions
@@ -134,6 +137,13 @@ export class Browser implements TabHost {
   /** The current window last logged as missing from the saved windows, to log it once. */
   private reportedLost: Win | undefined
   readonly live = new Map<ID, LiveTab>()
+  /** Tabs playing media out of sight (media-state.ts), and the window that floats a video. */
+  private media: MediaState = emptyMedia()
+  private readonly floating = new FloatingPlayer(this)
+  /** The tabs some window shows live, as of the last layout: one that leaves it may float or get a card. */
+  private onScreen = new Set<ID>()
+  /** Tabs found playing a video when they left: their card offers to float it again. */
+  private videoTabs = new Set<ID>()
   /** Streams pages one window shows live to the other windows that show them too (as stills). */
   private mirror = new Mirror((wc, still) => this.sendStill(wc, still))
   private mru: ID[] = []
@@ -402,6 +412,9 @@ export class Browser implements TabHost {
       return this.emitSoon()
     }
     // The last window keeps its view (reopened from the Dock on macOS, or at the next launch).
+    this.floating.release()
+    this.media = emptyMedia()
+    this.onScreen.clear()
     for (const t of this.live.values()) t.destroy()
     this.live.clear()
     if (this.incognito) this.dispose()
@@ -643,7 +656,8 @@ export class Browser implements TabHost {
       peek: w.peek && !w.peek.tab.destroyed ? w.peek.tab.info() : undefined,
       layout: w.layout,
       update: this.updater.status,
-      sitePermissions: Object.fromEntries(this.state.profiles.map((p) => [p.id, this.profiles.decisions(p.id).list()]))
+      sitePermissions: Object.fromEntries(this.state.profiles.map((p) => [p.id, this.profiles.decisions(p.id).list()])),
+      media: { cards: [...this.media.cards], floating: this.media.floating, videos: this.media.cards.filter((id) => this.videoTabs.has(id)) }
     }
   }
 
@@ -709,6 +723,7 @@ export class Browser implements TabHost {
   private dropLive(id: ID): void {
     const t = this.live.get(id)
     if (!t) return
+    this.mediaGone(id)
     this.live.delete(id)
     for (const w of this.wins) {
       if (w.open) w.main.detach(t.view)
@@ -790,6 +805,7 @@ export class Browser implements TabHost {
     if (mode.kind !== 'none') w.setOverlay(mode, this.overlayRect(mode))
     this.syncPrompts()
     this.syncMirrors()
+    this.syncMedia()
     this.emitSoon()
     // A page this window let go of goes live again in a window that shows a still of it.
     for (const other of this.wins) if (other !== this.cur && this.waitsForPage(other)) this.on(other, () => this.layout())
@@ -809,6 +825,9 @@ export class Browser implements TabHost {
    * window shows moves here, and that window shows a live still of it until it gets it back.
    */
   private show(slots: ViewSlot[]): void {
+    // Back on screen: the floating video goes back into its page first (a view has one parent).
+    const floatingId = this.floating.tabId
+    if (floatingId && slots.some((s) => s.view === this.floating.view)) this.setMedia(shown(this.media, floatingId))
     for (const other of this.wins) {
       if (other === this.cur || !other.open) continue
       for (const { view } of slots) if (other.main.isShown(view)) this.lend(other, view)
@@ -844,6 +863,93 @@ export class Browser implements TabHost {
       }
     }
     this.mirror.watch(pages)
+  }
+
+  // ---------------------------------------------------------------- media out of sight
+
+  /** Tabs that left every window since the last layout may float or get a card; those back on screen lose theirs. */
+  private syncMedia(): void {
+    const now = new Set<ID>()
+    for (const w of this.wins) if (w.open) for (const v of w.layout.views) if (!v.elsewhere) now.add(v.id)
+    const before = this.onScreen
+    this.onScreen = now
+    for (const id of now) if (!before.has(id)) this.setMedia(shown(this.media, id))
+    for (const id of before) if (!now.has(id)) void this.tabLeft(id)
+  }
+
+  /** A playing video floats, other playing media gets a card, a paused tab nothing (docs/arc-reference.md, "Mini Player"). */
+  private async tabLeft(id: ID): Promise<void> {
+    const tab = this.live.get(id)
+    if (!tab || tab.destroyed || (!tab.playing && !tab.wc.isCurrentlyAudible())) return
+    const found = await probeMedia(tab.wc)
+    const still = () => !this.onScreen.has(id) && this.live.get(id) === tab && !tab.destroyed
+    if (!still()) return
+    const playing: LeftWith = found === null ? (tab.wc.isCurrentlyAudible() ? 'audio' : 'nothing') : found === 'audio' ? 'audio' : 'video'
+    if (playing === 'video') this.videoTabs.add(id)
+    else this.videoTabs.delete(id)
+    const next = left(this.media, id, playing, this.state.settings.floatVideos)
+    if (next.floating !== id) return this.setMedia(next)
+    await this.floatTab(tab, still)
+  }
+
+  /** Floats `tab`'s video, or gives it a card when it has none to float. */
+  private async floatTab(tab: LiveTab, wanted: () => boolean): Promise<void> {
+    const id = tab.itemId
+    const ok = await this.floating.open(tab, this.floatAnchor(), wanted)
+    if (!wanted()) return
+    // The player now shows this tab: the one it showed before (if any) becomes a card.
+    this.setMedia(ok ? float(this.media, id) : left(this.media, id, 'audio', false))
+  }
+
+  /** The player opens by the window the user is in. */
+  private floatAnchor(): FloatAnchor {
+    const win = this.cur?.open ? this.cur.main.win.getBounds() : screen.getPrimaryDisplay().workArea
+    return { win, sidebarRight: this.state.settings.sidebarRight }
+  }
+
+  /** The new media state; the floating player lets go of a tab that no longer floats. */
+  private setMedia(next: MediaState): void {
+    const before = this.media
+    if (next === before) return
+    this.media = next
+    if (before.floating && before.floating !== next.floating && this.floating.tabId === before.floating) this.floating.release()
+    this.emitSoon()
+  }
+
+  /** A tab closed or its page went away. */
+  private mediaGone(id: ID): void {
+    this.onScreen.delete(id)
+    this.videoTabs.delete(id)
+    this.setMedia(closed(this.media, id))
+  }
+
+  backToTab(id: ID): void {
+    if (!findItem(this.state, id)) return
+    // Back in the tab's own space (activate() switches to it), in the window the user is in.
+    this.focusWindow()
+    this.activate(id)
+  }
+
+  minimizeFloating(): void {
+    this.setMedia(minimize(this.media))
+  }
+
+  closeFloating(): void {
+    const tab = this.media.floating ? this.live.get(this.media.floating) : undefined
+    if (tab) void pauseMedia(tab.wc)
+    this.setMedia(closeFloating(this.media))
+  }
+
+  private async mediaCard(id: ID, op: 'back' | 'toggle' | 'float' | 'dismiss'): Promise<void> {
+    const tab = this.live.get(id)
+    if (op === 'back') return this.backToTab(id)
+    if (op === 'dismiss') {
+      if (tab) void pauseMedia(tab.wc)
+      return this.setMedia(dismiss(this.media, id))
+    }
+    if (!tab || tab.destroyed) return this.setMedia(closed(this.media, id))
+    if (op === 'toggle') return void (await toggleMedia(tab.wc))
+    if (!this.onScreen.has(id)) await this.floatTab(tab, () => !this.onScreen.has(id) && this.live.get(id) === tab && !tab.destroyed)
   }
 
   /** Sends a new still of a mirrored page to every window that shows it elsewhere. */
@@ -1712,6 +1818,8 @@ export class Browser implements TabHost {
         if (t) t.wc.setAudioMuted(!t.wc.isAudioMuted())
         return this.emitSoon()
       }
+      case 'media':
+        return this.mediaCard(a.id, a.op)
       case 'back':
         return void (tab?.wc.navigationHistory.canGoBack() && tab.wc.navigationHistory.goBack())
       case 'forward':
@@ -1995,11 +2103,17 @@ export class Browser implements TabHost {
       this.adblock.resetCount(tab.wc)
     }
     if (persist) this.store.save()
+    if (this.floating.tabId === tab.itemId) {
+      // Another page loaded: its video is gone. Same-page navigations (YouTube's next video) keep it.
+      if (change.navigated) this.setMedia(closed(this.media, tab.itemId))
+      else this.floating.update()
+    }
     this.emitSoon()
   }
 
   onTabDestroyed(tab: LiveTab): void {
     if (this.live.get(tab.itemId) !== tab) return
+    this.mediaGone(tab.itemId)
     // Destroyed without going through close(): the page closed itself.
     const found = findItem(this.state, tab.itemId)
     if (found?.loc.kind === 'today') this.close(tab.itemId)

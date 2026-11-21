@@ -23,7 +23,7 @@ export interface ViewSlot {
   rect: Rectangle
 }
 
-export type RendererPage = 'index' | 'overlay' | 'little' | 'prompt'
+export type RendererPage = 'index' | 'overlay' | 'little' | 'prompt' | 'float'
 
 export function loadRenderer(wc: WebContents, page: RendererPage): void {
   guardUi(wc)

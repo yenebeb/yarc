@@ -24,6 +24,8 @@ export type Action =
   | { type: 'clearToday' }
   | { type: 'unload'; id: ID }
   | { type: 'mute'; id: ID }
+  /** A sidebar media card's buttons: back to the tab, play/pause, float its video, close the card. */
+  | { type: 'media'; id: ID; op: 'back' | 'toggle' | 'float' | 'dismiss' }
   // navigation on the active tab, or on tab `id` (a split pane's bar)
   | { type: 'back'; id?: ID }
   | { type: 'forward'; id?: ID }

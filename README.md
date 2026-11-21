@@ -114,6 +114,12 @@ A small, minimal window for quick lookups. Open one with `Ctrl+Alt+N` / `⌘⌥N
 
 The chip on the left of the address shows which profile the page uses, so which accounts you're signed in with. Click it to open the page with another profile; YARC remembers that choice for the site. The window also remembers the size you give it.
 
+### Floating player and media cards
+
+Leave a tab while its video plays and the video keeps going in a small floating player, in front of all your apps, whichever space or window you switch to. Drag it anywhere and resize it from its edges; YARC remembers where you left it. Point at it for its buttons: back to the tab, play/pause, 15 seconds back or ahead, **–** to keep it playing from the sidebar, and **✕** to pause it. Double-click it to go back to the tab, and going back to the tab any other way puts the video back in the page.
+
+Music and other sound from a tab you leave gets a card at the bottom of the sidebar instead, with play/pause, mute and the site's icon to go back to the tab. Hover the cards to see them all, each with its title, a button to float its video again and **✕** to close it. You can turn the floating player off in Settings.
+
 ### Built-in ad and tracker blocking
 
 Ads and trackers are blocked out of the box, in every profile, using the same kind of filter lists as uBlock Origin and EasyList (via [Ghostery's open-source engine](https://github.com/ghostery/adblocker)). That includes network blocking, cosmetic filtering that hides empty ad slots, and the scriptlets used against YouTube-style ads. The shield in the URL pill shows how many requests were blocked on the current page. Click it to allow ads on that site, for example if the site breaks, and click again to block them again. The lists update daily. You can turn blocking off completely in Settings.

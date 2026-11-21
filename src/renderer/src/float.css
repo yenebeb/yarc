@@ -1,0 +1,121 @@
+/* The floating player's controls: white on the video, behind soft scrims, only while hovered or paused. */
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+  background: transparent;
+  overflow: hidden;
+  user-select: none;
+  font: 12px/1.2 -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  color: #fff;
+}
+
+.float {
+  position: fixed;
+  inset: 0;
+  cursor: default;
+}
+
+.float-scrim,
+.float-top,
+.float-middle {
+  opacity: 0;
+  transition: opacity 0.18s ease-out;
+}
+
+.float:hover .float-scrim,
+.float:hover .float-top,
+.float:hover .float-middle,
+.float.paused .float-middle,
+.float.paused .float-scrim {
+  opacity: 1;
+}
+
+.float-scrim {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(to bottom, rgb(0 0 0 / 0.55), rgb(0 0 0 / 0) 42%),
+    radial-gradient(circle at 50% 55%, rgb(0 0 0 / 0.28), rgb(0 0 0 / 0) 55%);
+}
+
+.float-top {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  right: 6px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.float-host {
+  flex: 1;
+  min-width: 0;
+  padding: 0 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  text-shadow: 0 1px 2px rgb(0 0 0 / 0.5);
+}
+
+.float-middle {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  pointer-events: none;
+}
+
+.float-middle > * {
+  pointer-events: auto;
+}
+
+.float-btn {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: rgb(0 0 0 / 0.32);
+  color: inherit;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.float-btn:hover {
+  background: rgb(255 255 255 / 0.24);
+}
+
+.float-btn:active {
+  transform: scale(0.94);
+}
+
+.float-play {
+  width: 46px;
+  height: 46px;
+  border-radius: 999px;
+}
+
+.float-skip {
+  position: relative;
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+}
+
+.float-skip span {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -38%);
+  font-size: 8px;
+  font-weight: 700;
+}

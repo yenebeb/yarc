@@ -23,6 +23,7 @@ export const DEFAULT_SETTINGS: Settings = {
   adblock: true,
   adblockAllowlist: [],
   autoUpdate: true,
+  floatVideos: true,
   theme: 'system'
 }
 

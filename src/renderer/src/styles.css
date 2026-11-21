@@ -646,6 +646,87 @@ browser-action-list::part(action):hover {
   opacity: 1;
 }
 
+/* Media cards: tabs playing out of sight. Collapsed, older cards peek out above the newest. */
+.media-cards {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 6px 8px 2px;
+  flex: none;
+}
+
+.media-cards::before,
+.media-cards::after {
+  content: '';
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  top: -5px;
+  height: 12px;
+  border-radius: 9px 9px 0 0;
+  background: var(--panel);
+  opacity: 0.6;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.08);
+  display: none;
+}
+
+.media-cards::after {
+  left: 12px;
+  right: 12px;
+  top: -9px;
+  opacity: 0.35;
+}
+
+.media-cards[data-behind='1']::before,
+.media-cards[data-behind='2']::before,
+.media-cards[data-behind='2']::after {
+  display: block;
+}
+
+.media-card {
+  position: relative;
+  border-radius: 10px;
+  background: var(--panel);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.12);
+  padding: 2px 4px;
+}
+
+.media-card-title {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 0 0 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.media-card-title span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.media-card-title .icon-btn {
+  width: 24px;
+  height: 24px;
+}
+
+.media-card-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.media-card-site .fav-img,
+.media-card-site .letter {
+  width: 16px;
+  height: 16px;
+}
+
 .spaces {
   flex: 1;
   display: flex;

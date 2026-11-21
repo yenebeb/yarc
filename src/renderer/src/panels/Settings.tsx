@@ -245,6 +245,12 @@ function General({ state }: { state: AppState }) {
           checked={s.peekPinnedLinks}
           onChange={(v) => patch({ peekPinnedLinks: v })}
         />
+        <ToggleRow
+          title="Float playing videos when you leave their tab"
+          hint="The video keeps playing in a small window in front of your other apps. Move it, resize it, double-click it to go back to the tab."
+          checked={s.floatVideos}
+          onChange={(v) => patch({ floatVideos: v })}
+        />
       </Group>
       <Group title="Updates">
         <ToggleRow

@@ -19,6 +19,15 @@ const page = (name: string) =>
   `<a id="blank" href="/child-of-${name}" target="_blank">open child</a>` +
   `<a id="same" href="/next-${name}">same tab</a><p>findme findme findme</p>`
 
+/** A video that plays by itself: a canvas animation, with a quiet tone where the machine has audio. */
+const VIDEO_PAGE = `<!doctype html><title>Video page</title><video id="v" style="width:640px;height:360px"></video><script>
+const c = document.createElement('canvas'); c.width = 640; c.height = 360; const g = c.getContext('2d')
+;(function draw(t) { g.fillStyle = 'hsl(' + ((t / 20) % 360) + ' 60% 40%)'; g.fillRect(0, 0, 640, 360); requestAnimationFrame(draw) })(0)
+const tracks = c.captureStream(30).getVideoTracks()
+try { const ac = new AudioContext(); const o = ac.createOscillator(); const d = ac.createMediaStreamDestination(); const gain = ac.createGain(); gain.gain.value = 0.01; o.connect(gain).connect(d); o.start(); tracks.push(...d.stream.getAudioTracks()) } catch {}
+const v = document.getElementById('v'); v.srcObject = new MediaStream(tracks); v.play()
+</script>`
+
 async function launch(): Promise<ElectronApplication> {
   // YARC_EXE runs the suite against a packaged app (e.g. release/win-unpacked/YARC.exe).
   const exe = process.env.YARC_EXE
@@ -52,7 +61,7 @@ async function pageWithUrl(fragment: string): Promise<Page> {
 test.beforeAll(async () => {
   server = createServer((req, res) => {
     res.setHeader('content-type', 'text/html')
-    res.end(page((req.url ?? '/').slice(1) || 'home'))
+    res.end(req.url === '/video-page' ? VIDEO_PAGE : page((req.url ?? '/').slice(1) || 'home'))
   })
   await new Promise<void>((r) => server.listen(0, '127.0.0.1', r))
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
@@ -854,6 +863,64 @@ test('menu bar commands reopen the closed main window (macOS)', async () => {
   })
   await expect.poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length)).toBe(1)
   await expect.poll(() => app.evaluate(() => (globalThis as any).arcBrowser.window.overlayMode.kind)).toBe('command')
+})
+
+const isPlaying = (id: string) => app.evaluate((_e, tabId) => (globalThis as any).arcBrowser.live.get(tabId).playing as boolean, id)
+const floatingPlayer = () =>
+  app.evaluate(({ BaseWindow }) => {
+    const w = BaseWindow.getAllWindows().find((x) => x.getTitle() === 'Floating Player')
+    return w ? { onTop: w.isAlwaysOnTop(), resizable: w.isResizable() } : null
+  })
+
+test('a playing video floats when you leave its tab, and goes back into the page when you return', async () => {
+  await dispatch({ type: 'open', url: `${base}/video-page` })
+  const video = (await space()).activeItemId!
+  await expect.poll(() => isPlaying(video), { timeout: 10_000 }).toBe(true)
+
+  await dispatch({ type: 'open', url: `${base}/after-video` })
+  await expect.poll(async () => (await state()).media.floating, { timeout: 10_000 }).toBe(video)
+  expect(await floatingPlayer()).toEqual({ onTop: true, resizable: true })
+
+  await dispatch({ type: 'activate', id: video })
+  await expect.poll(async () => (await state()).media.floating).toBeUndefined()
+  expect(await floatingPlayer()).toBeNull()
+  expect(await isPlaying(video)).toBe(true)
+  await dispatch({ type: 'close', id: video })
+})
+
+test("the floating player's – keeps the video playing as a sidebar card, whose button floats it again", async () => {
+  await dispatch({ type: 'open', url: `${base}/video-page` })
+  const video = (await space()).activeItemId!
+  await expect.poll(() => isPlaying(video), { timeout: 10_000 }).toBe(true)
+  await dispatch({ type: 'open', url: `${base}/after-video-card` })
+  await expect.poll(async () => (await state()).media.floating, { timeout: 10_000 }).toBe(video)
+
+  await app.evaluate(() => (globalThis as any).arcBrowser.minimizeFloating())
+  expect((await state()).media).toEqual({ cards: [video], floating: undefined, videos: [video] })
+  expect(await isPlaying(video)).toBe(true)
+  const ui = await pageWithUrl('index.html')
+  await expect(ui.locator('.media-card')).toHaveCount(1)
+
+  await dispatch({ type: 'media', id: video, op: 'float' })
+  await expect.poll(async () => (await state()).media.floating, { timeout: 10_000 }).toBe(video)
+  await expect(ui.locator('.media-card')).toHaveCount(0)
+
+  await dispatch({ type: 'close', id: video })
+  await expect.poll(async () => (await state()).media.floating).toBeUndefined()
+  expect(await floatingPlayer()).toBeNull()
+})
+
+test('a video paused before you leave its tab gets no player and no card', async () => {
+  await dispatch({ type: 'open', url: `${base}/video-page` })
+  const video = (await space()).activeItemId!
+  await expect.poll(() => isPlaying(video), { timeout: 10_000 }).toBe(true)
+  await app.evaluate((_e, id) => (globalThis as any).arcBrowser.live.get(id).wc.executeJavaScript('document.getElementById("v").pause()'), video)
+  await expect.poll(() => isPlaying(video)).toBe(false)
+
+  await dispatch({ type: 'open', url: `${base}/after-paused-video` })
+  await new Promise((r) => setTimeout(r, 1000))
+  expect((await state()).media).toEqual({ cards: [], floating: undefined, videos: [] })
+  await dispatch({ type: 'close', id: video })
 })
 
 test('Little Window can move its page into a closed main window (macOS)', async () => {

@@ -113,6 +113,8 @@ export interface Settings {
   adblockAllowlist: string[]
   /** Check for new versions at startup and every few hours (installed app only). */
   autoUpdate: boolean
+  /** A playing video keeps going in the floating player when you leave its tab. */
+  floatVideos: boolean
 }
 
 export interface PersistedState {
@@ -184,6 +186,8 @@ export interface LiveInfo {
   loading: boolean
   audible: boolean
   muted: boolean
+  /** The page's media is playing (it may be silent); false once paused or ended. */
+  playing: boolean
   canGoBack: boolean
   canGoForward: boolean
   zoom: number
@@ -236,6 +240,11 @@ export interface AppState extends PersistedState {
   update: UpdateStatus
   /** Each profile's answers to site permission prompts, for Settings. */
   sitePermissions: Record<ID, SitePermissionRow[]>
+  /**
+   * Tabs playing media out of sight: `cards` at the bottom of the sidebar (oldest first) and the
+   * tab in the floating player. `videos`: the cards whose tab has a video, which can float again.
+   */
+  media: { cards: ID[]; floating?: ID; videos: ID[] }
 }
 
 /**

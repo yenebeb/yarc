@@ -143,6 +143,40 @@ const paths: Record<string, ReactNode> = {
       <path d="M11 17.5h2" />
     </>
   )
+,
+  // Media: the floating player and the sidebar's media cards.
+  play: <path d="M8 5.5v13a.6.6 0 0 0 .9.5l10.4-6.5a.6.6 0 0 0 0-1L8.9 5a.6.6 0 0 0-.9.5z" fill="currentColor" />,
+  pause: (
+    <>
+      <rect x="6.5" y="5" width="3.6" height="14" rx="1" fill="currentColor" />
+      <rect x="13.9" y="5" width="3.6" height="14" rx="1" fill="currentColor" />
+    </>
+  ),
+  minus: <path d="M6 12h12" />,
+  skipBack: (
+    <>
+      <path d="M4.5 13a7.5 7.5 0 1 0 2.2-5.3" />
+      <path d="M6 3.5v4.5h4.5" />
+    </>
+  ),
+  skipAhead: (
+    <>
+      <path d="M19.5 13a7.5 7.5 0 1 1-2.2-5.3" />
+      <path d="M18 3.5v4.5h-4.5" />
+    </>
+  ),
+  pip: (
+    <>
+      <rect x="3" y="5" width="18" height="14" rx="2.5" />
+      <rect x="11.5" y="11.5" width="6.5" height="4.5" rx="1" fill="currentColor" stroke="none" />
+    </>
+  ),
+  toTab: (
+    <>
+      <rect x="3" y="4" width="18" height="16" rx="3" />
+      <path d="M15 9l-6 6M9 10v5h5" />
+    </>
+  )
 }
 
 export type IconName = keyof typeof paths
