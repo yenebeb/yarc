@@ -10,7 +10,7 @@ Open-source Arc-browser replacement (Electron 45 / Chromium 156, React 19, TypeS
 - `pnpm dist:mac` / `dist:win` → installers in `release/`. Releases are automatic: each merge to `main` gets the next semver tag (patch; PR labels `release:minor` / `release:major` / `release:skip`; no release when the merge only touches `.github/`, `docs/`, `test/` or top-level Markdown), CI builds it and publishes once all platforms pass. The version comes from the tag (`package.json` is `0.0.0-dev`).
 - Every PR description needs a `## What's New` section (`.github/pull_request_template.md`, checked by `whats-new.yml`): one line per change in words for users, or `none` for what they won't notice (CI, tests, docs, refactors, logging). That's what What's New and the update card show (`scripts/changelog.mjs`); the title is only for GitHub. No "like Arc" in it. A big feature also gets a spotlight card in What's New, shown once per profile: an entry in `src/shared/spotlights.ts` and its picture in `src/renderer/src/panels/spotlight-pictures.tsx`, in the feature's own PR.
 
-## Architecture (see README "How it works")
+## Architecture (see docs/development.md "How it works")
 
 - Main process owns all state: `src/main/browser.ts` (controller), persisted in `state.json` via `src/main/store.ts`. Renderers get full snapshots and send typed `Action`s (`src/shared/actions.ts`).
 - Window = UI webContents (sidebar) under per-tab `WebContentsView`s, plus a transparent overlay view on top for the command bar/panels (`src/main/window.ts`).
