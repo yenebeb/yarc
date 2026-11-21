@@ -44,6 +44,7 @@ const paths: Record<string, ReactNode> = {
     </>
   ),
   more: <path d="M5.5 12h.01M12 12h.01M18.5 12h.01" />,
+  menu: <path d="M4 7h16M4 12h16M4 17h16" />,
   speaker: (
     <>
       <path d="M11 5L6 9H3v6h3l5 4z" />

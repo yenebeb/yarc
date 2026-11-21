@@ -3,7 +3,7 @@ import { IPC, type EditRequest } from '../shared/ipc'
 import { paneIds, splitMenuModel } from '../shared/split'
 import { findCanvas, findFolder, findItem, isAwayFromSaved, spaceCanvases } from '../shared/tree'
 import { SEARCH_ENGINES, searchUrl } from '../shared/url'
-import { commandTitle, type CommandId } from '../shared/keymap'
+import { bindingLabel, commandTitle, type CommandId } from '../shared/keymap'
 import type { Browser } from './browser'
 import type { LiveTab } from './tab'
 
@@ -144,25 +144,15 @@ export function installAppMenu(browser: Browser): void {
     Menu.setApplicationMenu(null)
     return
   }
-  const run = commandRunner(browser)
-  const item = (id: CommandId, label = commandTitle(id)): MenuItemConstructorOptions => ({ label, click: run(id) })
-  const opensDialog = (id: CommandId) => item(id, `${commandTitle(id)}…`)
-  const updateItem = (): MenuItemConstructorOptions => {
-    const { state } = browser.updater.status
-    if (state === 'available') return item('installUpdate', 'Update Available…')
-    if (state === 'ready') return item('installUpdate', 'Restart to Update')
-    return item('checkForUpdates')
-  }
+  const g = appMenuGroups(browser)
   const template: MenuItemConstructorOptions[] = [
     {
       label: app.name,
       submenu: [
         { role: 'about' },
-        updateItem(),
-        item('whatsNew', "What's New"),
-        item('tour', 'Take the Tour'),
+        ...g.about,
         { type: 'separator' },
-        opensDialog('settings'),
+        g.settings,
         { type: 'separator' },
         { role: 'services' },
         { type: 'separator' },
@@ -173,30 +163,65 @@ export function installAppMenu(browser: Browser): void {
         { role: 'quit' }
       ]
     },
-    {
-      label: 'File',
-      submenu: [
-        item('newTab'),
-        { label: commandTitle('newWindow'), click: () => browser.openNewWindow() },
-        { label: commandTitle('newIncognitoWindow'), click: () => browser.openIncognito() },
-        item('littleArc'),
-        item('newSpace'),
-        { type: 'separator' },
-        opensDialog('importArc'),
-        opensDialog('importZen'),
-        item('importChrome', 'Import from Chrome…'),
-        { type: 'separator' },
-        opensDialog('exportBookmarks')
-      ]
-    },
+    { label: 'File', submenu: [...g.windows, { type: 'separator' }, ...g.transfer] },
     { role: 'editMenu' },
-    {
-      label: 'View',
-      submenu: [item('toggleSidebar'), { role: 'togglefullscreen' }, item('devtools')]
-    },
+    { label: 'View', submenu: [g.toggleSidebar, { role: 'togglefullscreen' }, g.devtools] },
     { role: 'windowMenu' }
   ]
   Menu.setApplicationMenu(Menu.buildFromTemplate(template))
+}
+
+/** The sidebar's menu button, for platforms without a menu bar. */
+export function buildAppMenu(browser: Browser): Menu {
+  const g = appMenuGroups(browser)
+  const sep = { type: 'separator' as const }
+  return Menu.buildFromTemplate([
+    ...g.windows,
+    sep,
+    { label: 'Import and Export', submenu: g.transfer },
+    sep,
+    { role: 'togglefullscreen', label: 'Full Screen', accelerator: 'F11', registerAccelerator: false },
+    g.devtools,
+    sep,
+    ...g.about,
+    sep,
+    g.settings,
+    sep,
+    { role: 'quit', label: 'Exit' }
+  ])
+}
+
+/** Shared by the macOS menu bar and the sidebar's menu button. */
+function appMenuGroups(browser: Browser) {
+  const run = commandRunner(browser)
+  // Shown, not registered: keymap.ts already handles every shortcut. The macOS menu bar shows none.
+  const keys = (id: CommandId) =>
+    process.platform === 'darwin' ? {} : { accelerator: bindingLabel(id, false) || undefined, registerAccelerator: false }
+  const item = (id: CommandId, label = commandTitle(id), click = run(id)): MenuItemConstructorOptions => ({ label, click, ...keys(id) })
+  const opensDialog = (id: CommandId) => item(id, `${commandTitle(id)}…`)
+  const { state } = browser.updater.status
+  const update =
+    state === 'available' ? item('installUpdate', 'Update Available…') : state === 'ready' ? item('installUpdate', 'Restart to Update') : item('checkForUpdates')
+  return {
+    about: [update, item('whatsNew', "What's New"), item('tour', 'Take the Tour')],
+    settings: opensDialog('settings'),
+    windows: [
+      item('newTab'),
+      item('newWindow', undefined, () => browser.openNewWindow()),
+      item('newIncognitoWindow', undefined, () => browser.openIncognito()),
+      item('littleArc'),
+      item('newSpace')
+    ],
+    transfer: [
+      opensDialog('importArc'),
+      opensDialog('importZen'),
+      item('importChrome', 'Import from Chrome…'),
+      { type: 'separator' as const },
+      opensDialog('exportBookmarks')
+    ],
+    toggleSidebar: item('toggleSidebar'),
+    devtools: item('devtools')
+  }
 }
 
 function requestEdit(browser: Browser, req: EditRequest): void {
