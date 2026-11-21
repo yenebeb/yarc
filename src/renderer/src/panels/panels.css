@@ -950,3 +950,167 @@
   gap: 6px;
   font-size: 13px;
 }
+
+/* Scene coordinates: the page starts at 76px (window padding + sidebar + gap); the photo sits 12px, 30px into it. */
+.cv-scene {
+  position: relative;
+  width: 380px;
+  height: 168px;
+}
+
+.cv-scene .mini-window {
+  width: 240px;
+}
+
+.cv-page {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+}
+
+.cv-page i {
+  width: 70%;
+  height: 8px;
+  border-radius: 4px;
+  background: color-mix(in oklab, var(--text) 12%, transparent);
+}
+
+.cv-page i:first-child {
+  width: 50%;
+  height: 10px;
+  background: color-mix(in oklab, var(--text) 22%, transparent);
+}
+
+.cv-photo,
+.cv-card::before,
+.cv-pin {
+  border-radius: 4px;
+  background: linear-gradient(135deg, var(--accent), color-mix(in oklab, var(--accent) 40%, #e8578f));
+}
+
+.cv-photo {
+  width: 90px;
+  height: 58px;
+}
+
+.cv-pick {
+  position: absolute;
+  left: 85px;
+  top: 33px;
+  width: 96px;
+  height: 64px;
+  border: 1.5px dashed var(--accent);
+  border-radius: 6px;
+  opacity: 0;
+  animation: cv-pick 6s ease-in-out infinite;
+}
+
+.cv-board {
+  position: absolute;
+  left: 226px;
+  top: 20px;
+  width: 150px;
+  height: 128px;
+  border-radius: 10px;
+  background: var(--panel);
+  box-shadow:
+    0 0 0 1px var(--line),
+    0 12px 30px rgb(20 10 40 / 0.22);
+}
+
+.cv-board i {
+  position: absolute;
+  left: 12px;
+  top: 12px;
+  width: 70px;
+  height: 9px;
+  border-radius: 3px;
+  background: color-mix(in oklab, var(--text) 24%, transparent);
+}
+
+.cv-pin {
+  position: absolute;
+  left: 12px;
+  top: 34px;
+  width: 56px;
+  height: 36px;
+  box-shadow: 0 0 0 3px var(--panel), 0 3px 8px rgb(20 10 40 / 0.2);
+  filter: hue-rotate(60deg);
+}
+
+.cv-pin + .cv-pin {
+  top: 80px;
+  filter: hue-rotate(-60deg);
+}
+
+.cv-card {
+  position: absolute;
+  left: 88px;
+  top: 36px;
+  width: 90px;
+  height: 58px;
+  padding: 3px;
+  border-radius: 6px;
+  background: var(--panel);
+  opacity: 0;
+  animation: cv-card 6s cubic-bezier(0.5, 0, 0.2, 1) infinite;
+}
+
+.cv-card::before {
+  content: '';
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+@keyframes cv-pick {
+  0%,
+  10% {
+    opacity: 0;
+  }
+  20%,
+  34% {
+    opacity: 1;
+  }
+  44%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes cv-card {
+  0%,
+  30% {
+    opacity: 0;
+    left: 85px;
+    top: 33px;
+    width: 96px;
+    height: 64px;
+    box-shadow: none;
+  }
+  34% {
+    opacity: 1;
+    left: 85px;
+    top: 33px;
+    width: 96px;
+    height: 64px;
+    box-shadow: 0 8px 20px rgb(20 10 40 / 0.35);
+  }
+  56%,
+  90% {
+    opacity: 1;
+    left: 299px;
+    top: 51px;
+    width: 66px;
+    height: 44px;
+    box-shadow: 0 3px 8px rgb(20 10 40 / 0.2);
+  }
+  100% {
+    opacity: 0;
+    left: 299px;
+    top: 51px;
+    width: 66px;
+    height: 44px;
+  }
+}

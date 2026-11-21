@@ -34,7 +34,30 @@ function FloatingPlayer() {
   )
 }
 
+function Canvases() {
+  return (
+    <div className="cv-scene">
+      <MiniWindow active={1}>
+        <div className="cv-page">
+          <i />
+          <span className="cv-photo" />
+          <i />
+          <i />
+        </div>
+      </MiniWindow>
+      <span className="cv-pick" />
+      <div className="cv-board">
+        <i />
+        <span className="cv-pin" />
+        <span className="cv-pin" />
+      </div>
+      <span className="cv-card" />
+    </div>
+  )
+}
+
 const PICTURES: Record<string, () => ReactNode> = {
+  canvases: Canvases,
   'floating-player': FloatingPlayer
 }
 
