@@ -3,7 +3,7 @@ import { test } from 'node:test'
 import { BINDINGS, commandForInput, type KeyInput } from '../../src/shared/keymap.ts'
 import { findItem, isAwayFromSaved, profileOfItem, spaceItems } from '../../src/shared/tree.ts'
 import type { PersistedState } from '../../src/shared/types.ts'
-import { queryFromSearchUrl, resolveInput, toUrl } from '../../src/shared/url.ts'
+import { queryFromSearchUrl, resolveInput, toUrl, withoutTracking } from '../../src/shared/url.ts'
 
 test('toUrl recognises URLs, hosts and localhost', () => {
   assert.equal(toUrl('github.com'), 'https://github.com')
@@ -20,6 +20,17 @@ test('resolveInput falls back to the search engine', () => {
   assert.equal(resolveInput('cats and dogs', 'google'), 'https://www.google.com/search?q=cats%20and%20dogs')
   assert.equal(resolveInput('cats', 'duckduckgo'), 'https://duckduckgo.com/?q=cats')
   assert.equal(queryFromSearchUrl('https://www.google.com/search?q=hi+there'), 'hi there')
+})
+
+test('withoutTracking drops tracking parameters and keeps the rest as written', () => {
+  assert.equal(withoutTracking('https://example.com/a?id=42&utm_source=news&utm_medium=email&fbclid=IwAR3x#top'), 'https://example.com/a?id=42#top')
+  assert.equal(withoutTracking('https://example.com/?utm_campaign=x'), 'https://example.com/')
+  assert.equal(withoutTracking('https://example.com/s?q=a%20b,c&gclid=1&flag'), 'https://example.com/s?q=a%20b,c&flag')
+  assert.equal(withoutTracking('https://www.youtube.com/watch?v=abc&si=xyz'), 'https://www.youtube.com/watch?v=abc')
+  assert.equal(withoutTracking('https://x.com/user/status/1?s=20&t=abc'), 'https://x.com/user/status/1')
+  assert.equal(withoutTracking('https://example.com/?si=keep&s=keep'), 'https://example.com/?si=keep&s=keep')
+  assert.equal(withoutTracking('https://Example.com/?id=1'), 'https://Example.com/?id=1')
+  assert.equal(withoutTracking('about:blank'), 'about:blank')
 })
 
 const key = (code: string, mods: Partial<KeyInput> = {}): KeyInput => ({

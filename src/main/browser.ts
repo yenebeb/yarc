@@ -40,7 +40,7 @@ import type {
 } from '../shared/types'
 import { appendPaneIn, flipSplit, gatherSplit, layoutPanes, movePane, PANE_BAR, paneIds, placePaneIn, removeFromSplits, resizeGroup, splitOf, type Side } from '../shared/split'
 import { isFloating, stepAfter, type TourEvent, type TourStep } from '../shared/tour'
-import { resolveInput, SEARCH_ENGINES } from '../shared/url'
+import { resolveInput, SEARCH_ENGINES, withoutTracking } from '../shared/url'
 import { AdBlock, hostOf } from './adblock'
 import { Canvases } from './canvas'
 import { recentSpotlights, SPOTLIGHTS, unseenSpotlights } from '../shared/spotlights'
@@ -1651,7 +1651,7 @@ export class Browser implements TabHost, FloatingHost {
       }
       case 'copyUrl': {
         if (!tab) return
-        const url = tab.wc.getURL()
+        const url = withoutTracking(tab.wc.getURL())
         clipboard.writeText(a.markdown ? `[${tab.wc.getTitle()}](${url})` : url)
         return this.toast(a.markdown ? 'Copied URL as Markdown' : 'Copied URL')
       }

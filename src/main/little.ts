@@ -12,6 +12,7 @@ import {
 import { IPC, type LittleAnchor, type LittleOp, type LittleState } from '../shared/ipc'
 import { matches } from '../shared/keymap'
 import type { ID, Space } from '../shared/types'
+import { withoutTracking } from '../shared/url'
 import { hostOf } from './adblock'
 import type { Browser } from './browser'
 import { littleBarColor, littleBounds, littleExpired } from './little-layout'
@@ -184,7 +185,7 @@ export class LittleWindow implements TabHost {
       case 'close':
         return this.win.close()
       case 'copyUrl':
-        if (wc) clipboard.writeText(wc.getURL())
+        if (wc) clipboard.writeText(withoutTracking(wc.getURL()))
         return
       case 'back':
         return void (wc?.navigationHistory.canGoBack() && wc.navigationHistory.goBack())

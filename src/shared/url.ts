@@ -37,6 +37,31 @@ export function resolveInput(input: string, engine: SearchEngine): string {
   return toUrl(input) ?? searchUrl(input.trim(), engine)
 }
 
+const TRACKING = /^(utm_\w+|fbclid|gclid|gclsrc|dclid|gbraid|wbraid|msclkid|mc_[ce]id|igsh(id)?|twclid|ttclid|li_fat_id|yclid|_hsenc|_hsmi|mkt_tok|srsltid|ref_src)$/i
+const TRACKING_ON: [host: RegExp, key: RegExp][] = [
+  [/(^|\.)(youtube\.com|youtu\.be|spotify\.com)$/, /^si$/],
+  [/(^|\.)(x\.com|twitter\.com)$/, /^[st]$/]
+]
+
+/** Filters the raw query so the parameters that stay keep their exact encoding. */
+export function withoutTracking(url: string): string {
+  let u: URL
+  try {
+    u = new URL(url)
+  } catch {
+    return url
+  }
+  const onHost = TRACKING_ON.find(([host]) => host.test(u.hostname))?.[1]
+  const params = u.search.slice(1).split('&')
+  const kept = params.filter((p) => {
+    const key = p.split('=')[0]
+    return !TRACKING.test(key) && !onHost?.test(key)
+  })
+  if (kept.length === params.length) return url
+  u.search = kept.join('&')
+  return u.href
+}
+
 export function queryFromSearchUrl(url: string): string | undefined {
   try {
     const u = new URL(url)
