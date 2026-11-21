@@ -30,6 +30,13 @@ const ARCHIVE_OPTIONS: { hours: number; label: string }[] = [
   { hours: 720, label: 'After 30 days' }
 ]
 
+const LITTLE_CLOSE_OPTIONS: { hours: number; label: string }[] = [
+  { hours: 1, label: 'After 1 hour' },
+  { hours: 6, label: 'After 6 hours' },
+  { hours: 12, label: 'After 12 hours' },
+  { hours: 0, label: 'Never' }
+]
+
 const THEMES: { value: SettingsT['theme']; label: string }[] = [
   { value: 'system', label: 'System' },
   { value: 'light', label: 'Light' },
@@ -144,6 +151,7 @@ function General({ state }: { state: AppState }) {
   const space = activeSpace(state)
   const spaceProfile = state.profiles.find((p) => p.id === space.profileId)
   const archiveKnown = ARCHIVE_OPTIONS.some((o) => o.hours === s.archiveAfterHours)
+  const littleCloseKnown = LITTLE_CLOSE_OPTIONS.some((o) => o.hours === s.littleCloseAfterHours)
   const pct = ((width - SIDEBAR_WIDTH.min) / (SIDEBAR_WIDTH.max - SIDEBAR_WIDTH.min)) * 100
   return (
     <>
@@ -211,6 +219,16 @@ function General({ state }: { state: AppState }) {
           checked={s.littleArcForExternalLinks}
           onChange={(v) => patch({ littleArcForExternalLinks: v })}
         />
+        <Row title="Close Little Windows" hint="A Little Window you leave in the background closes after this long. Its page goes to the Archive.">
+          <Select label="Close Little Windows" value={s.littleCloseAfterHours} onChange={(v) => patch({ littleCloseAfterHours: Number(v) })}>
+            {!littleCloseKnown && <option value={s.littleCloseAfterHours}>After {s.littleCloseAfterHours} hours</option>}
+            {LITTLE_CLOSE_OPTIONS.map((o) => (
+              <option key={o.hours} value={o.hours}>
+                {o.label}
+              </option>
+            ))}
+          </Select>
+        </Row>
         <Row title="Little Window profile" hint="Which logins and history Little Windows use.">
           <Select label="Little Window profile" value={s.littleArcProfileId} onChange={(v) => patch({ littleArcProfileId: v })}>
             <option value="">Current space's profile{spaceProfile ? ` (now: ${spaceProfile.name})` : ''}</option>

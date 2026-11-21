@@ -234,7 +234,10 @@ export class Browser implements TabHost {
     // The last focused window is last in the list: it opens in front.
     saved.forEach((view, i) => this.openWindow(view, i < saved.length - 1))
     if (this.incognito) return
-    setInterval(() => this.autoArchive(), 5 * 60_000)
+    setInterval(() => {
+      this.autoArchive()
+      this.closeIdleLittles()
+    }, 5 * 60_000)
     this.autoArchive()
     this.updater.sync()
     this.showStartupScreen()
@@ -467,7 +470,7 @@ export class Browser implements TabHost {
   /** An incognito window closed: forget its pages, cookies, storage and history. */
   private dispose(): void {
     Browser.all.delete(this)
-    for (const l of this.openLittles()) l.win.close()
+    for (const l of this.openLittles()) l.discard()
     for (const rt of this.profiles.all()) void rt.session.clearData()
     this.profiles.closeAll()
   }
@@ -1153,7 +1156,7 @@ export class Browser implements TabHost {
     this.changed()
   }
 
-  private archive(item: TabItem, spaceId: ID): void {
+  private archive(item: Pick<TabItem, 'url' | 'title' | 'favicon'>, spaceId: ID): void {
     if (!/^https?:/.test(item.url)) return
     this.state.archive.unshift({ id: newId(), url: item.url, title: item.title, favicon: item.favicon, spaceId, archivedAt: Date.now() })
     if (this.state.archive.length > MAX_ARCHIVE) this.state.archive.length = MAX_ARCHIVE
@@ -2105,7 +2108,23 @@ export class Browser implements TabHost {
     if (host) this.state.littleArc.profileByHost[host] = profileId
     this.store.save()
     this.openLittle(url, profileId, little.win.getBounds())
-    little.win.close()
+    little.discard()
+  }
+
+  /** A closed Little Window's page goes to the Archive and can be reopened, in the space "Open in" would use. */
+  archiveLittle(profileId: ID, page: Pick<TabItem, 'url' | 'title' | 'favicon'>): void {
+    const space = this.littleTargetSpace(profileId)
+    this.archive(page, space.id)
+    this.closed.push({ url: page.url, title: page.title, spaceId: space.id })
+    this.changed()
+    // Little Windows close after the state was written for quitting.
+    if (this.quitting) this.store.flush()
+  }
+
+  /** Little Windows left in the background for the time picked in Settings close, like Arc's. */
+  private closeIdleLittles(): void {
+    const now = Date.now()
+    for (const l of this.openLittles()) if (l.expired(now, this.state.settings.littleCloseAfterHours)) l.win.close()
   }
 
   rememberLittleSize(width: number, height: number): void {

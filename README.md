@@ -110,7 +110,7 @@ Drag the gap between panes to resize them, and double-click it to make them equa
 
 ![Little Window](docs/screenshots/little-arc.png)
 
-A small, minimal window for quick lookups. Open one with `Ctrl+Alt+N` / `⌘⌥N`. When YARC is your default browser, links from other apps (Slack, Discord, email) open here too, so your sidebar stays tidy. If you want to keep the page, click **Open in** *your space*: it moves into your Today tabs as it is, without reloading. The arrow next to it picks another space. If you don't want to keep it, just close the window.
+A small, minimal window for quick lookups. Open one with `Ctrl+Alt+N` / `⌘⌥N`. When YARC is your default browser, links from other apps (Slack, Discord, email) open here too, so your sidebar stays tidy. If you want to keep the page, click **Open in** *your space*: it moves into your Today tabs as it is, without reloading. The arrow next to it picks another space. If you don't want to keep it, just close the window, or leave it: like Arc's, a Little Window you leave in the background closes after an hour (Settings > General). Either way its page goes to the Archive, and *Reopen Closed Tab* brings it back.
 
 The chip on the left of the address shows which profile the page uses, so which accounts you're signed in with. Click it to open the page with another profile; YARC remembers that choice for the site. The window also remembers the size you give it.
 
@@ -271,6 +271,9 @@ Electron is real Chromium, so sites behave as they do in Chrome, and Chrome exte
 
 **Is it private?**
 YARC has no account and no telemetry, and sends no data anywhere. Its own network requests are search suggestions (sent to the search engine you chose), Chrome Web Store update checks for installed extensions, a daily download of the ad-blocking filter lists from GitHub, and update checks for YARC itself against its GitHub releases (which you can turn off in Settings).
+
+**Who makes YARC?**
+One person, in their spare time: YARC is a hobby project. Features land when they're ready, and some may change along the way. On security, YARC relies on Chromium: every page runs in Chromium's sandbox, as it does in Chrome, and Chromium security fixes ship as soon as Electron releases them (see [Updating](#updating)). YARC's own updates are signed and checked before they install.
 
 **Do I need an ad-blocker extension?**
 No. Blocking is built in (see [Built-in ad and tracker blocking](#built-in-ad-and-tracker-blocking)). Ad-blocker *extensions* built on Manifest V3's `declarativeNetRequest`, such as uBlock Origin Lite, install but can't block, because Electron doesn't support that API.

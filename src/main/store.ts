@@ -17,6 +17,7 @@ export const DEFAULT_SETTINGS: Settings = {
   archiveAfterHours: 12,
   searchEngine: 'google',
   littleArcForExternalLinks: true,
+  littleCloseAfterHours: 1,
   littleArcProfileId: '',
   peekPinnedLinks: true,
   adblock: true,

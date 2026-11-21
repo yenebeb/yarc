@@ -100,6 +100,8 @@ export interface Settings {
   searchEngine: SearchEngine
   /** Open links from other apps in a Little Window (true) or as a new tab in the current space (false). */
   littleArcForExternalLinks: boolean
+  /** Hours a Little Window can stay in the background before it closes (its page goes to the Archive). 0 = never. */
+  littleCloseAfterHours: number
   /** Profile used by Little Windows; empty = profile of the active space. */
   littleArcProfileId: ID | ''
   /** Links from pinned tabs and favorites to other sites open in Peek instead of replacing the page. */

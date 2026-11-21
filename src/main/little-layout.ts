@@ -1,4 +1,4 @@
-// Little Window geometry and toolbar color, kept free of Electron so unit tests can import them.
+// Little Window geometry, toolbar color and lifetime, kept free of Electron so unit tests can import them.
 import type { Rectangle } from 'electron'
 
 /** The toolbar's color: the space color mixed into near-black: a dark bar that still shows which space it belongs to. */
@@ -21,4 +21,13 @@ export function littleBounds(area: Rectangle, remembered?: { width: number; heig
     width,
     height
   }
+}
+
+/**
+ * Whether a Little Window has been left long enough to close, like Arc's "Archive Little Arcs after":
+ * `hours` after it was last in front. Never while it is in front or playing sound; never when `hours` is 0.
+ */
+export function littleExpired(page: { inFront: boolean; audible: boolean; lastActive: number }, now: number, hours: number): boolean {
+  if (hours <= 0 || page.inFront || page.audible) return false
+  return now - page.lastActive >= hours * 3600_000
 }

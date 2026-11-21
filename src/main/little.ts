@@ -14,7 +14,7 @@ import {
 import { IPC, type LittleAnchor, type LittleOp, type LittleState } from '../shared/ipc'
 import { matches } from '../shared/keymap'
 import type { Browser } from './browser'
-import { littleBarColor, littleBounds } from './little-layout'
+import { littleBarColor, littleBounds, littleExpired } from './little-layout'
 import { buildContextMenu } from './menus'
 import type { PermissionQueue } from './permission-queue'
 import type { ProfileRuntime } from './profiles'
@@ -30,6 +30,10 @@ export class LittleWindow implements TabHost {
   readonly win: BrowserWindow
   private tab: LiveTab | undefined
   private released = false
+  /** Set when the window closes without its page going to the Archive (reopened with another profile, an incognito window's). */
+  private discarded = false
+  /** When the window was last in front: one left in the background closes after a while (`expired`). */
+  private lastActive = Date.now()
   private prompt: PromptView
 
   constructor(
@@ -75,10 +79,30 @@ export class LittleWindow implements TabHost {
       const [width, height] = this.win.getSize()
       browser.rememberLittleSize(width, height)
     })
+    this.win.on('focus', () => (this.lastActive = Date.now()))
+    this.win.on('blur', () => (this.lastActive = Date.now()))
+    // Like Arc's Little Arc, a page you close goes to the Archive and can be reopened.
+    this.win.on('close', () => {
+      if (this.released || this.discarded || !this.tab || this.tab.destroyed) return
+      const { url, title, favicon } = this.tab.info()
+      this.browser.archiveLittle(this.profile.id, { url, title, favicon })
+    })
     this.win.on('closed', () => {
       if (!this.released) this.tab?.destroy()
     })
     this.tab.wc.focus()
+  }
+
+  /** Whether the window has been in the background for `hours` (the Settings choice) and should close. */
+  expired(now: number, hours: number): boolean {
+    const audible = !!this.tab && !this.tab.destroyed && this.tab.info().audible
+    return littleExpired({ inFront: this.win.isFocused(), audible, lastActive: this.lastActive }, now, hours)
+  }
+
+  /** Closes the window without putting its page in the Archive. */
+  discard(): void {
+    this.discarded = true
+    this.win.close()
   }
 
   get url(): string {
