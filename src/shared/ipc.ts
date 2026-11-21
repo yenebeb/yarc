@@ -29,13 +29,11 @@ export const IPC = {
   floatOp: 'arc:float-op'
 } as const
 
-/** Main asks the sidebar to start inline editing (after a native context menu choice). */
 export interface EditRequest {
   kind: 'rename' | 'renameFolder'
   id: string
 }
 
-/** A still image of a page another window shows live, for the pane it leaves empty here. */
 export interface PageSnapshot {
   id: string
   /** A data: URL. */
@@ -49,7 +47,7 @@ export interface FindEvent {
   step?: 1 | -1
 }
 
-/** Toolbar requests; 'sync' asks for the current state once the toolbar listens. */
+/** 'sync' asks for the current state once the toolbar listens. */
 export type LittleOp =
   | 'sync'
   | 'openInMain'
@@ -61,7 +59,6 @@ export type LittleOp =
   | 'profileMenu'
   | 'spaceMenu'
 
-/** What the floating player's controls show. */
 export interface FloatState {
   url: string
   title: string
@@ -69,19 +66,18 @@ export interface FloatState {
   muted: boolean
 }
 
-/** The floating player's controls; 'sync' asks for the state once they listen. Drag positions are screen points. */
+/** 'sync' asks for the state once the controls listen. Drag positions are screen points. */
 export type FloatOp =
   | { kind: 'sync' | 'back' | 'toggle' | 'minimize' | 'close' }
   | { kind: 'skip'; seconds: number }
   | { kind: 'drag'; phase: 'start' | 'move' | 'end'; x: number; y: number }
 
-/** Where a Little Window toolbar menu opens, in window coordinates. */
+/** In window coordinates. */
 export interface LittleAnchor {
   x: number
   y: number
 }
 
-/** The API the preload exposes to UI renderers as `window.arc`. */
 export interface ArcApi {
   platform: NodeJS.Platform
   getState(): Promise<AppState>
@@ -99,17 +95,12 @@ export interface ArcApi {
   history(query: string, offset: number): Promise<HistoryRow[]>
   deleteHistory(url: string): Promise<void>
   little(op: LittleOp, at?: LittleAnchor): Promise<void>
-  /** The site permission prompt (prompt.html): what to ask, or null for nothing. */
   onPrompt(cb: (p: PermissionPrompt | null) => void): () => void
   prompt(op: PromptOp): Promise<void>
   /** Gives this view the keyboard; a page may have it, even after a click here. */
   focus(): Promise<void>
-  /**
-   * This view lost the keyboard to another view (a page, the overlay). The document itself isn't
-   * told: its focused element stays focused and gets no blur event.
-   */
+  /** Lost the keyboard to another view; the document isn't told and its focused element gets no blur. */
   onBlur(cb: () => void): () => void
-  /** The floating player's controls (float.html). */
   onFloat(cb: (s: FloatState) => void): () => void
   float(op: FloatOp): Promise<void>
 }

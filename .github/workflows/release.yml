@@ -203,7 +203,7 @@ jobs:
         # rejects the whole workflow, so no job runs at all.
         run: |
           node -e 'require("fs").writeFileSync("release/release.json", JSON.stringify({ electron: require("electron/package.json").version }) + "\n")'
-      # Installed copies list what a downloaded update brings from it (src/main/update-notes.ts).
+      # Installed copies list what a downloaded update brings from it (src/main/changelog.ts).
       - name: Add the changelog to the release
         if: runner.os == 'Linux'
         run: if [ -f build/changelog.json ]; then cp build/changelog.json release/changelog.json; fi
@@ -256,7 +256,7 @@ jobs:
           retention-days: 3
 
   # Signs what installed copies check before they update (src/main/update-signature.ts): the macOS
-  # update zips (mac-update.ts) and the Windows installers (windows-update.ts). No dependencies, no
+  # update zips (mac-update.ts) and the Windows installers (updater.ts). No dependencies, no
   # build: the repository's own script and Node's crypto. In the release-signing environment, so
   # the key can live there (Settings > Environments, deployment branch main) instead of in a
   # repository secret that every job can read.

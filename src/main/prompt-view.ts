@@ -1,6 +1,4 @@
-// The site permission prompt: a small popover pointing at the URL field, over the
-// page. Its own little view (not the overlay), so the page stays usable around it and the command
-// bar can open without losing the question.
+// Its own view, not the overlay, so the page stays usable around it and the command bar can open without losing the question.
 import { WebContentsView, type BrowserWindow, type Event, type Input, type Rectangle } from 'electron'
 import { IPC } from '../shared/ipc'
 import type { PermissionPrompt, PromptOp } from '../shared/permissions'
@@ -8,24 +6,17 @@ import type { PermissionRequest, PromptAnswer } from './permission-queue'
 import { handleUi } from './ui-origin'
 import { loadRenderer, uiWebPreferences } from './window'
 
-/** The popover's width, plus room around it for the shadow and the arrow. */
 export const PROMPT_WIDTH = 236
-const MARGIN = 16
-const VIEW_WIDTH = PROMPT_WIDTH + 2 * MARGIN
-/** How far below the view's top the arrow's tip is drawn (prompt.css). */
-const ARROW_TIP = 10
-/**
- * Clicks on Allow this soon after the prompt appears don't count, like Chrome's: a page can't
- * get the second click of a double-click it asked for to land on Allow.
- */
+const SHADOW_MARGIN = 16
+const VIEW_WIDTH = PROMPT_WIDTH + 2 * SHADOW_MARGIN
+/** As drawn by prompt.css. */
+const ARROW_TIP_BELOW_TOP = 10
+const ARROW_MIN_INSET = 18
+/** A page can't get the second click of a double-click it asked for to land on Allow. */
 const ALLOW_DELAY_MS = 500
 
-/** Where the prompt goes, in window coordinates. */
-export type PromptAnchor =
-  /** The arrow's tip: the popover hangs below it, centered on it where the window allows. */
-  | { arrow: true; x: number; y: number }
-  /** The popover's top-left corner, without an arrow (no URL field on screen). */
-  | { arrow: false; x: number; y: number }
+/** Window coordinates of the arrow's tip, or of the popover's top-left corner when there's no URL field to point at. */
+export type PromptAnchor = { arrow: true; x: number; y: number } | { arrow: false; x: number; y: number }
 
 const views = new Map<number, PromptView>()
 
@@ -36,14 +27,13 @@ export class PromptView {
   private height = 0
   private attached = false
   private ready = false
-  /** When the current question went on screen. */
   private shownAt = 0
 
   constructor(
     private win: BrowserWindow,
     private onAnswer: (id: string, answer: PromptAnswer) => void,
     private onShortcut: (e: Event, input: Input) => void,
-    /** Called after the view (re)joins the window, so the owner can keep its z-order. */
+    /** So the owner can keep its z-order. */
     private onAttach: () => void = () => {}
   ) {
     PromptView.registerIpc()
@@ -68,7 +58,6 @@ export class PromptView {
     return this.attached
   }
 
-  /** Shows `req` at `anchor`, or hides the prompt when there's nothing to ask. */
   show(req: PermissionRequest | undefined, anchor?: PromptAnchor): void {
     if (this.win.isDestroyed()) return
     if (!req || !anchor) return this.hide()
@@ -78,7 +67,6 @@ export class PromptView {
     this.current = req
     this.anchor = anchor
     if (changed) {
-      // Wait for the new text's height before showing it.
       this.height = 0
       this.detach()
     }
@@ -94,7 +82,6 @@ export class PromptView {
     this.sendToView(null)
   }
 
-  /** Puts the view back on top of the window's other views. */
   raise(): void {
     if (this.attached && this.view) this.win.contentView.addChildView(this.view)
   }
@@ -105,26 +92,23 @@ export class PromptView {
     if (!this.win.isDestroyed()) this.win.contentView.removeChildView(this.view)
   }
 
-  /** The view's left edge: centered on the arrow, kept inside the window. */
   private left(a: PromptAnchor): number {
     const [winWidth] = this.win.getContentSize()
-    const wanted = a.arrow ? a.x - VIEW_WIDTH / 2 : a.x - MARGIN
+    const wanted = a.arrow ? a.x - VIEW_WIDTH / 2 : a.x - SHADOW_MARGIN
     return Math.round(Math.max(0, Math.min(wanted, winWidth - VIEW_WIDTH)))
   }
 
   private rect(): Rectangle | undefined {
     const a = this.anchor
     if (!a || !this.height) return undefined
-    // With an arrow, its tip (10px below the view's top, in the margin) sits at the anchor.
-    return { x: this.left(a), y: Math.round(a.arrow ? a.y - ARROW_TIP : a.y - MARGIN), width: VIEW_WIDTH, height: Math.ceil(this.height) }
+    return { x: this.left(a), y: Math.round(a.arrow ? a.y - ARROW_TIP_BELOW_TOP : a.y - SHADOW_MARGIN), width: VIEW_WIDTH, height: Math.ceil(this.height) }
   }
 
   private info(): PermissionPrompt | null {
     const req = this.current
     if (!req) return null
     const a = this.anchor
-    // Near the window's edge the popover can't center on the arrow, so the arrow moves instead.
-    const arrowX = a?.arrow ? Math.max(MARGIN + 18, Math.min(a.x - this.left(a), VIEW_WIDTH - MARGIN - 18)) : undefined
+    const arrowX = a?.arrow ? Math.max(SHADOW_MARGIN + ARROW_MIN_INSET, Math.min(a.x - this.left(a), VIEW_WIDTH - SHADOW_MARGIN - ARROW_MIN_INSET)) : undefined
     return { id: req.id, origin: req.origin, permission: req.permission, mediaTypes: req.mediaTypes, arrowX }
   }
 
@@ -146,7 +130,7 @@ export class PromptView {
     this.attached = true
     this.win.contentView.addChildView(this.view)
     this.onAttach()
-    // Like Arc's popover, it takes the keyboard: Escape dismisses it, Tab reaches the buttons.
+    // Escape dismisses it, Tab reaches the buttons.
     if (first) this.view.webContents.focus()
   }
 

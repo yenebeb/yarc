@@ -1,8 +1,7 @@
-// Library sheet: Archive, History, Downloads and Spaces.
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { HistoryRow } from '../../../shared/ipc'
 import type { AppState, DownloadItemInfo } from '../../../shared/types'
-import { activeSpace, arc, dispatch, displayHost } from '../api'
+import { activeSpace, arc, cx, dispatch, displayHost } from '../api'
 import { Favicon, Icon } from '../icons'
 import { countPinned, formatBytes, groupByDay, timeLabel } from './util'
 import './panels.css'
@@ -103,8 +102,7 @@ function History({ state, close }: { state: AppState; close: () => void }) {
   const space = activeSpace(state)
   const profile = state.profiles.find((p) => p.id === space.profileId)
 
-  // Loads pages from the start until at least `count` rows (or the end) are in.
-  const load = async (q: string, count: number) => {
+  const loadAtLeast = async (q: string, count: number) => {
     const id = ++req.current
     setLoading(true)
     const out: HistoryRow[] = []
@@ -121,7 +119,7 @@ function History({ state, close }: { state: AppState; close: () => void }) {
   }
 
   useEffect(() => {
-    const t = setTimeout(() => void load(query, PAGE), 150)
+    const t = setTimeout(() => void loadAtLeast(query, PAGE), 150)
     return () => clearTimeout(t)
   }, [query, space.profileId])
 
@@ -138,7 +136,7 @@ function History({ state, close }: { state: AppState; close: () => void }) {
   const remove = async (url: string) => {
     setRows((r) => r.filter((x) => x.url !== url))
     await arc.deleteHistory(url)
-    await load(query, Math.max(PAGE, rows.length))
+    await loadAtLeast(query, Math.max(PAGE, rows.length))
   }
 
   const groups = useMemo(() => groupByDay(rows, (r) => r.time), [rows])
@@ -229,7 +227,7 @@ function Downloads({ state }: { state: AppState }) {
         return (
           <div
             key={d.id}
-            className={`list-row${done ? ' click' : ''}`}
+            className={cx('list-row', done && 'click')}
             title={d.path || d.url}
             onClick={() => done && dispatch({ type: 'downloadOpen', id: d.id })}
           >
@@ -237,7 +235,7 @@ function Downloads({ state }: { state: AppState }) {
             <div className="dl-main">
               <span className="t">{d.filename}</span>
               {d.state === 'progressing' && (
-                <div className={`progress${d.total > 0 ? '' : ' indeterminate'}`}>
+                <div className={cx('progress', d.total <= 0 && 'indeterminate')}>
                   <div style={d.total > 0 ? { width: `${pct}%` } : undefined} />
                 </div>
               )}
@@ -278,7 +276,7 @@ function Spaces({ state, close }: { state: AppState; close: () => void }) {
         return (
           <div
             key={s.id}
-            className={`list-row click${s.id === state.activeSpaceId ? ' current' : ''}`}
+            className={cx('list-row click', s.id === state.activeSpaceId && 'current')}
             onClick={() => {
               dispatch({ type: 'switchSpace', id: s.id })
               close()

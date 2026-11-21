@@ -1,5 +1,3 @@
-// Importers for Arc and Zen (spaces, pinned tabs, favorites, history; Arc's archive too) and
-// Chromium browsers (history, bookmarks).
 import { dialog, type BrowserWindow, type MessageBoxOptions, type OpenDialogOptions } from 'electron'
 import { createHash } from 'node:crypto'
 import { existsSync, readFileSync, statSync } from 'node:fs'
@@ -24,8 +22,6 @@ export async function runImport(browser: Browser, source: ImportSource, path?: s
   return importChromium(browser, path)
 }
 
-// ---------------------------------------------------------------- dialogs
-
 function parentWindow(browser: Browser): BrowserWindow | undefined {
   const win = browser.window?.win
   return win && !win.isDestroyed() ? win : undefined
@@ -42,12 +38,11 @@ async function pick(browser: Browser, opts: OpenDialogOptions): Promise<string |
   return res.canceled ? undefined : res.filePaths[0]
 }
 
-/** Let the user pick StorableSidebar.json or an Arc folder (e.g. copied from a Mac). */
 async function pickArcSource(browser: Browser, defaultPath?: string): Promise<string | undefined> {
   const title = 'Choose your Arc data'
   const filters = [{ name: 'Arc sidebar (StorableSidebar.json)', extensions: ['json'] }]
-  // Only macOS lets one dialog pick either a file or a folder.
-  if (process.platform === 'darwin') {
+  const dialogPicksFileOrFolder = process.platform === 'darwin'
+  if (dialogPicksFileOrFolder) {
     return pick(browser, { title, defaultPath, filters, properties: ['openFile', 'openDirectory', 'showHiddenFiles'] })
   }
   const choice = await ask(browser, {
@@ -63,16 +58,13 @@ async function pickArcSource(browser: Browser, defaultPath?: string): Promise<st
   return pick(browser, choice === 0 ? { title, defaultPath, properties: ['openDirectory'] } : { title, defaultPath, filters, properties: ['openFile'] })
 }
 
-// ---------------------------------------------------------------- Arc
-
 interface ArcSource {
   sidebarFile: string
-  /** Folder holding StorableSidebar.json. */
   root: string
   userData?: string
 }
 
-/** Accepts StorableSidebar.json, the Arc folder, its `User Data`, or a parent such as "Application Support" / the MSIX package dir. */
+/** Also accepts a parent such as "Application Support" or the MSIX package dir. */
 function resolveArcSource(p: string): ArcSource {
   let st
   try {
@@ -135,7 +127,6 @@ function arcFavicons(root: string): (arcItemId: string) => string | undefined {
   }
 }
 
-/** A fresh install: one empty 'Personal' space and nothing else worth keeping. */
 function isUntouchedDefault(state: PersistedState): boolean {
   const [space] = state.spaces
   return (
@@ -167,17 +158,16 @@ interface SourceSpace {
 }
 
 interface AddedSpaces {
-  /** App profile and space ids by the source browser's keys. */
+  /** By the source browser's keys. */
   profileIds: Map<string, string>
   spaceIds: Map<string, string>
   spaces: Space[]
-  /** A fresh install's empty default space was replaced: the caller picks the active space. */
+  /** The caller picks the active space. */
   replace: boolean
-  /** The replaced space was the active one: switch to the new active space after saving. */
   replacedActive: boolean
 }
 
-/** Adds another browser's profiles and spaces to the state (not saved yet). */
+/** Not saved yet. */
 function addSpaces(browser: Browser, from: string, profiles: SourceProfile[], spaces: SourceSpace[]): AddedSpaces {
   const state = browser.state
   const replace = isUntouchedDefault(state)
@@ -241,7 +231,6 @@ async function importArc(browser: Browser, path?: string): Promise<string | unde
 
   const state = browser.state
   const names = src.userData ? readProfileNames(src.userData) : new Map<string, string>()
-  // One app profile per Arc profile that a space uses.
   const used = new Set(parsed.spaces.map((s) => s.profileKey))
   const { profileIds, spaceIds, spaces: added, replace, replacedActive } = addSpaces(
     browser,
@@ -262,7 +251,6 @@ async function importArc(browser: Browser, path?: string): Promise<string | unde
   }
 
   if (replace) {
-    // Open where Arc was: its last focused space and sidebar width.
     const windows = await readJson(join(src.root, 'StorableWindows.json')).catch(() => undefined)
     const prefs = windows as { lastFocusedSpaceID?: unknown; sidebarViewPreferences?: { sidebarWidth?: unknown } } | undefined
     const focused = typeof prefs?.lastFocusedSpaceID === 'string' ? spaceIds.get(prefs.lastFocusedSpaceID) : undefined
@@ -274,7 +262,6 @@ async function importArc(browser: Browser, path?: string): Promise<string | unde
   browser.emit()
   if (replacedActive) browser.switchSpace(state.activeSpaceId)
 
-  // History per Arc profile, from `User Data/<dir>/History` next to the sidebar file.
   let visits = 0
   const failed: string[] = []
   if (src.userData) {
@@ -298,8 +285,6 @@ async function importArc(browser: Browser, path?: string): Promise<string | unde
   if (failed.length) summary += ` (couldn't read history of ${list(failed)}; quit Arc and import again)`
   return summary
 }
-
-// ---------------------------------------------------------------- Zen
 
 async function chooseZenProfile(browser: Browser, path?: string): Promise<ZenProfile | undefined> {
   if (path) return resolveZenProfile(path)
@@ -343,13 +328,12 @@ async function importZen(browser: Browser, path?: string): Promise<string | unde
     parsed.profiles,
     parsed.spaces.map((s) => ({ ...s, key: s.zenId }))
   )
-  // Open where Zen was.
   if (added.replace) state.activeSpaceId = (parsed.activeSpaceId && added.spaceIds.get(parsed.activeSpaceId)) || added.spaces[0].id
   browser.store.save()
   browser.emit()
   if (added.replacedActive) browser.switchSpace(state.activeSpaceId)
 
-  // Zen keeps one history for all its spaces, so every imported profile gets it.
+  // Zen keeps one history for all its spaces.
   let visits = 0
   let historyFailed = false
   try {
@@ -368,8 +352,6 @@ async function importZen(browser: Browser, path?: string): Promise<string | unde
   return summary
 }
 
-// ---------------------------------------------------------------- Chrome / Edge / Brave
-
 interface ChromiumCandidate {
   browserName: string
   profileName: string
@@ -378,8 +360,8 @@ interface ChromiumCandidate {
 
 function chromiumCandidates(path?: string): ChromiumCandidate[] {
   if (path) {
-    // A profile dir (has History/Bookmarks) or a whole user-data dir (has Local State).
-    if (existsSync(join(path, 'History')) || existsSync(join(path, 'Bookmarks'))) {
+    const isProfileDir = existsSync(join(path, 'History')) || existsSync(join(path, 'Bookmarks'))
+    if (isProfileDir) {
       return [{ browserName: 'Chrome', profileName: basename(path), dir: path }]
     }
     return listProfiles(path).map((p) => ({ browserName: 'Chrome', profileName: p.name, dir: p.path }))
@@ -424,8 +406,6 @@ async function importChromium(browser: Browser, path?: string): Promise<string |
   if (!visits && !bookmarkCount) return `Nothing to import from ${chosen.browserName} — ${chosen.profileName}`
   return `Imported ${list([plural(visits, 'history entry', 'history entries'), plural(bookmarkCount, 'bookmark')])} from ${chosen.browserName}`
 }
-
-// ---------------------------------------------------------------- text
 
 function plural(n: number, one: string, many = `${one}s`): string {
   return `${n.toLocaleString('en-US')} ${n === 1 ? one : many}`

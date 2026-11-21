@@ -1,4 +1,3 @@
-// Little Window toolbar: a URL pill (profile chip, domain, copy link) and "Open in <Space>".
 import { useEffect, useState, type MouseEvent } from 'react'
 import { createRoot } from 'react-dom/client'
 import type { LittleOp, LittleState } from '../../shared/ipc'
@@ -6,7 +5,6 @@ import { arc, displayHost, isMac } from './api'
 import { Icon } from './icons'
 import './styles.css'
 
-/** Opens a native menu just below the clicked button. */
 function menuBelow(op: LittleOp) {
   return (e: MouseEvent<HTMLButtonElement>) => {
     const r = e.currentTarget.getBoundingClientRect()

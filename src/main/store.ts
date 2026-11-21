@@ -1,4 +1,3 @@
-// Persistence of the sidebar/spaces state as one JSON file with atomic, debounced writes.
 import { randomUUID } from 'node:crypto'
 import { closeSync, existsSync, fsyncSync, mkdirSync, openSync, readdirSync, readFileSync, renameSync, rmSync, writeSync } from 'node:fs'
 import { basename, dirname, join } from 'node:path'
@@ -51,7 +50,6 @@ export function defaultState(): PersistedState {
   }
 }
 
-/** Fill in fields that older or imported state files may lack. */
 export function normalize(raw: Partial<PersistedState>): PersistedState {
   const base = defaultState()
   const profiles = raw.profiles?.length ? raw.profiles : base.profiles
@@ -77,7 +75,6 @@ export function normalize(raw: Partial<PersistedState>): PersistedState {
   }
 }
 
-/** An incognito window's state: one black space on a temporary profile, with the main window's settings. */
 export function incognitoState(settings: Settings): PersistedState {
   const state = defaultState()
   state.profiles[0].name = 'Incognito'
@@ -88,13 +85,11 @@ export function incognitoState(settings: Settings): PersistedState {
 
 export class Store {
   state: PersistedState
-  /** No state file existed before this launch: YARC's first run on this profile (the welcome screen). */
   readonly firstRun: boolean
   private timer: NodeJS.Timeout | undefined
-  /** Runs before each write, to bring per-window state into `state.windows`. */
   beforeWrite: (() => void) | undefined
 
-  /** Without a file (incognito), the state lives in memory only. */
+  /** Without a file (incognito), it lives in memory only. */
   constructor(
     private file: string | undefined,
     initial?: PersistedState
@@ -128,8 +123,7 @@ export class Store {
     this.beforeWrite?.()
     mkdirSync(dirname(this.file), { recursive: true })
     const tmp = `${this.file}.tmp`
-    // Only this user can read it (it lists every tab), and it's on disk before it replaces the old
-    // one: a power cut can't leave a truncated state.json, which would start YARC from scratch.
+    // On disk before it replaces the old one: a power cut can't leave a truncated state.json.
     const fd = openSync(tmp, 'w', 0o600)
     try {
       writeSync(fd, JSON.stringify(this.state))
@@ -158,7 +152,7 @@ export class Store {
   }
 }
 
-/** Keeps the three newest state.json.corrupt-<time> backups: each holds every tab's URL. */
+/** Each holds every tab's URL. */
 function pruneBackups(file: string): void {
   const dir = dirname(file)
   const prefix = `${basename(file)}.corrupt-`

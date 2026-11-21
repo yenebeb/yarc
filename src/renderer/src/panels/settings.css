@@ -1,5 +1,3 @@
-/* Settings window: section list on the left, grouped cards on the right, tinted by the space. */
-
 .panel.sheet.settings {
   --set-nav: color-mix(in oklab, var(--space) 10%, #f1f0f5);
   --set-bg: color-mix(in oklab, var(--space) 4%, #f7f6fa);
@@ -21,20 +19,6 @@
   font-size: 13px;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root:not([data-appearance='light']) .panel.sheet.settings {
-    --set-nav: color-mix(in oklab, var(--space) 9%, #1c1b21);
-    --set-bg: color-mix(in oklab, var(--space) 4%, #242229);
-    --set-card: rgb(255 255 255 / 0.045);
-    --set-card-shadow: none;
-    --set-input: rgb(255 255 255 / 0.07);
-    --set-input-line: rgb(255 255 255 / 0.1);
-    --set-seg-on: rgb(255 255 255 / 0.16);
-    --set-off: rgb(255 255 255 / 0.18);
-    --set-fill: color-mix(in oklab, var(--space) 78%, #000);
-  }
-}
-
 :root[data-appearance='dark'] .panel.sheet.settings {
   --set-nav: color-mix(in oklab, var(--space) 9%, #1c1b21);
   --set-bg: color-mix(in oklab, var(--space) 4%, #242229);
@@ -46,8 +30,6 @@
   --set-off: rgb(255 255 255 / 0.18);
   --set-fill: color-mix(in oklab, var(--space) 78%, #000);
 }
-
-/* ---------------------------------------------------------------- section list */
 
 .settings .set-nav {
   flex: none;
@@ -115,8 +97,6 @@
   width: 20px;
   height: 20px;
 }
-
-/* ---------------------------------------------------------------- content */
 
 .settings .set-main {
   flex: 1;
@@ -199,7 +179,6 @@
   color: var(--text-3);
 }
 
-/* One option: text on the left, its control on the right. Hairlines are inset like macOS. */
 .settings .set-row {
   position: relative;
   display: flex;
@@ -260,8 +239,6 @@
   align-items: center;
   gap: 10px;
 }
-
-/* ---------------------------------------------------------------- controls */
 
 .settings .btn {
   padding: 6px 13px;
@@ -327,7 +304,6 @@
   pointer-events: none;
 }
 
-/* Segmented control, like macOS's appearance picker. */
 .settings .set-seg {
   display: inline-flex;
   padding: 2px;
@@ -361,7 +337,6 @@
   outline: 2px solid color-mix(in oklab, var(--accent) 60%, transparent);
 }
 
-/* Slider with the filled part in the accent color. */
 .settings .set-range {
   appearance: none;
   width: 180px;
@@ -403,7 +378,6 @@
   background: var(--set-input);
 }
 
-/* Toggle switch on a checkbox. */
 .settings .switch {
   appearance: none;
   flex: none;
@@ -441,8 +415,6 @@
 .settings .switch:focus-visible {
   box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 30%, transparent);
 }
-
-/* ---------------------------------------------------------------- profiles */
 
 .settings .set-profile {
   gap: 12px;
@@ -509,8 +481,6 @@
   white-space: nowrap;
 }
 
-/* ---------------------------------------------------------------- extensions */
-
 .settings .set-ext {
   min-height: 46px;
   gap: 12px;
@@ -545,8 +515,6 @@
   color: var(--text-3);
 }
 
-/* ---------------------------------------------------------------- shortcuts */
-
 .settings .set-shortcut {
   min-height: 40px;
   padding-block: 7px;
@@ -574,8 +542,6 @@
   border-bottom-width: 2px;
   border-radius: 6px;
 }
-
-/* ---------------------------------------------------------------- about */
 
 .settings .set-about {
   margin-top: 4px;

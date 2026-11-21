@@ -16,7 +16,14 @@ const SCHEME = /^(https?|file|about|chrome|chrome-extension|view-source|data|blo
 const LOCAL = /^(localhost|\d{1,3}(\.\d{1,3}){3}|\[[0-9a-f:]+\])(:\d+)?(\/.*)?$/i
 const DOMAIN = /^([a-z0-9-]+\.)+[a-z][a-z0-9-]{1,62}(:\d+)?([/?#].*)?$/i
 
-/** Returns a URL when the input looks like one, otherwise undefined. */
+export function originOf(url: string): string {
+  try {
+    return new URL(url).origin
+  } catch {
+    return ''
+  }
+}
+
 export function toUrl(input: string): string | undefined {
   const text = input.trim()
   if (!text || /\s/.test(text)) return undefined
@@ -26,12 +33,10 @@ export function toUrl(input: string): string | undefined {
   return undefined
 }
 
-/** Turns command bar input into something loadable: a URL or a search. */
 export function resolveInput(input: string, engine: SearchEngine): string {
   return toUrl(input) ?? searchUrl(input.trim(), engine)
 }
 
-/** The search query, when a URL is a results page of one of the known engines. */
 export function queryFromSearchUrl(url: string): string | undefined {
   try {
     const u = new URL(url)

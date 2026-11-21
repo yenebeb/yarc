@@ -40,18 +40,27 @@ export function activeSpace(state: AppState): Space {
   return state.spaces.find((s) => s.id === state.activeSpaceId) ?? state.spaces[0]
 }
 
-/** Applies the space theme color (and, for the sidebar, its light/dark appearance) to the document. */
-export function useSpaceTheme(color: string | undefined, appearance?: 'light' | 'dark'): void {
+const systemDark = matchMedia('(prefers-color-scheme: dark)')
+let spaceAppearance: Space['appearance']
+
+function applyAppearance(): void {
+  document.documentElement.dataset.appearance = spaceAppearance ?? (systemDark.matches ? 'dark' : 'light')
+}
+applyAppearance()
+systemDark.addEventListener('change', applyAppearance)
+
+export function useSpaceTheme(color: string | undefined, appearance?: Space['appearance']): void {
   useEffect(() => {
-    if (!color) return
-    const root = document.documentElement
-    root.style.setProperty('--space', color)
+    if (color) document.documentElement.style.setProperty('--space', color)
   }, [color])
   useEffect(() => {
-    const root = document.documentElement
-    if (appearance) root.dataset.appearance = appearance
-    else delete root.dataset.appearance
+    spaceAppearance = appearance
+    applyAppearance()
   }, [appearance])
+}
+
+export function cx(...names: (string | false | null | undefined)[]): string {
+  return names.filter(Boolean).join(' ')
 }
 
 export function faviconFor(favicon?: string): string | undefined {

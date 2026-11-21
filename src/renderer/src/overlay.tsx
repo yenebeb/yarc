@@ -1,14 +1,12 @@
-// The transparent overlay above web pages: command bar, find bar, tab switcher, the
-// floating sidebar and the settings/library/space panels.
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { bindingLabel, type CommandId } from '../../shared/keymap'
 import { matchSiteSearch, siteSearchUrl, type SiteSearch } from '../../shared/site-search'
-import { paneIds, placePane, previewRect, sideAt, type Side } from '../../shared/split'
+import { MAX_PANES, paneIds, placePane, previewRect, sideAt, type Side } from '../../shared/split'
 import { isFloating } from '../../shared/tour'
 import { findItem } from '../../shared/tree'
 import type { AppState, ID, OverlayMode, Rect, SearchResult } from '../../shared/types'
-import { activeSpace, arc, dispatch, displayHost, isMac, useAppState, useOverlayMode, useSpaceTheme } from './api'
+import { activeSpace, arc, cx, dispatch, displayHost, isMac, useAppState, useOverlayMode, useSpaceTheme } from './api'
 import { Favicon, Icon, type IconName } from './icons'
 import { Tour, UpdateReady, WhatsNew } from './panels/Intro'
 import { Library } from './panels/Library'
@@ -25,7 +23,7 @@ function App() {
   const state = useAppState()
   const mode = useOverlayMode()
   const space = state ? activeSpace(state) : undefined
-  // The command bar and panels follow the system, like Arc; only the peeking sidebar takes the space's appearance.
+  // Only the peeking sidebar takes the space's appearance; the command bar and panels follow the system.
   useSpaceTheme(space?.color, mode.kind === 'sidebar' ? space?.appearance : undefined)
   // Remount panels each time they open so inputs start fresh.
   const [generation, setGeneration] = useState(0)
@@ -40,10 +38,8 @@ function App() {
   switch (mode.kind) {
     case 'sidebar':
       return (
-        <div className={`${isMac ? 'mac' : 'win'}${state.fullscreen ? ' fullscreen' : ''}${state.settings.sidebarRight ? ' sidebar-right' : ''}`} style={{ height: '100%' }}>
-          {/* A tab dragged out of the peeking sidebar: this overlay then covers the whole window. The zones
-              come first so the sidebar stays on top of them: over the sidebar a drag reorders, pins or adds
-              a favorite; only over the page does it make a split. */}
+        <div className={cx(isMac ? 'mac' : 'win', state.fullscreen && 'fullscreen', state.settings.sidebarRight && 'sidebar-right')} style={{ height: '100%' }}>
+          {/* Zones first so the sidebar stays on top: only over the page does a drag make a split. */}
           {state.tabDrag ? <SplitDropZones state={state} origin={{ x: 0, y: 0 }} /> : null}
           <Sidebar state={state} floating />
         </div>
@@ -52,8 +48,7 @@ function App() {
       return <FindBar key={key} />
     case 'notice':
       return (
-        // A click on it (it covers a strip of the page) hands the page back, keyboard included.
-        <div className="notice" role="status" onMouseDown={() => dispatch({ type: 'overlay', mode: { kind: 'none' } })}>
+        <div className="notice" role="status" onMouseDown={close}>
           {mode.text}
         </div>
       )
@@ -99,7 +94,6 @@ function App() {
     case 'split-drop':
       return <SplitDropZones state={state} origin={state.layout.content} />
     case 'tour':
-      // Try-it steps: only the card, in a small overlay at the bottom of the page.
       if (isFloating(mode.step)) return <Tour state={state} step={mode.step} close={endTour} />
       return (
         <>
@@ -124,23 +118,16 @@ function App() {
   }
 }
 
-// ------------------------------------------------------------------ split drop zones
-
 const distance = (r: Rect, x: number, y: number) => Math.hypot(Math.max(r.x - x, 0, x - r.x - r.width), Math.max(r.y - y, 0, y - r.y - r.height))
 
-/**
- * While a sidebar tab is dragged over the page: the half of the pane under the cursor that the
- * tab would take, like Arc. Left or right of a pane makes a side-by-side split, top or bottom a
- * stacked one. `origin` is where this overlay sits in the window (layout rects are in window pixels).
- */
+/** `origin`: where this overlay sits in the window, since layout rects are in window pixels. */
 function SplitDropZones({ state, origin }: { state: AppState; origin: { x: number; y: number } }) {
   const [zone, setZone] = useState<{ target: ID; side: Side; rect: Rect }>()
   const dragged = state.tabDrag ? findItem(state, state.tabDrag)?.item : undefined
   const { content, views, splitId } = state.layout
   const split = splitId ? activeSpace(state).splits.find((sp) => sp.id === splitId) : undefined
 
-  // Every drag end reaches the sidebar, which tells the main process. Should that ever miss, the
-  // first ordinary mouse move ends it here, so this layer never keeps the page's clicks.
+  // Should the sidebar ever miss a drag end, this layer still never keeps the page's clicks.
   useEffect(() => {
     const shown = Date.now()
     const end = (e: MouseEvent) => {
@@ -158,7 +145,7 @@ function SplitDropZones({ state, origin }: { state: AppState; origin: { x: numbe
     if (!dragged || views.length === 0) return undefined
     const x = clientX + origin.x
     const y = clientY + origin.y
-    // A split pane with its bar on top; the nearest one, so the gaps between panes don't flicker.
+    // The nearest pane (bar included), so the gaps between panes don't flicker.
     const panes = views.map((v) => ({ id: v.id, rect: v.bar ? { ...v.bar, height: v.bar.height + v.rect.height } : v.rect }))
     const pane = panes.reduce((a, b) => (distance(b.rect, x, y) < distance(a.rect, x, y) ? b : a))
     const side = sideAt(pane.rect, x, y)
@@ -167,7 +154,7 @@ function SplitDropZones({ state, origin }: { state: AppState; origin: { x: numbe
     return { target: pane.id, side, rect: previewRect(pane.rect, side) }
   }
 
-  const full = !!split && paneIds(split.root).length >= 4 && !paneIds(split.root).includes(dragged?.id ?? '')
+  const full = !!split && paneIds(split.root).length >= MAX_PANES && !paneIds(split.root).includes(dragged?.id ?? '')
   return (
     <div
       className="split-drop"
@@ -208,9 +195,6 @@ function SplitDropZones({ state, origin }: { state: AppState; origin: { x: numbe
   )
 }
 
-// ------------------------------------------------------------------ peek
-
-/** The dimmed page behind a Peek card and Arc's buttons beside it; the card itself is a web view on top. */
 function PeekFrame({ card }: { card: Rect }) {
   const peek = (op: 'close' | 'expand' | 'split') => () => dispatch({ type: 'peek', op })
   return (
@@ -231,12 +215,10 @@ function PeekFrame({ card }: { card: Rect }) {
   )
 }
 
-// ------------------------------------------------------------------ command bar
-
-/** Arc shows five rows: the top hit, the search for what was typed, then the rest. */
 const MAX_RESULTS = 5
 
-/** What Arc's inline completion shows for a URL: no scheme, no www., no trailing slash. */
+const PLACEHOLDER = { tab: 'Search or Enter URL…', split: 'Open in split view…', current: 'Edit URL or search…' }
+
 const completionText = (url: string) => url.replace(/^https?:\/\/(www\.)?/i, '').replace(/\/$/, '')
 
 const KIND_ICON: Partial<Record<SearchResult['kind'], IconName>> = {
@@ -253,9 +235,8 @@ function CommandBar({ state, mode }: { state: AppState; mode: Extract<OverlayMod
   const [local, setLocal] = useState<SearchResult[]>([])
   const [suggestions, setSuggestions] = useState<string[]>([])
   const [sel, setSel] = useState(0)
-  /** Arc-style inline completion after the typed text, shown selected. */
   const [suffix, setSuffix] = useState('')
-  /** Tab to Search: the site the query goes to, and what was typed to pick it (Backspace brings it back). */
+  /** `typed`: what Backspace brings back. */
   const [site, setSite] = useState<{ site: SiteSearch; typed: string }>()
   const typing = useRef(false)
   const input = useRef<HTMLInputElement>(null)
@@ -291,15 +272,11 @@ function CommandBar({ state, mode }: { state: AppState; mode: Extract<OverlayMod
     const extra: SearchResult[] = suggestions
       .filter((s) => !seen.has(s.toLowerCase()))
       .map((s) => ({ kind: 'suggestion', id: `sug:${s}`, title: s, url: s, subtitle: '' }))
-    // The main process already put the top hit, the search for the query, then commands, tabs and
-    // history in order (src/main/search-rank.ts); the search engine's suggestions come last.
     return [...local, ...extra].slice(0, MAX_RESULTS)
   }, [local, suggestions, site, query])
 
-  /** The site Tab would switch to. */
   const tabSite = site ? undefined : matchSiteSearch(query)
 
-  // Complete the top hit's URL inline while typing forward (not after deleting).
   useEffect(() => {
     const top = results[0]
     if (!typing.current || !query || !top?.url || !/^https?:/i.test(top.url)) return setSuffix('')
@@ -317,9 +294,8 @@ function CommandBar({ state, mode }: { state: AppState; mode: Extract<OverlayMod
 
   const run = (r: SearchResult | undefined, alt = false) => {
     if (!r) {
-      // Enter with no query in Tab to Search goes to the site itself, like Chromium's keyword mode.
       const url = site ? `https://${site.site.keyword}` : query.trim() ? query : ''
-      if (url) dispatch({ type: 'open', url, where: target === 'split' ? 'split' : target === 'current' ? 'current' : 'tab', splitAt: mode.splitAt })
+      if (url) dispatch({ type: 'open', url, where: target, splitAt: mode.splitAt })
       return
     }
     if ((r.kind === 'tab' || r.kind === 'favorite' || r.kind === 'pinned') && r.target) {
@@ -335,17 +311,10 @@ function CommandBar({ state, mode }: { state: AppState; mode: Extract<OverlayMod
       return
     }
     if (r.kind === 'archive' && r.target) return dispatch({ type: 'archiveRestore', id: r.target })
-    const where = alt || target === 'split' ? 'split' : target === 'current' ? 'current' : 'tab'
-    dispatch({ type: 'open', url: r.url ?? r.title, where, splitAt: where === 'split' && target === 'split' ? mode.splitAt : undefined })
+    dispatch({ type: 'open', url: r.url ?? r.title, where: alt ? 'split' : target, splitAt: target === 'split' ? mode.splitAt : undefined })
   }
 
-  const placeholder = site
-    ? `Search ${site.site.name}…`
-    : target === 'split'
-      ? 'Open in split view…'
-      : target === 'current'
-        ? 'Edit URL or search…'
-        : 'Search or Enter URL…'
+  const placeholder = site ? `Search ${site.site.name}…` : PLACEHOLDER[target]
 
   return (
     <div className="panel command" onMouseDown={(e) => e.stopPropagation()}>
@@ -381,13 +350,11 @@ function CommandBar({ state, mode }: { state: AppState; mode: Extract<OverlayMod
             } else if (e.key === 'Tab' && site) {
               e.preventDefault()
             } else if (e.key === 'Backspace' && site && !query) {
-              // Leave Tab to Search with what was typed before it.
               e.preventDefault()
               typing.current = false
               setQuery(site.typed)
               setSite(undefined)
             } else if (suffix && (e.key === 'ArrowRight' || e.key === 'End')) {
-              // Accept the completion.
               typing.current = false
               setQuery(query + suffix)
               setSuffix('')
@@ -440,10 +407,9 @@ function ResultRow({
   else if (r.kind === 'command' && r.target && !r.target.startsWith('space:')) hint = bindingLabel(r.target as CommandId, isMac)
   else if (r.kind === 'archive') hint = 'Restore'
   const isTab = r.kind === 'tab' || r.kind === 'pinned' || r.kind === 'favorite'
-  // Arc shows tabs by title only, and history as "Title — host".
   const subtitle = isTab ? '' : r.kind === 'history' && r.url ? `— ${displayHost(r.url)}` : r.subtitle
   return (
-    <div className={`result${sel ? ' sel' : ''}`} onMouseMove={sel ? undefined : onHover} onMouseDown={(e) => e.preventDefault()} onClick={onClick}>
+    <div className={cx('result', sel && 'sel')} onMouseMove={sel ? undefined : onHover} onMouseDown={(e) => e.preventDefault()} onClick={onClick}>
       <span className="ico">{icon ? <Icon name={icon} /> : <Favicon url={r.url ?? ''} favicon={r.favicon} />}</span>
       <span className="text">
         <span className="t">{r.title}</span>
@@ -458,8 +424,6 @@ function ResultRow({
     </div>
   )
 }
-
-// ------------------------------------------------------------------ find bar
 
 function FindBar() {
   const [query, setQuery] = useState('')
@@ -513,8 +477,6 @@ function FindBar() {
   )
 }
 
-// ------------------------------------------------------------------ ctrl+tab switcher
-
 function Switcher({ state, order, index }: { state: AppState; order: string[]; index: number }) {
   const visible = order.slice(0, 8)
   return (
@@ -526,7 +488,7 @@ function Switcher({ state, order, index }: { state: AppState; order: string[]; i
           if (!item) return null
           const live = state.live[id]
           return (
-            <div key={id} className={`switch-card${i === index % visible.length ? ' sel' : ''}`}>
+            <div key={id} className={cx('switch-card', i === index % visible.length && 'sel')}>
               <Favicon url={item.url} favicon={live?.favicon ?? item.favicon} />
               <span className="t">{item.savedTitle || live?.title || item.title}</span>
             </div>

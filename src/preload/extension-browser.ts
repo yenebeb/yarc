@@ -1,8 +1,4 @@
-// Preload for extension pages and service workers, run after electron-chrome-extensions' own.
-// That library adds its APIs (windows, contextMenus, cookies, webNavigation, …) to `chrome` only,
-// but Chromium also gives extensions a separate `browser` object with just the native APIs.
-// Extensions written against `browser.*` (1Password reads browser.windows at startup) would crash,
-// so `browser` gets every API `chrome` has.
+// electron-chrome-extensions adds its APIs to `chrome` only; extensions using `browser.*` (1Password) would crash.
 import { contextBridge } from 'electron'
 
 function shareChromeApis(): void {
@@ -12,9 +8,7 @@ function shareChromeApis(): void {
     if (browser[key] === chrome[key]) continue
     try {
       Object.defineProperty(browser, key, { value: chrome[key], enumerable: true, configurable: true })
-    } catch {
-      // A native API that can't be replaced keeps working as it is.
-    }
+    } catch {}
   }
 }
 

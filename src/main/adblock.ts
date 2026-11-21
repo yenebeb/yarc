@@ -1,9 +1,4 @@
-// Built-in ad & tracker blocking (Ghostery's engine with uBlock Origin/EasyList-compatible lists).
-// Electron has no declarativeNetRequest, so MV3 blockers like uBlock Origin Lite can't block;
-// this does it in the main process instead, for every profile.
-//
-// We don't use the library's enableBlockingInSession(): it registers global IPC handlers per
-// session (a second profile throws) and disabling one profile would unregister them for all.
+// Not enableBlockingInSession(): it registers global IPC handlers per session (a second profile throws).
 import { ElectronBlocker } from '@ghostery/adblocker-electron'
 import { ipcMain, type IpcMainInvokeEvent, type OnBeforeRequestListenerDetails, type OnHeadersReceivedListenerDetails, type Session, type WebContents } from 'electron'
 import { mkdir, readFile, stat, writeFile } from 'node:fs/promises'
@@ -11,7 +6,7 @@ import { createRequire } from 'node:module'
 import { dirname } from 'node:path'
 
 const PRELOAD = createRequire(__filename).resolve('@ghostery/adblocker-electron-preload')
-const MAX_AGE = 24 * 3600_000
+const FILTERS_MAX_AGE = 24 * 3600_000
 
 export class AdBlock {
   private engine: ElectronBlocker | undefined
@@ -33,14 +28,14 @@ export class AdBlock {
     )
   }
 
-  /** Loads the filter engine from cache (refreshed daily). Pages load unfiltered until it's ready. */
+  /** Pages load unfiltered until it's ready. */
   async load(): Promise<void> {
     let cached: Buffer | undefined
     let fresh = false
     try {
       const info = await stat(this.cacheFile)
       cached = await readFile(this.cacheFile)
-      fresh = Date.now() - info.mtimeMs < MAX_AGE
+      fresh = Date.now() - info.mtimeMs < FILTERS_MAX_AGE
     } catch {}
     if (cached && fresh) return this.use(ElectronBlocker.deserialize(new Uint8Array(cached)))
     try {
@@ -81,12 +76,10 @@ export class AdBlock {
     })
   }
 
-  /** Number of requests blocked on the page currently shown in a tab. */
   count(wc: WebContents): number {
     return this.blocked.get(wc.id) ?? 0
   }
 
-  /** Call on main-frame navigation so the counter is per page. */
   resetCount(wc: WebContents): void {
     if (this.blocked.delete(wc.id)) this.onChange()
   }
@@ -104,7 +97,6 @@ export class AdBlock {
 
   private activeForRequest(details: OnBeforeRequestListenerDetails | OnHeadersReceivedListenerDetails): boolean {
     if (!this.enabled) return false
-    // For the page itself use the URL being loaded; for subresources, the page that asked.
     if (details.resourceType === 'mainFrame') return !this.isAllowed(details.url)
     return this.activeFor(details.webContents, details.referrer)
   }

@@ -809,7 +809,7 @@ test('a tab selected in two windows is live in one and mirrored, greyed, in the 
   await app.evaluate((_e, id) => {
     const b = (globalThis as any).arcBrowser
     b.openNewWindow()
-    b.on(b.wins[1], () => b.activate(id))
+    b.inWin(b.wins[1], () => b.activate(id))
   }, shared)
   const where = () =>
     app.evaluate((_e, id) => {
@@ -836,7 +836,7 @@ test('a tab selected in two windows is live in one and mirrored, greyed, in the 
   // The second window moves on to another tab: the first gets the page back, live.
   await app.evaluate((_e, id) => {
     const b = (globalThis as any).arcBrowser
-    b.on(b.wins[1], () => b.activate(id))
+    b.inWin(b.wins[1], () => b.activate(id))
   }, other)
   await expect.poll(where).toEqual(['live', 'none'])
   expect(await app.evaluate(() => (globalThis as any).arcBrowser.mirror.subs.size)).toBe(0)

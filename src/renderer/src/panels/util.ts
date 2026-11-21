@@ -1,4 +1,3 @@
-// Small helpers shared by the overlay panels.
 import type { PinnedNode } from '../../../shared/types'
 
 export { SPACE_COLORS } from '../../../shared/colors'
@@ -25,7 +24,7 @@ export function dayLabel(t: number): string {
 
 export const timeLabel = (t: number) => new Date(t).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
 
-/** Groups items (already sorted newest first) by calendar day, keeping order. */
+/** `items` must be sorted newest first. */
 export function groupByDay<T>(items: T[], time: (x: T) => number): { label: string; key: number; items: T[] }[] {
   const groups: { label: string; key: number; items: T[] }[] = []
   for (const it of items) {
@@ -55,7 +54,6 @@ export function countPinned(nodes: PinnedNode[]): number {
   return n
 }
 
-/** First grapheme of a string, so pasted text keeps just one emoji. */
 export function firstGrapheme(s: string): string {
   const t = s.trim()
   if (!t) return ''

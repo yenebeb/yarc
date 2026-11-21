@@ -1,4 +1,3 @@
-// One Electron session per profile: separate cookies, storage, cache, extensions and history.
 import { app, safeStorage, session, type Session, type WebContents } from 'electron'
 import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -9,6 +8,7 @@ import { SiteDecisions } from './site-permissions'
 import { CHROME_UA_HOSTS, userAgentFor } from './useragent'
 import { permissionOrigin } from '../shared/permissions'
 import type { ID } from '../shared/types'
+import { originOf } from '../shared/url'
 
 export interface ProfileRuntime {
   id: ID
@@ -16,42 +16,19 @@ export interface ProfileRuntime {
   history: History
 }
 
-/** Those in PROMPT ask the user (PermissionQueue), who answers per profile (SiteDecisions). */
-/**
- * Granted without asking. Screen sharing (display-capture) too, like Chrome: Chromium only lets a
- * page ask after a click, and the screen picker the request opens is the user's consent
- * (browser.ts pickShare).
- */
+/** display-capture: a page can only ask after a click, and the screen picker it opens is the user's consent (browser.ts pickShare). */
 const AUTO_GRANT = new Set(['fullscreen', 'clipboard-sanitized-write', 'pointerLock', 'speaker-selection', 'display-capture'])
 const PROMPT = new Set(['media', 'geolocation', 'notifications', 'midi', 'midiSysex', 'clipboard-read', 'idle-detection', 'hid', 'serial', 'usb', 'window-management'])
 
-/**
- * Prompted permissions that report "granted" until the user blocks them. Electron's check handler
- * can only say granted or denied, not "ask". Sites like Google Meet read "denied" as blocked and
- * never request access. Each request still goes through the prompt.
- */
+/** Reported "granted" until blocked: Electron's check can't say "ask", and Meet reads "denied" as blocked and never requests. */
 const ASK_ON_REQUEST = new Set(['media'])
 
-/** "https://meet.google.com", whether Electron hands over an origin ("…/") or a URL. */
-function originOf(url: string): string {
-  try {
-    return new URL(url).origin
-  } catch {
-    return ''
-  }
-}
-
-/** Whether a frame's URL is from another origin than the page embedding it (unknown = no). */
 function crossOrigin(url: string, embedding: string | undefined): boolean {
   if (!embedding) return false
   return originOf(url) !== originOf(embedding)
 }
 
-/**
- * Saved session cookies are encrypted where the Cookies database is (Windows and Linux, the
- * EnableCookieEncryption fuse). On macOS neither is: the Keychain would ask for the login password
- * after every update (docs/electron-notes.md section 8).
- */
+/** Not on macOS: the Keychain would ask for the login password after every update (docs/electron-notes.md section 8). */
 function cookieCipher(): Cipher | undefined {
   if (process.platform === 'darwin' || !safeStorage.isEncryptionAvailable()) return undefined
   return { encrypt: (text) => safeStorage.encryptString(text), decrypt: (data) => safeStorage.decryptString(data) }
@@ -59,15 +36,11 @@ function cookieCipher(): Cipher | undefined {
 
 export class Profiles {
   private runtimes = new Map<ID, ProfileRuntime>()
-  /** Requests waiting for the user. The browser draws the prompt. */
   readonly permissionQueue: PermissionQueue
-  /** Each profile's answers, loaded on first use; incognito ones stay in memory. */
   private siteDecisions = new Map<ID, SiteDecisions>()
   private watched = new WeakSet<WebContents>()
-  /** Session cookies saved across restarts, per profile (none for incognito). */
   private sessionCookies = new Map<ID, SessionCookies>()
 
-  /** Incognito profiles keep nothing on disk: an in-memory session and history. */
   constructor(
     private onCreated: (rt: ProfileRuntime) => void,
     private incognito = false,
@@ -84,7 +57,6 @@ export class Profiles {
     return join(app.getPath('userData'), 'Profiles', id)
   }
 
-  /** The profile's answers to permission prompts, kept in Profiles/<id>/permissions.json. */
   decisions(id: ID): SiteDecisions {
     let d = this.siteDecisions.get(id)
     if (d) return d
@@ -113,10 +85,7 @@ export class Profiles {
     return join(this.dir(id), 'permissions.json')
   }
 
-  /**
-   * Sets each profile's session cookies from the last run again, before its pages load. They're
-   * saved from then on, also for profiles created later (get()).
-   */
+  /** Before its pages load. */
   async restoreSessionCookies(ids: ID[]): Promise<void> {
     if (this.incognito) return
     await Promise.all(ids.map((id) => this.keepSessionCookies(id).restore()))
@@ -134,7 +103,6 @@ export class Profiles {
   get(id: ID): ProfileRuntime {
     let rt = this.runtimes.get(id)
     if (rt) return rt
-    // A partition without "persist:" stays in memory.
     const ses = session.fromPartition(this.incognito ? `incognito-${id}` : Profiles.partition(id))
     if (!this.incognito) this.keepSessionCookies(id)
     ses.setUserAgent(app.userAgentFallback)
@@ -153,10 +121,7 @@ export class Profiles {
     return [...this.runtimes.values()]
   }
 
-  /**
-   * Forgets a deleted profile: its site data now (whether or not it was used this run), and its
-   * folders at the next launch (purgeDeleted), when no session has them open.
-   */
+  /** Its folders go at the next launch (purgeDeleted), when no session has them open. */
   async remove(id: ID): Promise<void> {
     this.siteDecisions.delete(id)
     const rt = this.runtimes.get(id)
@@ -189,7 +154,7 @@ export class Profiles {
     }
   }
 
-  /** At launch, before any session: removes the cookies, storage, cache, history and extensions of deleted profiles. */
+  /** At launch, before any session. */
   static purgeDeleted(): void {
     const file = Profiles.deletedFile()
     let ids: unknown
@@ -213,8 +178,7 @@ export class Profiles {
   }
 
   private permissions(ses: Session, profileId: ID): void {
-    // Like Chrome, a frame's permission is the top-level page's: the prompt names the site the
-    // user is on, and the answer is stored for it (a frame still needs the page's `allow`).
+    // A frame's permission is the top-level page's: the prompt names the site the user is on (a frame still needs the page's `allow`).
     ses.setPermissionCheckHandler((wc, permission, origin, details) => {
       if (AUTO_GRANT.has(permission)) return true
       if (permission === 'notifications' && crossOrigin(origin, (details as { embeddingOrigin?: string }).embeddingOrigin)) return false
@@ -227,20 +191,18 @@ export class Profiles {
     ses.setPermissionRequestHandler((wc, permission, callback, details) => {
       if (AUTO_GRANT.has(permission)) return callback(true)
       if (!PROMPT.has(permission) || !wc) return callback(false)
-      // Like Chrome, a frame from another site can't ask for notifications: Meet inside Gmail
-      // would otherwise ask on every launch.
+      // Meet inside Gmail would otherwise ask on every launch.
       if (permission === 'notifications' && !details.isMainFrame && crossOrigin(details.requestingUrl, wc.getURL())) return callback(false)
       const top = permissionOrigin(details.isMainFrame ? details.requestingUrl : wc.getURL())
       if (!top) return callback(false)
       const requested = (details as { mediaTypes?: string[] }).mediaTypes ?? []
       const mediaTypes = requested.filter((t): t is MediaType => t === 'video' || t === 'audio')
-      this.watch(wc)
+      this.cancelRequestsOnLeave(wc)
       this.permissionQueue.request({ profileId, wcId: wc.id, origin: top, permission, mediaTypes: permission === 'media' ? mediaTypes : undefined }, callback)
     })
   }
 
-  /** A page's open questions end when it goes to another page or closes. */
-  private watch(wc: WebContents): void {
+  private cancelRequestsOnLeave(wc: WebContents): void {
     if (this.watched.has(wc)) return
     this.watched.add(wc)
     const id = wc.id

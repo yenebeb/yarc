@@ -1,4 +1,3 @@
-/* YARC UI. The space color drives the whole chrome via --space. */
 :root {
   --space: #7c6cf2;
   --font: -apple-system, BlinkMacSystemFont, 'Segoe UI Variable Text', 'Segoe UI', Inter, system-ui, sans-serif;
@@ -16,39 +15,12 @@
   --field: rgb(255 255 255 / 0.55);
   --accent: color-mix(in oklab, var(--space) 85%, #000);
   --shadow-lg: 0 24px 64px rgb(20 10 40 / 0.28), 0 2px 8px rgb(20 10 40 / 0.12);
-  /* Arc's sidebar: a darker search field, lighter favorite tiles, the theme laid translucent over the desktop. */
   --urlfield: rgb(0 0 0 / 0.07);
   --tile: rgb(255 255 255 / 0.1);
-  /* The space color darkened at full saturation: Arc's selected command row and folder icons. */
   --space-strong: oklch(from var(--space) calc(l * 0.67) c h);
   --vibrant-1: color-mix(in srgb, var(--space) 74%, transparent);
   --vibrant-2: color-mix(in srgb, var(--space) 62%, transparent);
   color-scheme: light;
-}
-
-/* Dark: the system's, unless the space's theme says light (Arc themes carry their own appearance). */
-@media (prefers-color-scheme: dark) {
-  :root:not([data-appearance='light']) {
-    --bg: color-mix(in oklab, var(--space) 22%, #1b1a20);
-    --bg-2: color-mix(in oklab, var(--space) 34%, #16151a);
-    --text: #f1eff6;
-    --text-2: rgb(241 239 246 / 0.62);
-    --text-3: rgb(241 239 246 / 0.4);
-    --hover: rgb(255 255 255 / 0.07);
-    --active: rgb(255 255 255 / 0.15);
-    --active-shadow: 0 1px 2px rgb(0 0 0 / 0.25);
-    --line: rgb(255 255 255 / 0.1);
-    --panel: #26242c;
-    --panel-line: rgb(255 255 255 / 0.09);
-    --field: rgb(255 255 255 / 0.07);
-    --accent: color-mix(in oklab, var(--space) 70%, #fff);
-    --shadow-lg: 0 24px 64px rgb(0 0 0 / 0.55), 0 2px 8px rgb(0 0 0 / 0.3);
-    color-scheme: dark;
-    --urlfield: rgb(0 0 0 / 0.18);
-    --tile: rgb(255 255 255 / 0.07);
-    --vibrant-1: color-mix(in srgb, color-mix(in oklab, var(--space) 32%, #17161b) 84%, transparent);
-    --vibrant-2: color-mix(in srgb, color-mix(in oklab, var(--space) 24%, #131217) 88%, transparent);
-  }
 }
 
 :root[data-appearance='dark'] {
@@ -96,12 +68,10 @@ body.page-index {
   isolation: isolate;
 }
 
-/* macOS: the window has vibrancy, so the theme goes on translucent, as in Arc. */
 body.page-index.vibrant {
   background: linear-gradient(170deg, var(--vibrant-1) 0%, var(--vibrant-2) 100%);
 }
 
-/* Arc's grain overlay. */
 body.page-index::before,
 .sidebar.floating::before {
   content: '';
@@ -157,8 +127,6 @@ input {
   height: 16px;
   flex: none;
 }
-
-/* ------------------------------------------------------------------ sidebar */
 
 .sidebar {
   position: absolute;
@@ -229,8 +197,7 @@ input {
   padding-left: 0;
 }
 
-/* Windows, Linux: the native min/max/close buttons sit in a 32px strip at the top-right (CAPTION_H, window.ts).
-   The sidebar's top bar shares that strip; pages start below it, and so does a sidebar on the right. */
+/* Windows, Linux: the top bar shares the native caption buttons' 32px strip (CAPTION_H, window.ts). */
 .win:not(.fullscreen) .sidebar:not(.floating):not(.right) {
   padding-top: 0;
 }
@@ -441,7 +408,6 @@ browser-action-list::part(action):hover {
   opacity: 1;
 }
 
-/* Titles use the full width until the close button is needed, as in Arc. */
 .row:not(:hover):not(.active) .close {
   display: none;
 }
@@ -646,7 +612,6 @@ browser-action-list::part(action):hover {
   opacity: 1;
 }
 
-/* Media cards: tabs playing out of sight. Collapsed, older cards peek out above the newest. */
 .media-cards {
   position: relative;
   display: flex;
@@ -780,7 +745,6 @@ browser-action-list::part(action):hover {
   flex: none;
 }
 
-/* content area placeholder (empty space) */
 .content-empty {
   position: absolute;
   border-radius: 8px;
@@ -793,10 +757,8 @@ browser-action-list::part(action):hover {
   line-height: 1.7;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root:not([data-appearance='light']) .content-empty {
-    background: rgb(0 0 0 / 0.18);
-  }
+[data-appearance='dark'] .content-empty {
+  background: rgb(0 0 0 / 0.18);
 }
 
 .content-elsewhere {
@@ -816,7 +778,7 @@ browser-action-list::part(action):hover {
   height: 100%;
   object-fit: cover;
   object-position: top left;
-  /* Greyed out: this window mirrors the page; the window that has it live is where it takes input. */
+  /* Greyed out: the window that has the page live is where it takes input. */
   filter: grayscale(1);
   opacity: 0.6;
 }
@@ -921,8 +883,6 @@ browser-action-list::part(action):hover {
   }
 }
 
-/* ------------------------------------------------------------------ overlay panels */
-
 .scrim {
   position: fixed;
   inset: 0;
@@ -930,10 +890,8 @@ browser-action-list::part(action):hover {
   animation: fade 0.12s ease-out;
 }
 
-@media (prefers-color-scheme: dark) {
-  .scrim {
-    background: rgb(0 0 0 / 0.35);
-  }
+:where([data-appearance='dark']) .scrim {
+  background: rgb(0 0 0 / 0.35);
 }
 
 @keyframes fade {
@@ -961,13 +919,11 @@ browser-action-list::part(action):hover {
   }
 }
 
-/* The command bar: wide, a third of the way down, tinted by the space; no dimming behind it. */
 .scrim.clear {
   background: transparent;
   animation: none;
 }
 
-/* Peek's buttons: dark circles in a column beside the card's top-right corner. */
 .peek-buttons {
   position: fixed;
   display: flex;
@@ -1096,7 +1052,6 @@ browser-action-list::part(action):hover {
   background: var(--field);
 }
 
-/* Tab to Search: the site the query goes to, in front of the input. */
 .command .site-chip {
   display: flex;
   align-items: center;
@@ -1191,7 +1146,6 @@ browser-action-list::part(action):hover {
   border-radius: 3px;
 }
 
-/* Full screen: whose page it is and how to leave, over the top of the page for a few seconds. */
 .notice {
   position: fixed;
   inset: 0;
@@ -1281,7 +1235,6 @@ browser-action-list::part(action):hover {
   background: var(--active);
 }
 
-/* settings / library / editor panels share this */
 .sheet {
   top: 8vh;
   width: min(760px, calc(100vw - 48px));
@@ -1324,25 +1277,6 @@ browser-action-list::part(action):hover {
   background: var(--field);
   color: var(--text);
   box-shadow: var(--active-shadow);
-}
-
-.field-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 10px 0;
-  border-bottom: 1px solid var(--panel-line);
-}
-
-.field-row label {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.field-row small {
-  color: var(--text-3);
 }
 
 .text-input,
@@ -1408,9 +1342,6 @@ select:focus {
   white-space: nowrap;
 }
 
-/* ------------------------------------------------------------------ little arc */
-
-/* The Little Window toolbar: a 47px dark bar, a 31px URL pill and an "Open in <Space>" button. */
 body.page-little {
   --little-bar: #0d0b18;
   background: var(--little-bar);
@@ -1477,7 +1408,6 @@ body.page-little::before {
   white-space: nowrap;
 }
 
-/* Arc's profile glyph is a filled face. */
 .little-profile .icon circle {
   fill: currentColor;
 }
@@ -1490,7 +1420,6 @@ body.page-little::before {
   background: rgb(255 255 255 / 0.08);
 }
 
-/* The domain is centered in the pill, like Arc's, whatever sits left and right of it. */
 .little-host {
   position: absolute;
   inset: 0 110px;
@@ -1565,8 +1494,6 @@ body.page-little::before {
   color: rgb(255 255 255 / 0.55);
 }
 
-
-/* Dragging a tab onto the middle of another tab row: the row shows the split it would become. */
 .row.drop-split {
   outline: 2px solid var(--accent);
   outline-offset: -2px;
@@ -1602,7 +1529,6 @@ body.page-little::before {
   background: color-mix(in oklab, var(--accent) 18%, transparent);
 }
 
-/* A split view's sidebar row: a half per tab, between thin dividers, like Arc. */
 .row.split-row {
   padding: 0;
   gap: 0;
@@ -1638,7 +1564,6 @@ body.page-little::before {
   background: var(--line);
 }
 
-/* Dragging a tab over the page: the half of the pane it would take. */
 .split-drop {
   position: absolute;
 }
@@ -1688,8 +1613,6 @@ body.page-little::before {
   pointer-events: none;
 }
 
-/* Split view: a bar on top of each pane, drawn under the page views: back and forward on the left,
-   the host centered, close on the right, a hairline below. */
 .pane-card {
   position: absolute;
   border-radius: 8px;
@@ -1740,7 +1663,7 @@ body.page-little::before {
   gap: 9px;
 }
 
-/* The host text is what's centered (Arc); the link icon hangs to its left. */
+/* The host text is what's centered; the link icon hangs to its left. */
 .pane-host {
   flex: 0 1 auto;
   position: relative;

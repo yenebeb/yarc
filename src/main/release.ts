@@ -1,9 +1,6 @@
-// GitHub release lookup for the macOS self-updater and the Linux notice. No Electron imports, so it unit-tests.
-
-/** Published releases only: drafts are invisible here, so a release goes out once it's published. */
 export const LATEST_RELEASE_API = 'https://api.github.com/repos/yenebeb/yarc/releases/latest'
+export const RELEASES_PAGE = 'https://github.com/yenebeb/yarc/releases'
 
-/** The fields we use from GitHub's "get the latest release" response. */
 export interface GithubRelease {
   tag_name: string
   html_url: string
@@ -12,19 +9,17 @@ export interface GithubRelease {
 
 interface Version {
   parts: number[]
-  /** "beta.1" in "1.2.0-beta.1"; empty for a normal release. */
-  pre: string
+  preRelease: string
 }
 
 function parseVersion(text: string): Version {
   const v = text.trim().replace(/^v/i, '').split('+')[0]
   const dash = v.indexOf('-')
   const core = dash < 0 ? v : v.slice(0, dash)
-  const pre = dash < 0 ? '' : v.slice(dash + 1)
-  return { parts: core.split('.').map((n) => Number.parseInt(n, 10) || 0), pre }
+  const preRelease = dash < 0 ? '' : v.slice(dash + 1)
+  return { parts: core.split('.').map((n) => Number.parseInt(n, 10) || 0), preRelease }
 }
 
-/** Semver-style comparison of "1.2.3" / "v1.2.3" / "1.2.3-beta.1". Pre-releases sort before their release. */
 export function compareVersions(a: string, b: string): number {
   const x = parseVersion(a)
   const y = parseVersion(b)
@@ -32,39 +27,32 @@ export function compareVersions(a: string, b: string): number {
     const d = (x.parts[i] ?? 0) - (y.parts[i] ?? 0)
     if (d !== 0) return Math.sign(d)
   }
-  if (x.pre === y.pre) return 0
-  if (!x.pre) return 1
-  if (!y.pre) return -1
-  return Math.sign(x.pre.localeCompare(y.pre, 'en', { numeric: true }))
+  if (x.preRelease === y.preRelease) return 0
+  if (!x.preRelease) return 1
+  if (!y.preRelease) return -1
+  return Math.sign(x.preRelease.localeCompare(y.preRelease, 'en', { numeric: true }))
 }
 
 export function isNewer(latest: string, current: string): boolean {
   return compareVersions(latest, current) > 0
 }
 
-/** Where YARC's releases are. Links from GitHub's answer are only opened or fetched when they point here. */
-export const RELEASES_PAGE = 'https://github.com/yenebeb/yarc/releases'
-
 export function isReleaseUrl(url: string): boolean {
   return typeof url === 'string' && url.startsWith(`${RELEASES_PAGE}/`)
 }
 
-/** The release's page, or the list of releases when GitHub's answer points somewhere else. */
 export function releasePage(release: GithubRelease): string {
   return isReleaseUrl(release.html_url) ? release.html_url : RELEASES_PAGE
 }
 
-/** electron-builder names them YARC-<version>-<arch>.dmg / .AppImage (see electron-builder.yml). */
 const INSTALLER_EXT: Record<string, string> = { darwin: 'dmg', linux: 'AppImage' }
 
-/** The installer for this platform and CPU, or the release page when there isn't one. */
 export function pickDownload(release: GithubRelease, platform: string, arch: string): string {
   const ext = INSTALLER_EXT[platform]
   const asset = ext ? release.assets.find((a) => a.name.endsWith(`-${arch}.${ext}`) && isReleaseUrl(a.browser_download_url)) : undefined
   return asset ? asset.browser_download_url : releasePage(release)
 }
 
-/** The self-update zip for a Mac (electron-builder.yml names it YARC-<version>-<arch>-mac.zip) and its signature. */
 export interface MacUpdate {
   name: string
   url: string
@@ -78,12 +66,16 @@ export function pickMacUpdate(release: GithubRelease, arch: string): MacUpdate |
   return { name: zip.name, url: zip.browser_download_url, signatureUrl: signature.browser_download_url }
 }
 
-/** electron-builder.yml (nsis.artifactName) names the Windows installers YARC-Setup-<version>-<arch>.exe. */
 export function windowsInstallerName(version: string, arch: string): string {
   return `YARC-Setup-${version}-${arch}.exe`
 }
 
-/** Where a release's file is, by name. From yenebeb/yarc whatever feed electron-updater was built with. */
 export function releaseAssetUrl(version: string, name: string): string {
-  return `https://github.com/yenebeb/yarc/releases/download/v${version}/${name}`
+  return `${RELEASES_PAGE}/download/v${version}/${name}`
+}
+
+export async function download(url: string, timeoutMs: number): Promise<Buffer> {
+  const res = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) })
+  if (!res.ok) throw new Error(`Downloading ${url} failed: ${res.status}`)
+  return Buffer.from(await res.arrayBuffer())
 }

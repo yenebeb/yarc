@@ -1,4 +1,3 @@
-// Arc-style keyboard shortcuts. `Mod` is Cmd on macOS and Ctrl on Windows/Linux.
 // Bindings are matched on physical key codes so Option/AltGr layouts keep working.
 
 export type CommandId =
@@ -129,7 +128,6 @@ export const BINDINGS: Binding[] = [
   { id: 'installUpdate', title: 'Install Update', mac: [], other: [], palette: true },
   { id: 'whatsNew', title: "What's New in YARC", mac: [], other: [], palette: true },
   { id: 'tour', title: 'Take the YARC Tour', mac: [], other: [], palette: true },
-  // The floating player spotlight's Try It: plays a demo video in a new tab, then goes back.
   { id: 'floatingPlayerDemo', title: 'Try the Floating Player', mac: [], other: [], palette: true }
 ]
 
@@ -147,9 +145,7 @@ const CODE_ALIASES: Record<string, string> = {
   Left: 'ArrowLeft',
   Right: 'ArrowRight',
   Up: 'ArrowUp',
-  Down: 'ArrowDown',
-  Comma: 'Comma',
-  Period: 'Period'
+  Down: 'ArrowDown'
 }
 
 function tokenToCode(token: string): string {
@@ -187,10 +183,7 @@ export function matches(input: KeyInput, accel: string): boolean {
   )
 }
 
-/**
- * On Windows/Linux, AltGr arrives as Ctrl+Alt. When such a press types a character
- * (ñ, ó, € on US-International, German, Polish… layouts), it's text input, not a shortcut.
- */
+/** On Windows/Linux, AltGr arrives as Ctrl+Alt; when it types a character (ñ, €) it's text, not a shortcut. */
 export function isAltGrCharacter(input: KeyInput): boolean {
   if (!input.control || !input.alt || [...input.key].length !== 1) return false
   const base = /^Key([A-Z])$/.exec(input.code)?.[1] ?? /^Digit(\d)$/.exec(input.code)?.[1]
@@ -206,13 +199,14 @@ export function commandForInput(input: KeyInput, mac: boolean): CommandId | unde
   return undefined
 }
 
+const KEY_SYMBOLS: Record<string, string> = { Equal: '=', Minus: '-', Comma: ',', Left: '←', Right: '→', Up: '↑', Down: '↓', BracketLeft: '[', BracketRight: ']', Period: '.' }
+const MAC_SYMBOLS: Record<string, string> = { ...KEY_SYMBOLS, Cmd: '⌘', Ctrl: '⌃', Alt: '⌥', Shift: '⇧' }
+
 export function bindingLabel(id: CommandId, mac: boolean): string {
   const b = BINDINGS.find((x) => x.id === id)
   const accel = (mac ? b?.mac : b?.other)?.[0]
   if (!accel) return ''
-  const pretty: Record<string, string> = mac
-    ? { Cmd: '⌘', Ctrl: '⌃', Alt: '⌥', Shift: '⇧', Equal: '=', Minus: '-', Comma: ',', Left: '←', Right: '→', Up: '↑', Down: '↓', BracketLeft: '[', BracketRight: ']', Period: '.' }
-    : { Equal: '=', Minus: '-', Comma: ',', Left: '←', Right: '→', Up: '↑', Down: '↓', BracketLeft: '[', BracketRight: ']', Period: '.' }
+  const pretty = mac ? MAC_SYMBOLS : KEY_SYMBOLS
   return accel
     .split('+')
     .map((p) => pretty[p] ?? p.replace(/^Digit/, ''))

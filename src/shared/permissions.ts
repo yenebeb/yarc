@@ -1,9 +1,5 @@
-// What a site permission prompt says ("Allow meet.google.com to access your camera?"), and how
-// Settings lists a profile's answers.
-
 export type PromptIcon = 'bell' | 'camera' | 'mic' | 'location' | 'clipboard' | 'screen' | 'device'
 
-/** What the prompt view draws. */
 export interface PermissionPrompt {
   id: string
   origin: string
@@ -19,20 +15,39 @@ export type PromptOp =
   | { kind: 'size'; id: string; height: number }
   | { kind: 'answer'; id: string; answer: 'allow' | 'deny' | 'dismiss' }
 
-/** A site's answer, as Settings lists it. `quiet` = refused for a while after several Not Nows, until `until`. */
+/** `quiet` = refused for a while after several Not Nows, until `until`. */
 export interface SitePermissionRow {
   origin: string
-  /** 'notifications', 'geolocation', 'media:video' (camera), 'media:audio' (microphone), … */
+  /** A key of PERMISSIONS. */
   key: string
   setting: 'allow' | 'block' | 'quiet'
   until?: number
 }
 
-/**
- * The origin a permission is asked and stored for: a web page's origin, or an extension's.
- * Anything else (file:, data:, about:, sandboxed frames) has no origin to remember an answer
- * for, so it gets '' and is refused.
- */
+interface PromptText {
+  icon: PromptIcon
+  wants: string
+}
+
+const PERMISSIONS: Record<string, PromptText & { label: string }> = {
+  notifications: { label: 'Notifications', icon: 'bell', wants: 'send you notifications' },
+  'media:video': { label: 'Camera', icon: 'camera', wants: 'access your camera' },
+  'media:audio': { label: 'Microphone', icon: 'mic', wants: 'access your microphone' },
+  geolocation: { label: 'Location', icon: 'location', wants: 'access your location' },
+  'clipboard-read': { label: 'Clipboard', icon: 'clipboard', wants: 'see text and images copied to the clipboard' },
+  'display-capture': { label: 'Screen sharing', icon: 'screen', wants: 'share your screen' },
+  midi: { label: 'MIDI devices', icon: 'device', wants: 'use your MIDI devices' },
+  midiSysex: { label: 'MIDI device control', icon: 'device', wants: 'control and reprogram your MIDI devices' },
+  'idle-detection': { label: 'Idle detection', icon: 'device', wants: 'know when you’re actively using this device' },
+  hid: { label: 'HID devices', icon: 'device', wants: 'connect to HID devices' },
+  serial: { label: 'Serial ports', icon: 'device', wants: 'connect to serial ports' },
+  usb: { label: 'USB devices', icon: 'device', wants: 'connect to USB devices' },
+  'window-management': { label: 'Window management', icon: 'screen', wants: 'manage windows on all your displays' }
+}
+
+export const PERMISSION_KEYS = Object.keys(PERMISSIONS)
+
+/** A page's or extension's origin; anything else (file:, data:, sandboxed frames) gets '' and is refused. */
 export function permissionOrigin(url: string): string {
   try {
     const u = new URL(url)
@@ -41,23 +56,6 @@ export function permissionOrigin(url: string): string {
   } catch {}
   return ''
 }
-
-/** Every permission key a profile can store an answer for (Settings > Site Permissions). */
-export const PERMISSION_KEYS = [
-  'notifications',
-  'media:video',
-  'media:audio',
-  'geolocation',
-  'clipboard-read',
-  'display-capture',
-  'midi',
-  'midiSysex',
-  'idle-detection',
-  'hid',
-  'serial',
-  'usb',
-  'window-management'
-] as const
 
 /** The site as people know it: "meet.google.com", "localhost:8765"; other origins as they are. */
 export function siteName(origin: string): string {
@@ -69,57 +67,17 @@ export function siteName(origin: string): string {
   }
 }
 
-/** What Settings calls a stored permission key. */
 export function permissionLabel(key: string): string {
-  const labels: Record<string, string> = {
-    notifications: 'Notifications',
-    'media:video': 'Camera',
-    'media:audio': 'Microphone',
-    geolocation: 'Location',
-    'clipboard-read': 'Clipboard',
-    'display-capture': 'Screen sharing',
-    midi: 'MIDI devices',
-    midiSysex: 'MIDI device control',
-    'idle-detection': 'Idle detection',
-    hid: 'HID devices',
-    serial: 'Serial ports',
-    usb: 'USB devices',
-    'window-management': 'Window management'
-  }
-  return labels[key] ?? key
+  return PERMISSIONS[key]?.label ?? key
 }
 
-export function promptText(permission: string, mediaTypes?: ('video' | 'audio')[]): { icon: PromptIcon; wants: string } {
-  switch (permission) {
-    case 'notifications':
-      return { icon: 'bell', wants: 'send you notifications' }
-    case 'media': {
-      const camera = !mediaTypes?.length || mediaTypes.includes('video')
-      const mic = !mediaTypes?.length || mediaTypes.includes('audio')
-      if (camera && mic) return { icon: 'camera', wants: 'access your camera, microphone' }
-      return camera ? { icon: 'camera', wants: 'access your camera' } : { icon: 'mic', wants: 'access your microphone' }
-    }
-    case 'geolocation':
-      return { icon: 'location', wants: 'access your location' }
-    case 'clipboard-read':
-      return { icon: 'clipboard', wants: 'see text and images copied to the clipboard' }
-    case 'display-capture':
-      return { icon: 'screen', wants: 'share your screen' }
-    case 'midi':
-      return { icon: 'device', wants: 'use your MIDI devices' }
-    case 'midiSysex':
-      return { icon: 'device', wants: 'control and reprogram your MIDI devices' }
-    case 'idle-detection':
-      return { icon: 'device', wants: 'know when you’re actively using this device' }
-    case 'hid':
-      return { icon: 'device', wants: 'connect to HID devices' }
-    case 'serial':
-      return { icon: 'device', wants: 'connect to serial ports' }
-    case 'usb':
-      return { icon: 'device', wants: 'connect to USB devices' }
-    case 'window-management':
-      return { icon: 'screen', wants: 'manage windows on all your displays' }
-    default:
-      return { icon: 'device', wants: `use ${permission}` }
+export function promptText(permission: string, mediaTypes?: ('video' | 'audio')[]): PromptText {
+  if (permission === 'media') {
+    const camera = !mediaTypes?.length || mediaTypes.includes('video')
+    const mic = !mediaTypes?.length || mediaTypes.includes('audio')
+    if (camera && mic) return { icon: 'camera', wants: 'access your camera, microphone' }
+    return promptText(camera ? 'media:video' : 'media:audio')
   }
+  const { icon, wants } = PERMISSIONS[permission] ?? { icon: 'device', wants: `use ${permission}` }
+  return { icon, wants }
 }

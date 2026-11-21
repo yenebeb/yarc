@@ -1,4 +1,3 @@
-// Native menus: the page context menu and the macOS application menu.
 import { app, clipboard, dialog, Menu, type ContextMenuParams, type MenuItemConstructorOptions } from 'electron'
 import { IPC, type EditRequest } from '../shared/ipc'
 import { paneIds, splitMenuModel } from '../shared/split'
@@ -18,8 +17,7 @@ export function buildContextMenu(browser: Browser, tab: LiveTab, p: ContextMenuP
   }
 
   if (p.linkURL) {
-    // These load from the main process, which Chromium doesn't stop from opening file: and other
-    // local URLs a web page could never navigate to itself: web links, and a local page's own file: links.
+    // Loaded from main, which Chromium doesn't stop from opening local URLs a web page could never navigate to itself.
     if (WEB_LINK.test(p.linkURL) || (/^file:/i.test(p.linkURL) && /^file:/i.test(p.pageURL))) {
       items.push(
         { label: 'Open Link in New Tab', click: () => browser.open(p.linkURL, 'background') },
@@ -92,12 +90,7 @@ export function buildContextMenu(browser: Browser, tab: LiveTab, p: ContextMenuP
   return Menu.buildFromTemplate(items)
 }
 
-/** macOS needs an application menu for Cmd+C/V/Q etc. Arc shortcuts are handled separately. */
-/**
- * A menu item's click that runs a command in the main window. The app outlives its last window on
- * macOS; menu commands reopen it first, like Arc. Wait until it shows: showing moves focus, which
- * would close a just-opened command bar.
- */
+/** Waits until a reopened window shows: showing moves focus, which would close a just-opened command bar. */
 function commandRunner(browser: Browser): (cmd: CommandId) => () => void {
   return (cmd) => () => {
     browser.useFocused()
@@ -111,7 +104,6 @@ function commandRunner(browser: Browser): (cmd: CommandId) => () => void {
   }
 }
 
-/** The Dock icon's menu on macOS, like Arc's. */
 export function installDockMenu(browser: Browser): void {
   if (process.platform !== 'darwin') return
   const littles = () => browser.openLittles()
@@ -129,7 +121,6 @@ export function installDockMenu(browser: Browser): void {
     )
   }
   build()
-  // Little Windows come and go: the last two items are only enabled while there are some.
   app.on('browser-window-created', (_e, win) => {
     setImmediate(build)
     win.on('closed', () => setImmediate(build))
@@ -142,7 +133,6 @@ export function installAppMenu(browser: Browser): void {
     return
   }
   const run = commandRunner(browser)
-  // Like Arc: "Update Available…" replaces "Check for Updates…" once a new version is known.
   const updateItem = (): MenuItemConstructorOptions => {
     const { state } = browser.updater.status
     if (state === 'available') return { label: 'Update Available…', click: run('installUpdate') }
@@ -201,7 +191,6 @@ function requestEdit(browser: Browser, req: EditRequest): void {
   browser.window.ui.send(IPC.edit, req)
 }
 
-/** Right-click menu for a sidebar tab (favorite, pinned or Today). */
 export function buildItemMenu(browser: Browser, id: string): Menu | undefined {
   const state = browser.store.state
   const found = findItem(state, id)
@@ -243,7 +232,6 @@ export function buildItemMenu(browser: Browser, id: string): Menu | undefined {
   return Menu.buildFromTemplate(items)
 }
 
-/** The menu of a split pane's split view button. */
 export function buildSplitMenu(browser: Browser, id: string): Menu | undefined {
   const split = browser.store.activeSpace.splits.find((sp) => paneIds(sp.root).includes(id))
   if (!split) return undefined
@@ -259,7 +247,6 @@ export function buildSplitMenu(browser: Browser, id: string): Menu | undefined {
     { label: 'Separate Tab from Split', click: d({ type: 'separateFromSplit', id }) },
     { label: m.convert, click: d({ type: 'flipSplit', id }) },
     { type: 'separator' },
-    // Arc shares a split as a link on its servers; YARC has nothing to share it to.
     { label: 'Share Split View…', enabled: false }
   ])
 }

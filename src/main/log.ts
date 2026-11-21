@@ -1,16 +1,11 @@
-// A small log of what goes wrong in the main process. A packaged YARC can't open DevTools on its
-// own UI, and an error inside a sidebar action only reaches the sidebar's console, so without this
-// file a freeze on someone's machine leaves nothing to read. Kept free of Electron for unit tests.
 import { appendFileSync, mkdirSync, renameSync, statSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { format } from 'node:util'
 
-/** The log is moved to `<file>.old` (replacing the one before) once it grows past this. */
 const MAX_BYTES = 1_000_000
 
 export type Level = 'error' | 'warn' | 'info'
 
-/** An append-only text log, one timestamped entry per write, readable only by this user. */
 export class LogFile {
   readonly file: string
   private readonly now: () => Date
@@ -25,20 +20,13 @@ export class LogFile {
       mkdirSync(dirname(this.file), { recursive: true })
       if (sizeOf(this.file) > MAX_BYTES) renameSync(this.file, `${this.file}.old`)
       appendFileSync(this.file, `${this.now().toISOString()} ${level.toUpperCase()} ${text}\n`, { mode: 0o600 })
-    } catch {
-      // A log that can't be written must never break the app.
-    }
+    } catch {}
   }
 }
 
 let log: LogFile | undefined
-/** What the app is doing when something fails (which window is current, which are open). */
-let context: (() => string) | undefined
+let describeContext: (() => string) | undefined
 
-/**
- * Starts writing the log: everything main prints with console.error or console.warn, and every
- * exception nothing caught. Errors still reach the terminal and Electron's own handling as before.
- */
 export function startLog(file: string): LogFile {
   log = new LogFile(file)
   const printError = console.error.bind(console)
@@ -62,17 +50,15 @@ export function startLog(file: string): LogFile {
   return log
 }
 
-/** Adds this to every error logged from now on. */
 export function setLogContext(describe: () => string): void {
-  context = describe
+  describeContext = describe
 }
 
-/** Logs an error with its stack and what the app was doing, without printing it again. */
+/** Doesn't print it. */
 export function logError(what: string, err: unknown): void {
   log?.write('error', `${what}: ${describeError(err)}${contextLine()}`)
 }
 
-/** Logs something that shouldn't happen but didn't throw, with where it was called from. */
 export function logProblem(what: string): void {
   const stack = new Error().stack?.split('\n').slice(2).join('\n') ?? ''
   log?.write('warn', `${what}${contextLine()}\n${stack}`)
@@ -88,9 +74,9 @@ export function describeError(err: unknown): string {
 }
 
 function contextLine(): string {
-  if (!context) return ''
+  if (!describeContext) return ''
   try {
-    return `\n  context: ${context()}`
+    return `\n  context: ${describeContext()}`
   } catch (err) {
     return `\n  context unavailable: ${describeError(err)}`
   }

@@ -1,4 +1,3 @@
-// Little Window: a small, minimal window for quick links (and links opened from other apps).
 import {
   BrowserWindow,
   clipboard,
@@ -8,8 +7,7 @@ import {
   type ContextMenuParams,
   type Event,
   type Input,
-  type Rectangle,
-  type WebContents
+  type Rectangle
 } from 'electron'
 import { IPC, type LittleAnchor, type LittleOp, type LittleState } from '../shared/ipc'
 import { matches } from '../shared/keymap'
@@ -22,17 +20,19 @@ import { PromptView } from './prompt-view'
 import { LiveTab, type OpenDisposition, type TabHost } from './tab'
 import { loadRenderer, uiWebPreferences } from './window'
 
-/** Toolbar height. The page fills the rest of the window, edge to edge. */
-const TOOLBAR = 47
+const TOOLBAR_HEIGHT = 47
 const isMac = process.platform === 'darwin'
+const TRAFFIC_LIGHTS_END = isMac ? 83 : 8
+const URL_PILL_SITE_NAME_X = TRAFFIC_LIGHTS_END + 120
+const URL_PILL_BOTTOM = TOOLBAR_HEIGHT - 6
+const MAIN_WINDOW_TAB_RADIUS = 8
 
 export class LittleWindow implements TabHost {
   readonly win: BrowserWindow
   private tab: LiveTab | undefined
   private released = false
-  /** Set when the window closes without its page going to the Archive (reopened with another profile, an incognito window's). */
+  /** Reopened with another profile, or an incognito window's. */
   private discarded = false
-  /** When the window was last in front: one left in the background closes after a while (`expired`). */
   private lastActive = Date.now()
   private prompt: PromptView
 
@@ -50,8 +50,7 @@ export class LittleWindow implements TabHost {
       minHeight: 240,
       titleBarStyle: isMac ? 'hiddenInset' : 'hidden',
       trafficLightPosition: { x: 11, y: 17 },
-      // Windows, Linux: native caption buttons at the right end of the dark toolbar.
-      titleBarOverlay: isMac ? undefined : { color: '#00000000', symbolColor: '#f1eff6', height: TOOLBAR },
+      titleBarOverlay: isMac ? undefined : { color: '#00000000', symbolColor: '#f1eff6', height: TOOLBAR_HEIGHT },
       backgroundColor: littleBarColor(browser.store.activeSpace.color),
       show: false,
       webPreferences: uiWebPreferences()
@@ -75,14 +74,12 @@ export class LittleWindow implements TabHost {
     )
     this.layout()
     this.win.on('resize', () => this.layout())
-    // 'resized' fires once the user lets go, not for programmatic resizes.
     this.win.on('resized', () => {
       const [width, height] = this.win.getSize()
       browser.rememberLittleSize(width, height)
     })
     this.win.on('focus', () => (this.lastActive = Date.now()))
     this.win.on('blur', () => (this.lastActive = Date.now()))
-    // Like Arc's Little Arc, a page you close goes to the Archive and can be reopened.
     this.win.on('close', () => {
       if (this.released || this.discarded || !this.tab || this.tab.destroyed) return
       const { url, title, favicon } = this.tab.info()
@@ -94,13 +91,11 @@ export class LittleWindow implements TabHost {
     this.tab.wc.focus()
   }
 
-  /** Whether the window has been in the background for `hours` (the Settings choice) and should close. */
   expired(now: number, hours: number): boolean {
     const audible = !!this.tab && !this.tab.destroyed && this.tab.info().audible
     return littleExpired({ inFront: this.win.isFocused(), audible, lastActive: this.lastActive }, now, hours)
   }
 
-  /** Closes the window without putting its page in the Archive. */
   discard(): void {
     this.discarded = true
     this.win.close()
@@ -111,24 +106,21 @@ export class LittleWindow implements TabHost {
     return this.tab && !this.tab.destroyed ? this.tab.wc.getURL() : ''
   }
 
-  /** The page's webContents id, while this window has it. */
   get pageId(): number | undefined {
     return this.tab && !this.tab.destroyed && !this.released ? this.tab.wc.id : undefined
   }
 
-  /** Shows the page's permission question under the toolbar's URL pill, pointing at the site's name. */
   syncPrompt(queue: PermissionQueue): void {
     if (this.win.isDestroyed()) return
     const id = this.pageId
     if (id === undefined || this.win.isFullScreen()) return this.prompt.show(undefined)
-    // The pill starts after the traffic lights (83px on macOS, 8px elsewhere) and ends 8px above the page.
-    this.prompt.show(queue.next([id]), { arrow: true, x: (isMac ? 83 : 8) + 120, y: TOOLBAR - 6 })
+    this.prompt.show(queue.next([id]), { arrow: true, x: URL_PILL_SITE_NAME_X, y: URL_PILL_BOTTOM })
   }
 
   private layout(): void {
     if (!this.tab || this.released) return
     const [w, h] = this.win.getContentSize()
-    this.tab.view.setBounds({ x: 0, y: TOOLBAR, width: w, height: h - TOOLBAR })
+    this.tab.view.setBounds({ x: 0, y: TOOLBAR_HEIGHT, width: w, height: h - TOOLBAR_HEIGHT })
   }
 
   private push(): void {
@@ -148,12 +140,11 @@ export class LittleWindow implements TabHost {
     this.win.webContents.send(IPC.little, state)
   }
 
-  /** Hands the page over to the main window and closes this one. */
   release(): LiveTab {
     const tab = this.tab!
     this.released = true
     this.win.contentView.removeChildView(tab.view)
-    tab.view.setBorderRadius(8) // tabs in the main window have rounded corners
+    tab.view.setBorderRadius(MAIN_WINDOW_TAB_RADIUS)
     this.tab = undefined
     this.win.close()
     return tab
@@ -184,7 +175,6 @@ export class LittleWindow implements TabHost {
     }
   }
 
-  /** The profile chip: reopens the page signed in with another profile, remembered for the site. */
   private profileMenu(at?: LittleAnchor): void {
     const items = this.browser.state.profiles.map((p) => ({
       label: p.name,
@@ -197,7 +187,6 @@ export class LittleWindow implements TabHost {
     Menu.buildFromTemplate(items).popup({ window: this.win, x: at?.x, y: at?.y })
   }
 
-  /** "Open in…": moves the page into one of the spaces that use this window's profile. */
   private spaceMenu(at?: LittleAnchor): void {
     const spaces = this.browser.state.spaces.filter((s) => s.profileId === this.profile.id)
     const items = spaces.map((s) => ({
@@ -207,10 +196,9 @@ export class LittleWindow implements TabHost {
     Menu.buildFromTemplate(items).popup({ window: this.win, x: at?.x, y: at?.y })
   }
 
-  // TabHost
-  onTabChanged(): void {
-    this.push()
-  }
+  onTabChanged = () => this.push()
+  adoptOpenedPage = (opener: LiveTab, options: BrowserWindowConstructorOptions | undefined, disposition: OpenDisposition, url: string) =>
+    this.browser.adoptOpenedPage(opener, options, disposition, url)
 
   onTabInput(_tab: LiveTab | undefined, e: Event, input: Input): void {
     if (input.type !== 'keyDown') return
@@ -242,11 +230,6 @@ export class LittleWindow implements TabHost {
   }
 
   onFoundInPage(): void {}
-
-  adoptOpenedPage(opener: LiveTab, options: BrowserWindowConstructorOptions | undefined, disposition: OpenDisposition, url: string): WebContents {
-    // New tabs from a Little Window page go to the main window, like Arc.
-    return this.browser.adoptOpenedPage(opener, options, disposition, url)
-  }
 
   showContextMenu(tab: LiveTab, params: ContextMenuParams): void {
     buildContextMenu(this.browser, tab, params).popup({ window: this.win })

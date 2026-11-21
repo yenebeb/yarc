@@ -1,21 +1,15 @@
-// Split view layout: a tree of side-by-side ('row') and stacked ('column') groups whose leaves
-// are tabs. Pure functions, shared by the main process (placing views) and the UI (handles and
-// drop zones), and covered by unit tests.
 import type { ID, Rect, SplitGroup, SplitNode, SplitPane } from './types'
 
-/** Arc's limit: a split view holds at most four tabs. */
 export const MAX_PANES = 4
-/** Space between panes, in pixels. */
 export const SPLIT_GAP = 6
 
-/** The edge of a pane where a dropped tab lands. */
 export type Side = 'left' | 'right' | 'top' | 'bottom'
 
 export function isPane(node: SplitNode): node is SplitPane {
   return 'itemId' in node
 }
 
-/** The tabs in a split, in reading order (left to right, top to bottom). */
+/** In reading order. */
 export function paneIds(node: SplitNode): ID[] {
   return isPane(node) ? [node.itemId] : node.children.flatMap(paneIds)
 }
@@ -34,16 +28,12 @@ export function newSplitRoot(target: ID, added: ID, side: Side): SplitGroup {
   return { dir: axisOf(side), children, sizes: [0.5, 0.5] }
 }
 
-/** Sizes scaled to sum to 1 (equal shares when they sum to nothing). */
 function normalizeSizes(sizes: number[]): number[] {
   const sum = sizes.reduce((a, b) => a + b, 0)
   return sum > 0 ? sizes.map((s) => s / sum) : sizes.map(() => 1 / sizes.length)
 }
 
-/**
- * Tidies a tree: drops empty groups, replaces one-child groups with their child and merges a
- * group into its parent when both run the same way (so their panes share one row of handles).
- */
+/** Drops empty groups, unwraps one-child groups and merges same-direction groups into their parent. */
 function tidy(node: SplitNode): SplitNode | undefined {
   if (isPane(node)) return node
   const children: SplitNode[] = []
@@ -79,10 +69,7 @@ export function removePane(root: SplitGroup, id: ID): SplitGroup | undefined {
   return tidied && !isPane(tidied) ? tidied : undefined
 }
 
-/**
- * The split with `added` placed on `side` of the pane showing `target`, which gives up half its
- * space. A side along the pane's group adds a sibling; a side across it stacks the two in a new group.
- */
+/** `target` gives up half its space; a side across its group nests the two in a new group. */
 export function insertPane(root: SplitGroup, target: ID, added: ID, side: Side): SplitGroup {
   const axis = axisOf(side)
   const visit = (group: SplitGroup): SplitGroup => {
@@ -110,10 +97,7 @@ export function insertPane(root: SplitGroup, target: ID, added: ID, side: Side):
   return visit(root)
 }
 
-/**
- * Where `added` would end up when dropped on `side` of `target`, moving it if it's already in this
- * split, or undefined when that isn't a change (dropping a pane on itself) or the split is full.
- */
+/** Moves `added` if it's already in the split; undefined for a drop on itself or a full split. */
 export function placePane(root: SplitGroup | undefined, target: ID, added: ID, side: Side): SplitGroup | undefined {
   if (target === added) return undefined
   const rest = root && removePane(root, added)
@@ -122,10 +106,7 @@ export function placePane(root: SplitGroup | undefined, target: ID, added: ID, s
   return insertPane(rest, target, added, side)
 }
 
-/**
- * `added` as a new column at the right of the whole split (Add Split View), with columns of equal
- * width. Unchanged if it's already in the split; undefined if the split is full.
- */
+/** A new equal-width column at the right; unchanged if already in, undefined if the split is full. */
 export function appendPane(root: SplitGroup, added: ID): SplitGroup | undefined {
   const ids = paneIds(root)
   if (ids.includes(added)) return root
@@ -137,7 +118,6 @@ export function appendPane(root: SplitGroup, added: ID): SplitGroup | undefined 
   return { dir: 'row', children: [root, { itemId: added }], sizes: [0.5, 0.5] }
 }
 
-/** Cuts a rect along `dir` into parts with these relative sizes, `gap` pixels apart. */
 function cut(rect: Rect, dir: SplitGroup['dir'], sizes: number[], gap: number): Rect[] {
   const row = dir === 'row'
   const length = row ? rect.width : rect.height
@@ -152,14 +132,12 @@ function cut(rect: Rect, dir: SplitGroup['dir'], sizes: number[], gap: number): 
   })
 }
 
-/** Where each tab of the split sits inside `rect`. */
 export function layoutPanes(root: SplitNode, rect: Rect, gap = SPLIT_GAP): { id: ID; rect: Rect }[] {
   if (isPane(root)) return [{ id: root.itemId, rect }]
   const rects = cut(rect, root.dir, root.sizes, gap)
   return root.children.flatMap((c, i) => layoutPanes(c, rects[i], gap))
 }
 
-/** A draggable border between two neighbours in a group. */
 export interface Divider {
   /** Child indexes from the root down to the group. */
   path: number[]
@@ -173,7 +151,6 @@ export interface Divider {
   sizes: number[]
 }
 
-/** Every border between panes, for the resize handles. */
 export function dividers(root: SplitGroup, rect: Rect, gap = SPLIT_GAP): Divider[] {
   const out: Divider[] = []
   const visit = (group: SplitGroup, r: Rect, path: number[]) => {
@@ -191,7 +168,6 @@ export function dividers(root: SplitGroup, rect: Rect, gap = SPLIT_GAP): Divider
   return out
 }
 
-/** The group at `path`, or undefined when the path doesn't lead to one. */
 export function groupAt(root: SplitGroup, path: number[]): SplitGroup | undefined {
   let node: SplitNode = root
   for (const i of path) {
@@ -202,7 +178,7 @@ export function groupAt(root: SplitGroup, path: number[]): SplitGroup | undefine
   return isPane(node) ? undefined : node
 }
 
-/** Sizes of `before` and `before + 1` after moving their border by `delta` pixels in a group `length` long. */
+/** `sizes` after moving the border after child `index` by `delta` pixels in a group `length` pixels long. */
 export function dragBorder(sizes: number[], index: number, delta: number, length: number, min = 0.15): number[] {
   const next = [...sizes]
   const pair = sizes[index] + sizes[index + 1]
@@ -212,10 +188,7 @@ export function dragBorder(sizes: number[], index: number, delta: number, length
   return next
 }
 
-/**
- * Which edge of a pane the cursor is nearest: the pane is cut corner to corner into four
- * triangles, so the middle of the left half means "left" and the middle of the top means "top".
- */
+/** The pane is cut corner to corner into four triangles, one per side. */
 export function sideAt(rect: Rect, x: number, y: number): Side {
   const nx = (x - rect.x) / rect.width - 0.5
   const ny = (y - rect.y) / rect.height - 0.5
@@ -239,7 +212,7 @@ export function previewRect(rect: Rect, side: Side, gap = SPLIT_GAP): Rect {
   }
 }
 
-/** Height of the bar on top of each pane of a split (back, forward, the host, close). */
+/** Height of the bar on top of each split pane. */
 export const PANE_BAR = 32
 
 /** The group holding pane `id`, its index there and the path to the group (child indexes from the root). */
@@ -258,7 +231,6 @@ export function parentOf(root: SplitGroup, id: ID): { group: SplitGroup; index: 
   return visit(root, [])
 }
 
-/** The split with the group at `path` replaced by `change(group)`. */
 function updateGroup(root: SplitGroup, path: number[], change: (g: SplitGroup) => SplitGroup): SplitGroup {
   if (path.length === 0) return change(root)
   const [i, ...rest] = path
@@ -266,10 +238,7 @@ function updateGroup(root: SplitGroup, path: number[], change: (g: SplitGroup) =
   return { ...root, children }
 }
 
-/**
- * Pane `id` swapped with its neighbour in its group, keeping its size: -1 is left (or up in a
- * stacked group), +1 right (or down). Undefined when it's already at that edge.
- */
+/** Swaps with a neighbour, sizes included: -1 is left (up when stacked). Undefined at the edge. */
 export function movePane(root: SplitGroup, id: ID, delta: -1 | 1): SplitGroup | undefined {
   const at = parentOf(root, id)
   if (!at) return undefined
@@ -284,7 +253,6 @@ export function movePane(root: SplitGroup, id: ID, delta: -1 | 1): SplitGroup | 
   })
 }
 
-/** The split turned the other way: side-by-side panes stacked, stacked ones side by side. */
 export function flipSplit(root: SplitGroup): SplitGroup {
   return {
     dir: root.dir === 'row' ? 'column' : 'row',
@@ -293,7 +261,6 @@ export function flipSplit(root: SplitGroup): SplitGroup {
   }
 }
 
-/** What the split menu of pane `id` offers, worded for the way its group runs. */
 export function splitMenuModel(root: SplitGroup, id: ID) {
   const at = parentOf(root, id)
   const row = (at?.group.dir ?? root.dir) === 'row'
@@ -308,10 +275,7 @@ export function splitMenuModel(root: SplitGroup, id: ID) {
   }
 }
 
-/**
- * `list` with the entries whose ids are in `ids` brought together where the first of them is,
- * in list order, so a split's tabs sit side by side in the sidebar as one row.
- */
+/** Brings the `ids` entries together where the first of them is, so a split's tabs form one sidebar row. */
 export function gather<T extends { id: ID }>(list: T[], ids: ID[]): T[] {
   const members = list.filter((x) => ids.includes(x.id))
   if (members.length < 2) return list

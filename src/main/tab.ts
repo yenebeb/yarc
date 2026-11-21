@@ -1,4 +1,3 @@
-// A live web page attached to a sidebar item (favorite, pinned or Today tab).
 import {
   BrowserWindow,
   WebContentsView,
@@ -11,6 +10,7 @@ import {
   type WebContents
 } from 'electron'
 import type { ID, LiveInfo } from '../shared/types'
+import { originOf } from '../shared/url'
 import { openExternalLink } from './external-links'
 import { userAgentFor } from './useragent'
 
@@ -28,26 +28,15 @@ export interface TabHost {
   showContextMenu(tab: LiveTab, params: ContextMenuParams): void
   /** A link the user clicked is about to replace the page; return true to open it elsewhere instead. */
   interceptLink?(tab: LiveTab, url: string): boolean
-  /** The page tried to open a window without the user clicking or typing just before. */
   onPopupBlocked?(tab: LiveTab, url: string): void
 }
 
-/** How long a click or key press counts as the user's doing, like Chromium's transient user activation. */
-const ACTIVATION_MS = 5000
-/**
- * A page that opened a window without the user's input can't open another for this long. Clicks in
- * a cross-site frame (a "Sign in with Google" button) don't reach the tab's input events, so one
- * such window is always allowed; the blocker stops pop-up floods, not single sign-in windows.
- */
+const USER_ACTIVATION_MS = 5000
+const LINK_CLICK_MS = 1000
+/** One unrequested window is always allowed: clicks in a cross-site frame ("Sign in with Google") don't reach the tab's input events. */
 const UNREQUESTED_POPUP_MS = 30_000
-
-function originOf(url: string): string {
-  try {
-    return new URL(url).origin
-  } catch {
-    return '(unparsable URL)'
-  }
-}
+const ERR_ABORTED = -3
+const PAINT_DELAY_MS = 200
 
 const WEB_SCHEMES = /^(https?|file|about|data|blob|chrome-extension|view-source|devtools|chrome):/i
 
@@ -60,6 +49,7 @@ export function createTabView(session: Session): WebContentsView {
   return view
 }
 
+/** Sites mark drag regions for their own desktop apps (Linear covers its whole page); Electron would apply them to our window, swallowing clicks. */
 const IGNORE_APP_REGIONS = '*, *::before, *::after { -webkit-app-region: no-drag !important; app-region: no-drag !important; }'
 
 export class LiveTab {
@@ -68,18 +58,13 @@ export class LiveTab {
   readonly wc: WebContents
   fullscreen = false
   crashed = false
-  /** The page's media plays (from Chromium's media events; it may be silent). */
   playing = false
-  /** When the user last clicked in the page; navigations right after it are link clicks, not redirects. */
   private lastClick = 0
-  /** When the user last clicked or pressed a key in the page. */
   private lastActivation = 0
-  /** When the page last opened a window without the user's input. */
   private lastUnrequestedPopup = 0
 
-  /** Whether the user clicked or typed in the page just now. */
   get userActivated(): boolean {
-    return Date.now() - this.lastActivation < ACTIVATION_MS
+    return Date.now() - this.lastActivation < USER_ACTIVATION_MS
   }
 
   constructor(
@@ -105,10 +90,9 @@ export class LiveTab {
     try {
       await this.wc.loadURL(url)
     } catch (err) {
-      // ERR_ABORTED (-3) happens on redirects and user navigation; the page handles the rest.
       const code = (err as { errno?: number }).errno
       // The origin only: a URL can hold tokens, and an incognito tab's shouldn't reach any log.
-      if (code !== -3) console.warn('[tab] load failed', originOf(url), (err as Error).message)
+      if (code !== ERR_ABORTED) console.warn('[tab] load failed', originOf(url), (err as Error).message)
     }
   }
 
@@ -133,21 +117,17 @@ export class LiveTab {
   }
 
   favicon?: string
-  /** Counts favicon changes, so a slow fetch can't replace a newer icon. */
-  private faviconRequest = 0
-  /** The color along the top of the page, for its bar in a split view (Arc tints the bar like the page). */
+  private latestFaviconRequest = 0
   barColor?: string
-  /** The page `barColor` was read from; set once the tab has been in a split, so later loads read it again. */
+  /** Set once the tab has been in a split, so later loads read the bar color again. */
   private sampledFor?: string
 
-  /** Reads the color along the top of the page (a strip 2 px tall), once per page unless `again`. */
   sampleBarColor(again = false): void {
     const wc = this.wc
     if (wc.isDestroyed()) return
     const url = wc.getURL()
     if (!again && this.sampledFor === url) return
     this.sampledFor = url
-    // A page just put on screen paints a moment later.
     setTimeout(() => {
       const { width } = this.view.getBounds()
       if (wc.isDestroyed() || width <= 0) return
@@ -161,7 +141,7 @@ export class LiveTab {
           this.host.onTabChanged(this, {})
         })
         .catch(() => {})
-    }, 200)
+    }, PAINT_DELAY_MS)
   }
 
   private setPlaying(on: boolean): void {
@@ -176,17 +156,13 @@ export class LiveTab {
 
   private wire(): void {
     const wc = this.wc
-    // Websites can mark areas as window-drag regions (`-webkit-app-region`, meant for their own
-    // desktop apps, e.g. Linear covers its whole page). Electron would apply them to our window,
-    // above the overlay, swallowing clicks; browsers ignore them, so cancel them as the user.
     wc.on('dom-ready', () => void wc.insertCSS(IGNORE_APP_REGIONS, { cssOrigin: 'user' }).catch(() => {}))
     wc.on('page-title-updated', (_e, title) => this.host.onTabChanged(this, { title }))
     wc.on('page-favicon-updated', (_e, icons) => {
-      const asked = ++this.faviconRequest
+      const asked = ++this.latestFaviconRequest
       void faviconData(this.session, icons[0]).then((data) => {
-        if (asked !== this.faviconRequest || wc.isDestroyed()) return
-        // Incognito favicons never fall back to the URL: the sidebar would fetch it through the
-        // default, persistent session, outside the incognito one.
+        if (asked !== this.latestFaviconRequest || wc.isDestroyed()) return
+        // Not for incognito: the sidebar would fetch the URL through the default, persistent session.
         const favicon = data ?? (this.session.isPersistent() && /^https:/i.test(icons[0] ?? '') ? icons[0] : undefined)
         this.favicon = favicon
         this.host.onTabChanged(this, { favicon })
@@ -195,7 +171,6 @@ export class LiveTab {
     wc.on('did-start-loading', () => this.host.onTabChanged(this, {}))
     wc.on('did-stop-loading', () => {
       this.host.onTabChanged(this, {})
-      // A tab shown in a split has a bar the color of its page: read it again once the page has painted.
       if (this.sampledFor !== undefined) this.sampleBarColor(true)
     })
     wc.on('did-navigate', (_e, url) => this.host.onTabChanged(this, { url, navigated: true }))
@@ -220,7 +195,6 @@ export class LiveTab {
       this.fullscreen = false
       this.host.onTabFullscreen(this, false)
     })
-    // Pages can close themselves (window.close()) — drop them like a closed tab.
     wc.once('destroyed', () => this.host.onTabDestroyed(this))
     wc.on('render-process-gone', (_e, details) => {
       if (details.reason === 'clean-exit') return
@@ -238,7 +212,7 @@ export class LiveTab {
         void openExternalLink(wc, url, this.userActivated)
         return
       }
-      const clicked = Date.now() - this.lastClick < 1000
+      const clicked = Date.now() - this.lastClick < LINK_CLICK_MS
       if (clicked && this.host.interceptLink?.(this, url)) e.preventDefault()
     })
     wc.setWindowOpenHandler(({ url, disposition, features }) => {
@@ -246,7 +220,6 @@ export class LiveTab {
         void openExternalLink(wc, url, this.userActivated)
         return { action: 'deny' }
       }
-      // A pop-up blocker for floods: without a click or key press just before, one window per half minute.
       if (!this.userActivated) {
         if (Date.now() - this.lastUnrequestedPopup < UNREQUESTED_POPUP_MS) {
           this.host.onPopupBlocked?.(this, url)
@@ -254,12 +227,11 @@ export class LiveTab {
         }
         this.lastUnrequestedPopup = Date.now()
       }
-      // Real popups (OAuth/SSO windows opened with size features) stay popups so window.opener works.
+      // Sized windows (OAuth/SSO) stay popups so window.opener works.
       if (disposition === 'new-window' && features) {
         return { action: 'allow', overrideBrowserWindowOptions: popupOptions(this.session) }
       }
-      // A page Electron creates for window.open keeps the session's UA in navigator.userAgent whatever
-      // setUserAgent says, so sites that need another UA (Teams) open with loadURL instead.
+      // A window.open page keeps the session's UA in navigator.userAgent whatever setUserAgent says, so Teams opens with loadURL.
       const ua = this.session.getUserAgent()
       if (userAgentFor(url, ua) !== ua) {
         this.host.adoptOpenedPage(this, undefined, disposition as OpenDisposition, url)
@@ -278,7 +250,7 @@ function popupOptions(session: Session): BrowserWindowConstructorOptions {
   return { autoHideMenuBar: true, width: 520, height: 680, webPreferences: { session, sandbox: true, contextIsolation: true } }
 }
 
-/** A popup's title is the site it shows, never the page's own title: there's no address bar to check. */
+/** Never the page's own title: a popup has no address bar to check. */
 export function popupTitle(url: string): string {
   try {
     const u = new URL(url)
@@ -288,7 +260,6 @@ export function popupTitle(url: string): string {
   return url.length > 80 ? `${url.slice(0, 80)}…` : url
 }
 
-/** Popup windows (sign-in pages): the site in the title, and the same guards as tabs. */
 function wirePopup(win: BrowserWindow, session: Session): void {
   const wc = win.webContents
   const show = () => {
@@ -315,14 +286,11 @@ function wirePopup(win: BrowserWindow, session: Session): void {
   show()
 }
 
-/** Larger icons stay URLs: each data: URL is stored with its tab and sent to the UI with every update. */
+/** Each data: URL is stored with its tab and sent to the UI with every update. */
 export const FAVICON_MAX = 16_000
 const IMAGE_TYPES: Record<string, string> = { ico: 'image/x-icon', png: 'image/png', svg: 'image/svg+xml', gif: 'image/gif', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp' }
 
-/**
- * A page's favicon as a data: URL, fetched with the tab's own session (its cookies, cache and ad
- * blocking; in memory for incognito), so YARC's UI never loads anything from the network itself.
- */
+/** With the tab's own session (in memory for incognito), so YARC's UI never loads anything from the network itself. */
 export async function faviconData(session: Session, url: string | undefined): Promise<string | undefined> {
   if (!url) return undefined
   if (/^data:image\//i.test(url)) return url.length <= FAVICON_MAX * 1.4 ? url : undefined
@@ -342,7 +310,6 @@ export async function faviconData(session: Session, url: string | undefined): Pr
   }
 }
 
-/** The most common color in a BGRA bitmap (colors close together count as one), as `rgb(…)`. */
 function commonColor(bgra: Buffer): string | undefined {
   const buckets = new Map<number, { n: number; r: number; g: number; b: number }>()
   for (let i = 0; i + 3 < bgra.length; i += 4) {

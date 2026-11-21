@@ -1,10 +1,10 @@
-// Pure parser for Arc's StorableSidebar.json / StorableArchiveItems.json (see docs/arc-data-format.md).
-// Only type imports from the app, so it runs under `node --test --experimental-strip-types`.
+// See docs/arc-data-format.md.
 import { randomUUID } from 'node:crypto'
 import type { PinnedFolder, PinnedNode, PinnedTab, TabItem } from '../../shared/types'
+import { isImportableUrl, isObj, num, str, type Obj } from './loose-json.ts'
 
 export interface ParsedArcProfile {
-  /** Arc's Chromium profile dir: 'Default', 'Profile 1', … */
+  /** 'Default', 'Profile 1', … */
   key: string
   favorites: TabItem[]
 }
@@ -13,9 +13,7 @@ export interface ParsedArcSpace {
   arcId: string
   name: string
   emoji?: string
-  /** Hex, e.g. '#336699'. */
   color: string
-  /** Text appearance Arc uses over the theme (`contentOverBackgroundAppearance`). */
   appearance?: 'light' | 'dark'
   profileKey: string
   pinned: PinnedNode[]
@@ -33,31 +31,23 @@ export interface ParsedArc {
   profiles: ParsedArcProfile[]
   spaces: ParsedArcSpace[]
   archive?: ParsedArcArchived[]
-  /** Skipped items, unknown kinds, broken references. Informational only. */
   warnings: string[]
 }
 
 export interface ParseArcOptions {
-  /** Epoch ms used for missing timestamps and as `lastActive` of Today tabs. Default Date.now(). */
   now?: number
-  /** Parsed StorableArchiveItems.json, if available. */
+  /** Parsed StorableArchiveItems.json. */
   archive?: unknown
-  /** Colors for spaces without a theme, picked by space index. */
+  /** For spaces without a theme, picked by space index. */
   palette?: string[]
-  /** Cached icon (a data: URL) of an Arc sidebar item, by its id. */
   favicon?: (arcItemId: string) => string | undefined
 }
-
-type Obj = Record<string, unknown>
 
 const COCOA_EPOCH_MS = 978_307_200_000
 const DEFAULT_SPACE_ID = 'thebrowser.company.defaultPersonalSpaceID'
 const MAX_DEPTH = 32
 const DEFAULT_PALETTE = ['#7c6cf2', '#e0607e', '#3fa7d6', '#3dbb8a', '#f2a541', '#c06cf2', '#5b7bd6', '#8a8a8a']
 
-const isObj = (v: unknown): v is Obj => typeof v === 'object' && v !== null && !Array.isArray(v)
-const str = (v: unknown): string | undefined => (typeof v === 'string' && v.trim() ? v.trim() : undefined)
-const num = (v: unknown): number | undefined => (typeof v === 'number' && Number.isFinite(v) ? v : undefined)
 const unwrap = (v: unknown): unknown => (isObj(v) && 'value' in v && isObj(v.value) ? v.value : v)
 const firstKey = (v: unknown): string => (isObj(v) ? (Object.keys(v)[0] ?? 'empty') : typeof v)
 
@@ -66,10 +56,6 @@ export function arcTime(v: unknown): number | undefined {
   const s = num(v)
   if (s === undefined || s <= 0) return undefined
   return s > 1e11 ? Math.round(s) : Math.round(COCOA_EPOCH_MS + s * 1000)
-}
-
-export function isImportableUrl(url: string | undefined): url is string {
-  return !!url && /^(https?|file):/i.test(url)
 }
 
 /** JSON.parse with the repair for Windows files that contain raw backslashes (`C:\…` in file: URLs). */
@@ -102,7 +88,7 @@ function entries(arr: unknown): [string, Obj][] {
   return out
 }
 
-/** Value following the first key that is `role` itself or a `{ [role]: … }` enum marker. */
+/** The value after the first key that is `role` itself or a `{ [role]: … }` enum marker. */
 function lookupRole(arr: unknown, role: string): string | undefined {
   if (!Array.isArray(arr)) return undefined
   for (let i = 0; i + 1 < arr.length; i++) {
@@ -125,7 +111,7 @@ export function profileKey(desc: unknown): string {
   return 'Default'
 }
 
-/** Arc's named space icons (`iconType.icon`, Ionicons glyphs from its `CustomIcon` enum), as the closest emoji. */
+/** `iconType.icon` names (Ionicons glyphs). */
 const ARC_ICONS: Record<string, string> = {
   star: '⭐', bookmark: '🔖', heart: '❤️', flag: '🚩', flash: '⚡', triangle: '🔺', medical: '⚕️',
   notifications: '🔔', bulb: '💡', shapes: '🔷', grid: '🔲', apps: '🧩', layers: '🗂️', server: '🗄️',
@@ -170,7 +156,6 @@ export function colorToHex(c: unknown): string | undefined {
   return '#' + rgb.map((v) => Math.round(Math.min(1, Math.max(0, v!)) * 255).toString(16).padStart(2, '0')).join('')
 }
 
-/** First visible color of the window background: single color, gradient base, or any nested color. */
 function backgroundColor(theme: Obj): string | undefined {
   const bg = theme.background
   const style = isObj(bg) ? dig(bg, 'single', '_0', 'style', 'color', '_0') : undefined
@@ -203,7 +188,7 @@ function dig(v: unknown, ...path: string[]): unknown {
 
 interface Ctx {
   items: Map<string, Obj>
-  /** parentID → children in array order, for items whose parent has no usable childrenIds. */
+  /** For items whose parent has no usable childrenIds. */
   byParent: Map<string, string[]>
   now: number
   warnings: string[]
@@ -249,7 +234,7 @@ function toTab(ctx: Ctx, itemId: string, item: Obj, saved: boolean): PinnedTab |
   return out
 }
 
-/** Pinned tree of a container: folders keep nesting, split views are flattened in place. */
+/** Split views are flattened in place. */
 function walk(ctx: Ctx, id: string, saved: boolean, depth = 0, seen = new Set<string>()): PinnedNode[] {
   if (depth > MAX_DEPTH) {
     ctx.warnings.push(`Stopped at ${id}: nesting too deep`)
@@ -294,8 +279,7 @@ const stripKind = ({ kind: _kind, ...rest }: PinnedTab): TabItem => rest
 interface DataContainer {
   spaces: [string, Obj][]
   items: [string, Obj][]
-  /** [profile descriptor, topApps container id] */
-  topApps: [unknown, string][]
+  topApps: [profileDescriptor: unknown, containerId: string][]
   order?: string[]
 }
 
@@ -308,7 +292,6 @@ function topAppsPairs(arr: unknown): [unknown, string][] {
   return out
 }
 
-/** Merge every container that has items (largest first); fall back to the legacy sync mirrors. */
 function dataContainer(json: Obj, warnings: string[]): DataContainer {
   const raw = dig(json, 'sidebar', 'containers')
   const containers = (Array.isArray(raw) ? raw : []).filter((c): c is Obj => isObj(c) && (Array.isArray(c.items) || Array.isArray(c.spaces)))
@@ -365,7 +348,6 @@ export function parseArcSidebar(json: unknown, opts: ParseArcOptions = {}): Pars
     return p
   }
 
-  // Spaces, in sidebar order
   let spaces = data.spaces.filter(([key], i, all) => !key || all.findIndex(([k]) => k === key) === i)
   if (data.order?.length) {
     const rank = (id: string): number => {
@@ -374,13 +356,12 @@ export function parseArcSidebar(json: unknown, opts: ParseArcOptions = {}): Pars
     }
     spaces = [...spaces].sort((a, b) => rank(a[0]) - rank(b[0]))
   }
-  // Machines whose profiles the spaces use, per profile dir; favorites of the same dir on other Macs are skipped.
-  const spaceMachines = new Map<string, Set<string>>()
+  const spaceMachinesByProfileDir = new Map<string, Set<string>>()
   for (const [, s] of spaces) {
     const machine = machineIdOf(s.profile)
     if (!machine) continue
     const dir = profileKey(s.profile)
-    spaceMachines.set(dir, (spaceMachines.get(dir) ?? new Set()).add(machine))
+    spaceMachinesByProfileDir.set(dir, (spaceMachinesByProfileDir.get(dir) ?? new Set()).add(machine))
   }
 
   spaces.forEach(([key, s], index) => {
@@ -409,7 +390,6 @@ export function parseArcSidebar(json: unknown, opts: ParseArcOptions = {}): Pars
     result.spaces.push(space)
   })
 
-  // Favorites per profile
   let topApps = data.topApps
   if (!topApps.length) {
     for (const [key, item] of ctx.items) {
@@ -420,7 +400,7 @@ export function parseArcSidebar(json: unknown, opts: ParseArcOptions = {}): Pars
   topApps = topApps.filter(([, id], i, all) => all.findIndex(([, other]) => other === id) === i)
   for (const [desc, id] of topApps) {
     const machine = machineIdOf(desc)
-    const machines = spaceMachines.get(profileKey(desc))
+    const machines = spaceMachinesByProfileDir.get(profileKey(desc))
     if (machine && machines && !machines.has(machine)) {
       warnings.push(`Skipped favorites of ${profileKey(desc)} from another Mac (${machine})`)
       continue

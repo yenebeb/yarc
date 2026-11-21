@@ -1,15 +1,12 @@
-// Site Search: type a site's name in the command bar, press Tab, and the query goes to that site's search.
-
 export interface SiteSearch {
   name: string
-  /** What the typed text is matched against, like Chromium's search engine keyword. */
   keyword: string
-  /** Results page, `%s` is the query. */
+  /** `%s` is the query. */
   url: string
   favicon: string
 }
 
-/** Popular sites' public search pages, by name, and the usual web search engines. Prefix matches go to the first one. */
+/** Prefix matches go to the first one. */
 export const SITE_SEARCHES: SiteSearch[] = [
   { name: 'Amazon', keyword: 'amazon.com', url: 'https://www.amazon.com/s?k=%s', favicon: 'https://www.amazon.com/favicon.ico' },
   { name: 'Apple Music', keyword: 'music.apple.com', url: 'https://music.apple.com/us/search?term=%s', favicon: 'https://music.apple.com/favicon.ico' },
@@ -60,10 +57,7 @@ export const SITE_SEARCHES: SiteSearch[] = [
   { name: 'YouTube', keyword: 'youtube.com', url: 'https://www.youtube.com/results?search_query=%s', favicon: 'https://www.youtube.com/favicon.ico' }
 ]
 
-/**
- * The site Tab would search, for what's typed so far: a keyword it starts ("you" → youtube.com),
- * else a site name it starts ("gmail", "google m"). A single letter only matches a whole name ("x").
- */
+/** A keyword it starts ("you" → youtube.com), else a name it starts; one letter only matches a whole name ("x"). */
 export function matchSiteSearch(input: string): SiteSearch | undefined {
   const text = input
     .trim()

@@ -700,7 +700,7 @@ are what catch them.
    uploads `release.json` (`{ "electron": "<version>" }`).
 6. **Users**: installed copies check GitHub every hour (`CHECK_EVERY` in `src/main/updater.ts`).
    - Windows downloads the update in the background (electron-updater, `latest.yml`), checks the
-     installer's Ed25519 `.sig` (`src/main/windows-update.ts`, same key as macOS) and installs it
+     installer's Ed25519 `.sig` (`verifyInstaller` in `src/main/update-signature.ts`, same key as macOS) and installs it
      on the next quit; an installer that fails the check is never offered or installed. Meanwhile the sidebar shows a *Restart to Update* pill (also in the
      command bar and menu). The relaunch card (listing what's new) only opens by itself once the
      update has waited without a restart: 1 day when its `release.json` names a different

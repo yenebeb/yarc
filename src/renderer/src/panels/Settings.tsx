@@ -1,4 +1,3 @@
-// Settings window: a section list on the left, grouped cards of options on the right.
 import { useState, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react'
 import logo from '../../../../build/icon.svg'
 import { BINDINGS, bindingLabel } from '../../../shared/keymap'
@@ -22,7 +21,9 @@ const SECTIONS: { id: Section; label: string; icon?: IconName }[] = [
   { id: 'about', label: 'About' }
 ]
 
-const ARCHIVE_OPTIONS: { hours: number; label: string }[] = [
+type HoursOption = { hours: number; label: string }
+
+const ARCHIVE_OPTIONS: HoursOption[] = [
   { hours: 0, label: 'Never' },
   { hours: 12, label: 'After 12 hours' },
   { hours: 24, label: 'After 24 hours' },
@@ -30,7 +31,7 @@ const ARCHIVE_OPTIONS: { hours: number; label: string }[] = [
   { hours: 720, label: 'After 30 days' }
 ]
 
-const LITTLE_CLOSE_OPTIONS: { hours: number; label: string }[] = [
+const LITTLE_CLOSE_OPTIONS: HoursOption[] = [
   { hours: 1, label: 'After 1 hour' },
   { hours: 6, label: 'After 6 hours' },
   { hours: 12, label: 'After 12 hours' },
@@ -48,7 +49,6 @@ const patch = (p: Partial<SettingsT>) => dispatch({ type: 'settings', patch: p }
 export function Settings({ state, close }: { state: AppState; close: () => void }) {
   const [section, setSection] = useState<Section>('general')
   const current = SECTIONS.find((s) => s.id === section)!
-  // Up/down arrows move through the section list, like a native sidebar.
   const onNavKey = (e: KeyboardEvent) => {
     if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return
     e.preventDefault()
@@ -118,7 +118,6 @@ function Row({ title, hint, children }: { title: string; hint?: ReactNode; child
   )
 }
 
-/** A row whose whole area flips its switch. */
 function ToggleRow({ title, hint, checked, onChange }: { title: string; hint?: ReactNode; checked: boolean; onChange: (v: boolean) => void }) {
   return (
     <label className="set-row click">
@@ -144,14 +143,25 @@ function Select({ label, value, onChange, children }: { label: string; value: st
   )
 }
 
+function HoursSelect({ label, value, options, onChange }: { label: string; value: number; options: HoursOption[]; onChange: (hours: number) => void }) {
+  return (
+    <Select label={label} value={value} onChange={(v) => onChange(Number(v))}>
+      {!options.some((o) => o.hours === value) && <option value={value}>After {value} hours</option>}
+      {options.map((o) => (
+        <option key={o.hours} value={o.hours}>
+          {o.label}
+        </option>
+      ))}
+    </Select>
+  )
+}
+
 function General({ state }: { state: AppState }) {
   const s = state.settings
   // Local value so the slider stays smooth while main catches up.
   const [width, setWidth] = useState(s.sidebarWidth)
   const space = activeSpace(state)
   const spaceProfile = state.profiles.find((p) => p.id === space.profileId)
-  const archiveKnown = ARCHIVE_OPTIONS.some((o) => o.hours === s.archiveAfterHours)
-  const littleCloseKnown = LITTLE_CLOSE_OPTIONS.some((o) => o.hours === s.littleCloseAfterHours)
   const pct = ((width - SIDEBAR_WIDTH.min) / (SIDEBAR_WIDTH.max - SIDEBAR_WIDTH.min)) * 100
   return (
     <>
@@ -172,14 +182,7 @@ function General({ state }: { state: AppState }) {
           onChange={(v) => patch({ adblock: v })}
         />
         <Row title="Archive unpinned tabs" hint="Tabs in Today that you haven't used for a while move to the Archive.">
-          <Select label="Archive unpinned tabs" value={s.archiveAfterHours} onChange={(v) => patch({ archiveAfterHours: Number(v) })}>
-            {!archiveKnown && <option value={s.archiveAfterHours}>After {s.archiveAfterHours} hours</option>}
-            {ARCHIVE_OPTIONS.map((o) => (
-              <option key={o.hours} value={o.hours}>
-                {o.label}
-              </option>
-            ))}
-          </Select>
+          <HoursSelect label="Archive unpinned tabs" value={s.archiveAfterHours} options={ARCHIVE_OPTIONS} onChange={(hours) => patch({ archiveAfterHours: hours })} />
         </Row>
       </Group>
       <Group title="Appearance">
@@ -220,14 +223,7 @@ function General({ state }: { state: AppState }) {
           onChange={(v) => patch({ littleArcForExternalLinks: v })}
         />
         <Row title="Close Little Windows" hint="A Little Window you leave in the background closes after this long. Its page goes to the Archive.">
-          <Select label="Close Little Windows" value={s.littleCloseAfterHours} onChange={(v) => patch({ littleCloseAfterHours: Number(v) })}>
-            {!littleCloseKnown && <option value={s.littleCloseAfterHours}>After {s.littleCloseAfterHours} hours</option>}
-            {LITTLE_CLOSE_OPTIONS.map((o) => (
-              <option key={o.hours} value={o.hours}>
-                {o.label}
-              </option>
-            ))}
-          </Select>
+          <HoursSelect label="Close Little Windows" value={s.littleCloseAfterHours} options={LITTLE_CLOSE_OPTIONS} onChange={(hours) => patch({ littleCloseAfterHours: hours })} />
         </Row>
         <Row title="Little Window profile" hint="Which logins and history Little Windows use.">
           <Select label="Little Window profile" value={s.littleArcProfileId} onChange={(v) => patch({ littleArcProfileId: v })}>
@@ -426,7 +422,7 @@ function Extensions({ state }: { state: AppState }) {
   )
 }
 
-/** Splits a shortcut label into keycaps: "Ctrl+Shift+T" or "⌘⇧T". */
+/** "Ctrl+Shift+T" or "⌘⇧T". */
 function keyCaps(label: string): string[] {
   if (!isMac) return label.split(/\+(?=.)/)
   const mods = /^[⌘⌃⌥⇧]*/.exec(label)![0]

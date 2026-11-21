@@ -1,10 +1,4 @@
-// What to tell the user about a link to another app. Kept free of Electron so unit tests can import it.
-
-/**
- * Schemes web pages must never launch: Windows handlers that have been used to run code (Follina
- * et al.), Chrome's own denylist (shell:, vbscript:, hcp:, …), network file systems that would
- * mount a server the page names (smb:, afp:, nfs:), and schemes that are the browser's own.
- */
+/** Windows handlers used to run code (Follina), Chrome's denylist, network file systems a page could mount, and our own. */
 const BLOCKED = new Set([
   'ms-msdt',
   'search-ms',
@@ -59,11 +53,8 @@ const APPS: Record<string, string> = {
 
 export interface ExternalLinkInfo {
   scheme: string
-  /** How the app is named in the prompt. */
   app: string
-  /** The page's origin, for remembering "Always allow". */
   origin: string
-  /** The page's host, as shown to the user ('' for pages without one). */
   site: string
   blocked: boolean
 }

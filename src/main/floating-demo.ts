@@ -1,6 +1,4 @@
-// The floating player's "Try It" (its spotlight in What's New): a silent video made on the spot, in
-// a page of its own, so there's something playing to float without the network or a site's consent
-// wall. A data: URL never reaches history or the archive (both keep only http(s) pages).
+// Made on the spot, so it needs no network or consent wall. A data: URL never reaches history or the archive.
 
 const PAGE = `<!doctype html><meta charset="utf-8"><title>Floating Player Demo</title>
 <style>

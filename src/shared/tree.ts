@@ -1,4 +1,3 @@
-// Pure helpers over the persisted state. Used by the main process and by unit tests.
 import type { ID, PersistedState, PinnedFolder, PinnedNode, Space, TabItem } from './types'
 
 export type ItemLocation =
@@ -56,7 +55,7 @@ export function* walkPinned(nodes: PinnedNode[]): Generator<PinnedNode> {
   }
 }
 
-/** Every tab item visible in a space, in sidebar order: favorites, pinned (depth-first), today. */
+/** In sidebar order: favorites, pinned (depth-first), today. */
 export function spaceItems(state: PersistedState, space: Space): TabItem[] {
   const profile = state.profiles.find((p) => p.id === space.profileId)
   const out: TabItem[] = [...(profile?.favorites ?? [])]
@@ -65,7 +64,6 @@ export function spaceItems(state: PersistedState, space: Space): TabItem[] {
   return out
 }
 
-/** Which profile an item's web page must live in. */
 export function profileOfItem(state: PersistedState, id: ID): ID | undefined {
   const found = findItem(state, id)
   if (!found) return undefined
@@ -74,21 +72,11 @@ export function profileOfItem(state: PersistedState, id: ID): ID | undefined {
   return state.spaces.find((s) => s.id === spaceId)?.profileId
 }
 
-/** Is `ancestorId` the given node or one of its ancestors? Prevents dropping a folder into itself. */
 export function containsNode(node: PinnedNode, id: ID): boolean {
   if (node.id === id) return true
   return node.kind === 'folder' && node.children.some((c) => containsNode(c, id))
 }
 
-export function hostOf(url: string): string {
-  try {
-    return new URL(url).hostname.replace(/^www\./, '')
-  } catch {
-    return url
-  }
-}
-
-/** True when a pinned/favorite tab has navigated away from its saved URL (Arc shows a "/" + reset). */
 export function isAwayFromSaved(item: TabItem, currentUrl?: string): boolean {
   if (!item.savedUrl) return false
   const url = currentUrl ?? item.url

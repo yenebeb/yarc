@@ -1,9 +1,7 @@
-// "Choose what to share": the screen picker a page's getDisplayMedia opens (Meet, Zoom, Teams…)
-// on Windows and Linux; macOS shows its own. Picking is the consent: nothing is shared until
-// Share, and closing the panel any way is Cancel.
+// Picking is the consent: nothing is shared until Share, and closing the panel any way is Cancel.
 import { useState } from 'react'
 import type { OverlayMode } from '../../../shared/types'
-import { dispatch } from '../api'
+import { cx, dispatch } from '../api'
 
 type Mode = Extract<OverlayMode, { kind: 'share-picker' }>
 
@@ -39,7 +37,7 @@ export function SharePicker({ mode }: { mode: Mode }) {
           shown.map((s) => (
             <button
               key={s.id}
-              className={`share-source${selected === s.id ? ' on' : ''}`}
+              className={cx('share-source', selected === s.id && 'on')}
               onClick={() => setSelected(s.id)}
               onDoubleClick={() => answer(s.id)}
               title={s.name}

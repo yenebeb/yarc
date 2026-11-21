@@ -1,4 +1,4 @@
-// Minimal line icons (24x24 grid, stroke = currentColor).
+// 24x24 grid, stroke = currentColor.
 import { useState, type ReactNode } from 'react'
 import { displayHost, faviconFor } from './api'
 
@@ -9,7 +9,6 @@ const paths: Record<string, ReactNode> = {
       <path d="M9 4v16" />
     </>
   ),
-  // Arrows, not chevrons, like Arc.
   back: <path d="M19 12H5M11 18l-6-6 6-6" />,
   forward: <path d="M5 12h14M13 6l6 6-6 6" />,
   reload: (
@@ -92,7 +91,6 @@ const paths: Record<string, ReactNode> = {
   puzzle: <path d="M10 4a2 2 0 1 1 4 0v2h4v4h-2a2 2 0 1 0 0 4h2v4h-4v-2a2 2 0 1 0-4 0v2H6v-4h2a2 2 0 1 0 0-4H6V6h4z" />,
   pin: <path d="M12 17v5M8 3h8l-1 6 3 4H6l3-4z" />,
   shield: <path d="M12 3l7 3v5c0 4.5-3 8.5-7 10-4-1.5-7-5.5-7-10V6z" />,
-  // Arc's profile glyph: a smiley in a circle.
   profile: (
     <>
       <circle cx="12" cy="12" r="9" />
@@ -105,7 +103,6 @@ const paths: Record<string, ReactNode> = {
       <path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" />
     </>
   ),
-  // Site permission prompts, like the SF Symbols in Arc's.
   bell: (
     <>
       <path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z" />
@@ -144,7 +141,6 @@ const paths: Record<string, ReactNode> = {
     </>
   )
 ,
-  // Media: the floating player and the sidebar's media cards.
   play: <path d="M8 5.5v13a.6.6 0 0 0 .9.5l10.4-6.5a.6.6 0 0 0 0-1L8.9 5a.6.6 0 0 0-.9.5z" fill="currentColor" />,
   pause: (
     <>
@@ -200,7 +196,6 @@ export function Icon({ name, size = 16, stroke = 1.8 }: { name: IconName; size?:
   )
 }
 
-/** A site icon, falling back to a colored letter when there is no favicon (or it fails to load). */
 export function Favicon({ url, favicon, className = 'fav-img' }: { url: string; favicon?: string; className?: string }) {
   const src = faviconFor(favicon)
   const [failed, setFailed] = useState<string>()

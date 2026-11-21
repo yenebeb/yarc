@@ -1,19 +1,9 @@
-// Zen browser (Firefox-based) data that needs no file access, so it can be unit-tested: Firefox's
-// mozLz4 compression, profiles.ini, prefs.js, containers.json, and the session's spaces, essentials,
-// pinned tabs and folders turned into YARC's model. zen.ts reads the files.
 import { randomUUID } from 'node:crypto'
 import type { PinnedFolder, PinnedNode, TabItem } from '../../shared/types'
+import { isImportableUrl, isObj, num, str, type Obj } from './loose-json.ts'
 
-type Obj = Record<string, unknown>
-const isObj = (v: unknown): v is Obj => typeof v === 'object' && v !== null && !Array.isArray(v)
-const str = (v: unknown): string | undefined => (typeof v === 'string' && v.trim() ? v.trim() : undefined)
-const num = (v: unknown): number | undefined => (typeof v === 'number' && Number.isFinite(v) ? v : undefined)
 const objects = (v: unknown): Obj[] => (Array.isArray(v) ? v.filter(isObj) : [])
-const isWebUrl = (url: string | undefined): url is string => !!url && /^(https?|file):/i.test(url)
 
-// ---------------------------------------------------------------- mozLz4
-
-/** Larger than any real session file. */
 const MOZLZ4_MAX = 256 * 1024 * 1024
 
 /** Firefox's .jsonlz4 files: "mozLz40\0", the decompressed size (u32 LE), then one raw LZ4 block. */
@@ -21,8 +11,8 @@ export function readMozLz4(file: Uint8Array): Buffer {
   const buf = Buffer.from(file.buffer, file.byteOffset, file.byteLength)
   if (buf.length < 12 || buf.toString('latin1', 0, 8) !== 'mozLz40\0') throw new Error('Not a mozLz4 file')
   const size = buf.readUInt32LE(8)
-  // LZ4 shrinks data at most about 255 times; a bigger claim is a crafted file asking for gigabytes.
-  if (size > MOZLZ4_MAX || size > (buf.length - 12) * 255 + 64) throw new Error('Corrupt mozLz4 data')
+  const lz4MaxRatio = 255
+  if (size > MOZLZ4_MAX || size > (buf.length - 12) * lz4MaxRatio + 64) throw new Error('Corrupt mozLz4 data')
   return lz4Block(buf.subarray(12), size)
 }
 
@@ -31,7 +21,6 @@ function lz4Block(src: Buffer, size: number): Buffer {
   const out = Buffer.alloc(size)
   let i = 0
   let o = 0
-  // A 4-bit length of 15 continues in the next bytes, each added, until one is below 255.
   const length = (n: number): number => {
     if (n < 15) return n
     let b: number
@@ -49,19 +38,19 @@ function lz4Block(src: Buffer, size: number): Buffer {
     src.copy(out, o, i, i + literals)
     i += literals
     o += literals
-    if (i === src.length) break // the last sequence is literals only
+    const lastSequenceIsLiteralsOnly = i === src.length
+    if (lastSequenceIsLiteralsOnly) break
     if (i + 2 > src.length) throw corrupt()
     const offset = src[i] | (src[i + 1] << 8)
     i += 2
     const match = length(token & 15) + 4
     if (offset === 0 || offset > o || o + match > size) throw corrupt()
-    for (let k = 0; k < match; k++) out[o + k] = out[o - offset + k] // byte by byte: the copy may overlap itself
+    // Byte by byte: the copy may overlap itself.
+    for (let k = 0; k < match; k++) out[o + k] = out[o - offset + k]
     o += match
   }
   return out.subarray(0, o)
 }
-
-// ---------------------------------------------------------------- profiles.ini, prefs.js, containers.json
 
 export interface IniProfile {
   name: string
@@ -70,7 +59,7 @@ export interface IniProfile {
   relative: boolean
 }
 
-/** The [ProfileN] entries of profiles.ini, the one Zen opens by default first. */
+/** The one Zen opens by default first. */
 export function parseProfilesIni(text: string): IniProfile[] {
   const sections: { name: string; values: Map<string, string> }[] = []
   for (const raw of text.split(/\r?\n/)) {
@@ -95,7 +84,6 @@ export function parseProfilesIni(text: string): IniProfile[] {
   return profiles.sort((a, b) => a.rank - b.rank).map(({ name, path, relative }) => ({ name, path, relative }))
 }
 
-/** The `user_pref("name", value);` lines of prefs.js. */
 export function parsePrefs(text: string): Map<string, string | number | boolean> {
   const prefs = new Map<string, string | number | boolean>()
   for (const m of text.matchAll(/^user_pref\(("(?:[^"\\]|\\.)*"),\s*(.*)\);\s*$/gm)) {
@@ -109,7 +97,7 @@ export function parsePrefs(text: string): Map<string, string | number | boolean>
 
 const DEFAULT_CONTAINERS: Record<number, string> = { 1: 'Personal', 2: 'Work', 3: 'Banking', 4: 'Shopping' }
 
-/** Container (userContextId) names from containers.json; the built-in four have no name stored. */
+/** The built-in four have no name stored. */
 export function parseContainers(json: unknown): Map<number, string> {
   const names = new Map<number, string>()
   for (const c of objects(isObj(json) ? json.identities : undefined)) {
@@ -120,10 +108,8 @@ export function parseContainers(json: unknown): Map<number, string> {
   return names
 }
 
-// ---------------------------------------------------------------- the session
-
 export interface ParsedZenProfile {
-  /** The container (userContextId) of its spaces, as a string. */
+  /** The userContextId of its spaces. */
   key: string
   name: string
   favorites: TabItem[]
@@ -133,7 +119,6 @@ export interface ParsedZenSpace {
   zenId: string
   name: string
   emoji?: string
-  /** Hex, e.g. '#336699'. */
   color: string
   profileKey: string
   pinned: PinnedNode[]
@@ -145,27 +130,19 @@ export interface ParsedZen {
   spaces: ParsedZenSpace[]
   /** Distinct essentials (each profile may get its own copy). */
   essentials: number
-  /** Zen id of the space that was open, if it was imported. */
   activeSpaceId?: string
 }
 
 export interface ParseZenOptions {
-  /** Colors for spaces without a theme color. */
   palette?: string[]
   containers?: Map<number, string>
-  /** zen.workspaces.container-specific-essentials-enabled: essentials only show in spaces of their container. */
+  /** Essentials only show in spaces of their container. */
   containerEssentials?: boolean
-  /** zen.workspaces.active. */
   activeSpace?: string
   now?: number
 }
 
-/**
- * A Zen session ({ tabs, folders, spaces }, from zen-sessions.jsonlz4 or a session-store window) in
- * YARC's model. Spaces get one profile per container they use, since containers keep cookies apart
- * like profiles do. Essentials become favorites, pinned tabs and folders stay pinned, and other web
- * tabs become Today tabs. Glance and placeholder tabs are left out.
- */
+/** Spaces get one profile per container they use: containers keep cookies apart like profiles do. */
 export function parseZenSession(session: unknown, opts: ParseZenOptions = {}): ParsedZen {
   const s = isObj(session) ? session : {}
   const now = opts.now ?? Date.now()
@@ -210,7 +187,7 @@ export function parseZenSession(session: unknown, opts: ParseZenOptions = {}): P
   return { profiles, spaces, essentials, activeSpaceId: spaces.some((sp) => sp.zenId === active) ? active : undefined }
 }
 
-/** A space's pinned tree (folders keep their nesting, at the place of their first tab) and its Today tabs, newest first. */
+/** Folders go at the place of their first tab. */
 function spaceTabs(spaceId: string, tabs: Obj[], folders: Obj[], now: number): { pinned: PinnedNode[]; today: TabItem[] } {
   const pinned: PinnedNode[] = []
   const today: TabItem[] = []
@@ -248,21 +225,17 @@ function spaceTabs(spaceId: string, tabs: Obj[], folders: Obj[], now: number): {
       if (item) today.push(item)
     }
   }
-  for (const id of own.keys()) place(id) // folders with no tabs in them
+  for (const emptyFolderId of own.keys()) place(emptyFolderId)
   today.sort((a, b) => b.lastActive - a.lastActive)
   return { pinned, today }
 }
 
-/**
- * A pinned tab or essential opens at the URL it was pinned with (`_zenPinnedInitialState`), under the
- * name it was given (`zenStaticLabel`); other tabs at the page they show now.
- */
 function toTab(tab: Obj, saved: boolean, now: number): TabItem | undefined {
   const entries = objects(tab.entries)
   const current = entries[Math.min(Math.max((num(tab.index) ?? entries.length) - 1, 0), entries.length - 1)]
   const initial = isObj(tab._zenPinnedInitialState) && isObj(tab._zenPinnedInitialState.entry) ? tab._zenPinnedInitialState.entry : undefined
   const url = saved ? (str(initial?.url) ?? str(current?.url)) : str(current?.url)
-  if (!isWebUrl(url)) return undefined
+  if (!isImportableUrl(url)) return undefined
   const label = str(tab.zenStaticLabel)
   const item: TabItem = {
     id: randomUUID(),
@@ -279,7 +252,6 @@ function toTab(tab: Obj, saved: boolean, now: number): TabItem | undefined {
   return item
 }
 
-/** The space's primary gradient color ({ c: [r, g, b] }, 0-255), as hex. */
 function themeColor(theme: unknown): string | undefined {
   const colors = objects(isObj(theme) ? theme.gradientColors : undefined)
   const c = (colors.find((x) => x.isPrimary === true) ?? colors[0])?.c
@@ -289,7 +261,7 @@ function themeColor(theme: unknown): string | undefined {
   return '#' + rgb.map((v) => Math.round(Math.min(255, Math.max(0, v!))).toString(16).padStart(2, '0')).join('')
 }
 
-/** Zen stores a space's icon as an emoji, or as an icon file path/URL that YARC can't show. */
+/** Zen stores an emoji, or an icon file path/URL that YARC can't show. */
 function iconEmoji(icon: unknown): string | undefined {
   const s = str(icon)
   if (!s || /^([a-z-]+:|\/)/i.test(s) || [...s].length > 4) return undefined

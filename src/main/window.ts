@@ -1,6 +1,3 @@
-// The main browser window: the UI (sidebar + frame) underneath, web page views in the
-// content area, and a transparent overlay view on top for the command bar and panels.
-// A Peek page sits above even the overlay, which draws its backdrop and buttons.
 import { BrowserWindow, WebContentsView, nativeTheme, screen, type BrowserWindowConstructorOptions, type Rectangle, type WebContents } from 'electron'
 import { join } from 'node:path'
 import { IPC } from '../shared/ipc'
@@ -12,11 +9,9 @@ import { guardUi, uiOrigin, uiPageUrl } from './ui-origin'
 export const PAD = 8
 
 const mac = process.platform === 'darwin'
-/** Where the traffic lights sit (macOS): in line with the sidebar's top bar. */
 const TRAFFIC_LIGHTS = { x: 13, y: 16 }
-/** Height of the strip at the top of the window with the native min/max/close buttons (Windows, Linux). */
 export const CAPTION_H = mac ? 0 : 32
-/** Caption button glyphs: the UI's --text for light and dark (styles.css). */
+/** The UI's --text (styles.css). */
 export const captionSymbols = (dark: boolean): string => (dark ? '#f1eff6' : '#1d1b22')
 
 export interface ViewSlot {
@@ -33,7 +28,6 @@ export function loadRenderer(wc: WebContents, page: RendererPage): void {
 
 export const preloadPath = (): string => join(__dirname, '../preload/ui.js')
 
-/** YARC's own pages: sandboxed like tabs; the preload tells them apart from web pages by origin. */
 export function uiWebPreferences() {
   return {
     preload: preloadPath(),
@@ -60,16 +54,14 @@ export class MainWindow {
   private shown: WebContentsView[] = []
   private overlayAttached = false
   private top: WebContentsView | undefined
-  /** The site permission prompt, kept above everything else. */
   prompt: PromptView | undefined
-  /** The active space's appearance, which colors the caption buttons; unset follows the system. */
+  /** Unset follows the system. */
   private appearance: 'light' | 'dark' | undefined
   private captionDark: boolean | undefined
 
-  /** `background`: show without taking the focus (windows restored behind the front one). */
+  /** `background`: windows restored behind the front one. */
   constructor(bounds: Partial<Rectangle> | undefined, background = false) {
     const area = screen.getPrimaryDisplay().workArea
-    // Ignore saved positions on a monitor that's no longer connected.
     if (bounds?.x !== undefined && bounds.y !== undefined && !onSomeDisplay(bounds as Rectangle)) bounds = { width: bounds.width, height: bounds.height }
     const options: BrowserWindowConstructorOptions = {
       width: bounds?.width ?? Math.min(1440, area.width - 80),
@@ -84,13 +76,11 @@ export class MainWindow {
       webPreferences: uiWebPreferences()
     }
     if (mac) {
-      // The theme is painted translucent over the desktop, like Arc's vibrant themes.
       options.vibrancy = 'under-window'
       options.visualEffectState = 'active'
       options.backgroundColor = '#00000000'
     } else {
       options.backgroundColor = nativeTheme.shouldUseDarkColors ? '#1f1e24' : '#e9e7f3'
-      // Native caption buttons at the top-right, over the space-tinted UI, like Arc for Windows.
       this.captionDark = nativeTheme.shouldUseDarkColors
       options.titleBarOverlay = { color: '#00000000', symbolColor: captionSymbols(this.captionDark), height: CAPTION_H }
     }
@@ -125,15 +115,11 @@ export class MainWindow {
     return { width, height }
   }
 
-  /** The caption buttons' strip; Windows hides the buttons in fullscreen. */
   captionHeight(): number {
     return mac || this.win.isFullScreen() ? 0 : CAPTION_H
   }
 
-  /**
-   * Shows or hides the traffic lights (macOS). Electron shows them again at macOS's default spot,
-   * out of line with the sidebar's top bar, so they are put back where they belong.
-   */
+  /** Electron shows them again at macOS's default spot, out of line with the sidebar's top bar. */
   setTrafficLights(visible: boolean): void {
     if (!mac) return
     this.win.setWindowButtonVisibility(visible)
@@ -153,7 +139,6 @@ export class MainWindow {
     this.win.setTitleBarOverlay({ symbolColor: captionSymbols(dark) })
   }
 
-  /** The area web pages occupy, given the sidebar configuration. Below the caption buttons on Windows. */
   contentRect(sidebarVisible: boolean, sidebarWidth: number, right: boolean, fullscreenPage: boolean): Rectangle {
     const { width, height } = this.size()
     if (fullscreenPage) return { x: 0, y: 0, width, height }
@@ -163,7 +148,6 @@ export class MainWindow {
     return { x: right ? PAD : side, y: top, width: w, height: Math.max(100, height - top - PAD) }
   }
 
-  /** Shows exactly these views (in order), detaching any others. */
   show(slots: ViewSlot[]): void {
     const next = slots.map((s) => s.view)
     for (const v of this.shown) if (!next.includes(v)) this.win.contentView.removeChildView(v)
@@ -176,7 +160,6 @@ export class MainWindow {
     else this.prompt?.raise()
   }
 
-  /** Shows a view above everything else (Peek), or removes it. */
   setTop(view: WebContentsView | undefined, rect?: Rectangle): void {
     if (this.top && this.top !== view) this.win.contentView.removeChildView(this.top)
     this.top = view
@@ -210,13 +193,12 @@ export class MainWindow {
     this.overlay.setBounds(rect)
     this.overlayAttached = true
     this.raiseOverlay()
-    // Peek keeps the focus on its page, and drop zones and a floating tour card on whatever had it.
     const keepFocus = mode.kind === 'sidebar' || mode.kind === 'notice' || mode.kind === 'peek' || mode.kind === 'split-drop' || (mode.kind === 'tour' && isFloating(mode.step))
     if (!keepFocus) this.overlay.webContents.focus()
   }
 
   private raiseOverlay(): void {
-    // Re-adding an existing child moves it to the top of the z-order.
+    // Re-adding an existing child moves it to the top.
     this.win.contentView.addChildView(this.overlay)
     if (this.top) this.win.contentView.addChildView(this.top)
     this.prompt?.raise()

@@ -1,7 +1,4 @@
-// Sites that ask for a client certificate (company sign-in, national ID cards). Electron's default
-// sends the first matching one without asking, which identifies the user to any site that asks,
-// in incognito too. Like Chrome, ask which one to send, or none. Chromium remembers the answer
-// for that site until the session ends, so the question comes once.
+// Electron's default sends the first matching certificate without asking, identifying the user to any site, in incognito too.
 import { app, BrowserWindow, dialog, type Certificate } from 'electron'
 
 const MAX_SHOWN = 4

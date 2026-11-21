@@ -1,26 +1,17 @@
-// Keeps session cookies (no expiry) across a restart, like Chrome and Arc do when they reopen the
-// previous tabs. Electron's network service never writes them to the Cookies database (its
-// persist_session_cookies is off and not configurable), so logins that use them are gone after a
-// quit: Microsoft/Entra (ESTSAUTH, Teams, Azure), most company portals, any "stay signed in" left
-// unticked. We mirror a profile's session cookies from the cookie change events, save them to a
-// file in the profile folder, and set them again at the next launch before any tab loads.
-// See docs/electron-notes.md section 10.
+// Electron never writes session cookies to the Cookies database, so Microsoft/Entra logins were gone after a quit (docs/electron-notes.md section 10).
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname } from 'node:path'
 import type { Cookie, CookiesSetDetails, Session } from 'electron'
 
-/** Turns the saved file's text into bytes and back (safeStorage on Windows and Linux, see SessionCookies). */
 export interface Cipher {
   encrypt(text: string): Buffer
   decrypt(data: Buffer): string
 }
 
-/** The cookie's identity in the jar: a cookie with the same name, domain and path replaces it. */
 export function cookieKey(c: Pick<Cookie, 'name' | 'domain' | 'path'>): string {
   return `${c.name}\n${c.domain ?? ''}\n${c.path ?? '/'}`
 }
 
-/** The details that set `c` again as it was: a session cookie, host-only or for the domain and its subdomains. */
 export function setDetailsFor(c: Cookie): CookiesSetDetails {
   const domain = c.domain ?? ''
   let host = domain.replace(/^\./, '')
@@ -40,11 +31,10 @@ export function setDetailsFor(c: Cookie): CookiesSetDetails {
   return details
 }
 
-/** A profile's session cookies, kept up to date from the session's cookie change events. */
 export class SessionCookieJar {
   private cookies = new Map<string, Cookie>()
 
-  /** One 'changed' event. Returns whether the jar changed. */
+  /** Returns whether the jar changed. */
   apply(cookie: Cookie, removed: boolean): boolean {
     const key = cookieKey(cookie)
     // A session cookie replaced by one with an expiry is no longer ours to keep.
@@ -60,17 +50,16 @@ export class SessionCookieJar {
 
 interface SavedFile {
   version: 1
-  /** Base64 of the cipher's bytes when encrypted, else the cookies themselves. */
+  /** Base64 when encrypted. */
   cookies: Cookie[] | string
 }
 
-/** The file's text for `cookies`. */
 export function encodeCookies(cookies: Cookie[], cipher?: Cipher): string {
   const file: SavedFile = { version: 1, cookies: cipher ? cipher.encrypt(JSON.stringify(cookies)).toString('base64') : cookies }
   return JSON.stringify(file)
 }
 
-/** The cookies in a saved file's text; none if it can't be read (another version, another machine's key). */
+/** None if it can't be read (another version, another machine's key). */
 export function decodeCookies(text: string, cipher?: Cipher): Cookie[] {
   try {
     const file = JSON.parse(text) as SavedFile
@@ -84,13 +73,9 @@ export function decodeCookies(text: string, cipher?: Cipher): Cookie[] {
   }
 }
 
-/** How long changes wait before they're written, so a page setting many cookies writes once. */
 const SAVE_DELAY = 2000
 
-/**
- * Saves `session`'s session cookies to `file` as they change (and at quit), and sets them again
- * with restore(). Never for incognito profiles: their cookies must go when the window closes.
- */
+/** Never for incognito profiles: their cookies must go when the window closes. */
 export class SessionCookies {
   private jar = new SessionCookieJar()
   private dirty = false
@@ -110,7 +95,7 @@ export class SessionCookies {
     session.cookies.on('changed', this.onChanged)
   }
 
-  /** Sets last run's session cookies again. Call before the profile's pages load. */
+  /** Call before the profile's pages load. */
   async restore(): Promise<void> {
     if (!existsSync(this.file)) return
     let text = ''
@@ -126,14 +111,12 @@ export class SessionCookies {
           await this.session.cookies.set(setDetailsFor(c))
           // Kept even if the change event comes after a quick quit.
           this.jar.apply({ ...c, session: true }, false)
-        } catch {
-          // One the network service refuses (an invalid name, say) shouldn't keep the others out.
-        }
+        } catch {}
       })
     )
   }
 
-  /** Writes the cookies now if they changed. Synchronous: it runs as the app quits. */
+  /** Synchronous: it runs as the app quits. */
   save(): void {
     clearTimeout(this.timer)
     this.timer = undefined
@@ -149,7 +132,6 @@ export class SessionCookies {
     }
   }
 
-  /** The profile is gone: stop saving and delete the file. */
   forget(): void {
     this.stopped = true
     clearTimeout(this.timer)

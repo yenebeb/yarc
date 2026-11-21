@@ -1,7 +1,3 @@
-// The tour (first run, or Take the Tour) and What's New (first launch after an update, or from the
-// menu and command bar). The tour's setup steps and What's New are cards over the dimmed window;
-// the tour's try-it steps float over the page so the user can do what they describe. What's New
-// opens with feature spotlights, one large card each, before the list of changes.
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import logo from '../../../../build/icon.svg'
 import { bindingLabel, type CommandId } from '../../../shared/keymap'
@@ -9,7 +5,7 @@ import { spotlight, type Spotlight } from '../../../shared/spotlights'
 import { isFloating, nextStep, previousStep, TOUR_STEPS, tryEvent, type TourStep } from '../../../shared/tour'
 import { spaceItems } from '../../../shared/tree'
 import type { AppState, ReleaseNotes, UpdateStatus } from '../../../shared/types'
-import { activeSpace, dispatch, isMac } from '../api'
+import { activeSpace, cx, dispatch, isMac } from '../api'
 import { Icon } from '../icons'
 import './panels.css'
 import { SpotlightPicture } from './spotlight-pictures'
@@ -32,7 +28,6 @@ const SHORTCUTS: { id: CommandId; label: string }[] = [
 interface StepContent {
   title: string
   text: ReactNode
-  /** What to do to go on, for a try-it step. */
   tryIt?: ReactNode
   body?: ReactNode
 }
@@ -206,7 +201,7 @@ export function Tour({ step, state, close }: { step: TourStep; state: AppState; 
   const first = step === 'welcome'
   return (
     <div className="panel intro tour" onMouseDown={(e) => e.stopPropagation()}>
-      <div className={`intro-hero${first ? '' : ' compact'}`}>
+      <div className={cx('intro-hero', !first && 'compact')}>
         <img className="logo" src={logo} alt="" />
         <h1>{c.title}</h1>
         <p>{c.text}</p>
@@ -239,10 +234,7 @@ export function Tour({ step, state, close }: { step: TourStep; state: AppState; 
   )
 }
 
-/**
- * The relaunch card for a downloaded update, at most once a day: every version since the running one
- * with its changes. Neither button has the focus, so typing meant for a page can't restart YARC.
- */
+/** Neither button has the focus, so typing meant for a page can't restart YARC. */
 export function UpdateReady({ update, close }: { update: UpdateStatus; close: () => void }) {
   if (update.state !== 'ready') return null
   const releases = update.notes ?? []
@@ -288,14 +280,10 @@ export function UpdateReady({ update, close }: { update: UpdateStatus; close: ()
   )
 }
 
-/**
- * What's New: a page per feature spotlight (`spotlights`, ids), then the list of changes per version.
- * After an update the list comes last as "Also in this update"; without spotlights it's the only page.
- */
 export function WhatsNew({ releases, spotlights, close }: { releases: ReleaseNotes[]; spotlights: string[]; close: () => void }) {
   const cards = spotlights.flatMap((id) => spotlight(id) ?? [])
-  // The list is a page of its own unless spotlights are all there is.
-  const pages = cards.length + (releases.length || !cards.length ? 1 : 0)
+  const hasChangesPage = releases.length > 0 || cards.length === 0
+  const pages = cards.length + (hasChangesPage ? 1 : 0)
   const [page, setPage] = useState(0)
   const primary = useRef<HTMLButtonElement>(null)
   useEffect(() => primary.current?.focus(), [page])
@@ -305,7 +293,7 @@ export function WhatsNew({ releases, spotlights, close }: { releases: ReleaseNot
 
   return (
     <div
-      className={`panel intro whats-new${card ? ' spotlit' : ''}`}
+      className={cx('panel intro whats-new', card && 'spotlit')}
       onMouseDown={(e) => e.stopPropagation()}
       onKeyDown={(e) => {
         if (e.key === 'ArrowRight') turn(page + 1)

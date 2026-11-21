@@ -1,26 +1,19 @@
-// macOS self-update without an Apple Developer ID. Squirrel.Mac (electron-updater's MacUpdater)
-// refuses ad-hoc-signed apps, so this does the same job itself:
-//   1. download the release's zip with Node's fetch, not Chromium's download manager: files Node
-//      writes get no com.apple.quarantine flag, so Gatekeeper never assesses the new version;
-//   2. check the zip's Ed25519 signature (update-signature.ts) before anything touches it;
-//   3. unzip into the profile folder and check the app (bundle id, version, code signature);
-//   4. when YARC quits, swap the new bundle in for the running one (installStaged).
-// The running app's files stay in place until it quits: a helper process started from a half-
-// replaced bundle would be the wrong version.
+// The running app's files stay in place until it quits: a helper process started from a half-replaced bundle would be the wrong version.
 import { app } from 'electron'
 import { execFile, execFileSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import { promisify } from 'node:util'
-import type { MacUpdate } from './release'
+import { download, type MacUpdate } from './release'
 import { UPDATE_PUBLIC_KEY, verifyUpdate } from './update-signature'
 
 const run = promisify(execFile)
+const DOWNLOAD_TIMEOUT = 15 * 60_000
 
 /** Holds the unpacked update until the app quits, then the replaced app until the next start. */
 const stagingDir = (): string => path.join(app.getPath('userData'), 'Update')
 
-/** The running .app, if it can replace itself: not in development, not translocated, and in a folder this user can write to. */
+/** Not in development, not translocated, and in a folder this user can write to. */
 export function updatableBundle(): string | undefined {
   const bundle = path.resolve(process.execPath, '../../..')
   if (!app.isPackaged || !bundle.endsWith('.app') || bundle.includes('/AppTranslocation/')) return undefined
@@ -33,35 +26,24 @@ export function updatableBundle(): string | undefined {
   return bundle
 }
 
-/**
- * Removes the app replaced by the last update, or an update that was never installed. With rm, not
- * fs.rm: Electron's fs treats app.asar as a folder and leaves it behind.
- */
+/** With rm, not fs.rm: Electron's fs treats app.asar as a folder and leaves it behind. */
 export async function cleanUpStaging(): Promise<void> {
   await run('/bin/rm', ['-rf', stagingDir()])
 }
 
 export interface StagedUpdate {
-  /** The unpacked .app, for installStaged. */
   app: string
-  /**
-   * Its designated requirement, read once it passed its checks: installStaged checks the app
-   * against it again, since it then waited (possibly for days) in the profile folder.
-   */
+  /** installStaged checks the app against it again, since it then waited (possibly for days) in the profile folder. */
   requirement: string
-  /**
-   * Its executable once it's installed in place of the running bundle. To relaunch with: it can have
-   * another name than the running one's (the Arc Shell → YARC rename), and the bundle keeps its own.
-   */
+  /** Inside the running bundle's path: the new app's executable can have another name (the Arc Shell → YARC rename). */
   executable: string
 }
 
 /** The update itself failed a check (signature, contents, code signature): not tried again this run. */
 export class UpdateRejected extends Error {}
 
-/** Downloads, verifies and unpacks the update. Throws UpdateRejected when the download isn't a good update. */
 export async function stageUpdate(update: MacUpdate, version: string, bundle: string): Promise<StagedUpdate> {
-  const [zip, signature] = await Promise.all([download(update.url), download(update.signatureUrl)])
+  const [zip, signature] = await Promise.all([download(update.url, DOWNLOAD_TIMEOUT), download(update.signatureUrl, DOWNLOAD_TIMEOUT)])
   if (!verifyUpdate(update.name, zip, signature.toString('utf8'), UPDATE_PUBLIC_KEY)) {
     throw new UpdateRejected(`${update.name} doesn't match its signature`)
   }
@@ -79,7 +61,6 @@ async function unpack(update: MacUpdate, zip: Buffer, version: string, bundle: s
   const zipPath = path.join(dir, update.name)
   await fs.promises.writeFile(zipPath, zip)
   const unpacked = path.join(dir, 'new')
-  // --noqtn: don't copy a quarantine flag from the zip onto the app (there shouldn't be one).
   await run('/usr/bin/ditto', ['-x', '-k', '--noqtn', zipPath, unpacked])
   await fs.promises.rm(zipPath)
   const apps = (await fs.promises.readdir(unpacked)).filter((name) => name.endsWith('.app'))
@@ -93,7 +74,6 @@ async function unpack(update: MacUpdate, zip: Buffer, version: string, bundle: s
   }
 }
 
-/** "identifier … and certificate leaf = H\"…\"" for the release certificate; "cdhash H\"…\"" for an ad-hoc signature. */
 async function designatedRequirement(app: string): Promise<string> {
   const { stdout, stderr } = await run('/usr/bin/codesign', ['-d', '-r-', app])
   const found = /designated => (.+)/.exec(`${stdout}\n${stderr}`)?.[1]?.trim()
@@ -101,14 +81,12 @@ async function designatedRequirement(app: string): Promise<string> {
   return found
 }
 
-/** The new app must be this app, at the expected version, with an intact (ad-hoc) code signature. */
 async function checkBundle(staged: string, bundle: string, version: string): Promise<void> {
   const id = await plistValue(staged, 'CFBundleIdentifier')
   if (id !== (await plistValue(bundle, 'CFBundleIdentifier'))) throw new Error(`The update is a different app (${id})`)
   const stagedVersion = await plistValue(staged, 'CFBundleShortVersionString')
   if (stagedVersion !== version) throw new Error(`The update is version ${stagedVersion}, not ${version}`)
   await run('/usr/bin/codesign', ['--verify', '--deep', '--strict', staged])
-  // A quarantined app would hit Gatekeeper's "Open Anyway" after the relaunch.
   const quarantined = await run('/usr/bin/xattr', ['-p', 'com.apple.quarantine', staged]).then(
     () => true,
     () => false
@@ -125,18 +103,8 @@ async function plistValue(bundle: string, key: string): Promise<string> {
   return stdout.trim()
 }
 
-async function download(url: string): Promise<Buffer> {
-  const res = await fetch(url, { signal: AbortSignal.timeout(15 * 60_000) })
-  if (!res.ok) throw new Error(`Downloading ${url} failed: ${res.status}`)
-  return Buffer.from(await res.arrayBuffer())
-}
-
-/**
- * Puts the staged app where the running one is. Two renames, rolled back if the second fails, so
- * the app is never left half-copied (Node has no rename-swap). Synchronous: it runs in will-quit.
- */
+/** Two renames, rolled back if the second fails (Node has no rename-swap). Synchronous: it runs in will-quit. */
 export function installStaged(staged: StagedUpdate, bundle: string): void {
-  // Still the app that passed the checks: same signer (or, ad-hoc, the very same code), intact seal.
   execFileSync('/usr/bin/codesign', ['--verify', '--strict', `-R=${staged.requirement}`, staged.app], { timeout: 30_000, stdio: 'ignore' })
   const replaced = path.join(stagingDir(), 'replaced.app')
   fs.renameSync(bundle, replaced)

@@ -1,16 +1,12 @@
-// Links a web page hands to another app (mailto:, msteams:, zoommtg:, …). Like Chrome, YARC asks
-// before opening one; "Always allow" is remembered per site and scheme until YARC quits.
 import { BrowserWindow, dialog, shell, type WebContents } from 'electron'
 import { externalLinkInfo } from './external-link-info'
 
 const alwaysAllowed = new Set<string>()
-/** Pages with a question on screen: a page can't stack dialogs by launching links in a loop. */
+/** A page can't stack dialogs by launching links in a loop. */
 const asking = new Set<number>()
-/** Site and scheme the user just said Cancel to: the page can't ask again on its own until a pause has passed. */
 const cancelledAt = new Map<string, number>()
 const CANCEL_QUIET_MS = 30_000
 
-/** `userActivated`: the user just clicked or typed in the page, so it's their link, not the page's doing. */
 export async function openExternalLink(from: WebContents, url: string, userActivated = false): Promise<void> {
   const info = externalLinkInfo(url, from.isDestroyed() ? '' : from.getURL())
   if (info.blocked) return console.warn('[external] refused', info.scheme)

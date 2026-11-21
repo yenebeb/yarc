@@ -1,5 +1,3 @@
-// Read-only access to Chromium-family browser data (Arc, Chrome, Edge, Brave).
-// Source files are never written: SQLite databases are copied to a temp dir before opening.
 import { randomUUID } from 'node:crypto'
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { copyFile, mkdtemp, rm } from 'node:fs/promises'
@@ -15,7 +13,7 @@ export interface ChromiumBrowser {
 }
 
 export interface ChromiumProfile {
-  /** Directory name inside User Data: 'Default', 'Profile 1', … */
+  /** 'Default', 'Profile 1', … */
   dir: string
   name: string
   path: string
@@ -36,7 +34,6 @@ function localAppData(): string {
   return process.env.LOCALAPPDATA || join(homedir(), 'AppData', 'Local')
 }
 
-/** Arc's root folder (holds StorableSidebar.json and `User Data`), if Arc is installed. */
 export function findArcRoot(): string | undefined {
   if (process.platform === 'darwin') {
     const p = join(homedir(), 'Library', 'Application Support', 'Arc')
@@ -59,7 +56,6 @@ export function findArcRoot(): string | undefined {
   return undefined
 }
 
-/** Installed Chrome, Edge and Brave user-data dirs. */
 export function findChromiumBrowsers(): ChromiumBrowser[] {
   const home = homedir()
   const candidates: [string, string][] =
@@ -83,7 +79,6 @@ export function findChromiumBrowsers(): ChromiumBrowser[] {
   return candidates.filter(([, dir]) => isDir(dir)).map(([name, userDataDir]) => ({ name, userDataDir }))
 }
 
-/** Profile dir → display name from `Local State` (`profile.info_cache`). */
 export function readProfileNames(userDataDir: string): Map<string, string> {
   const names = new Map<string, string>()
   try {
@@ -98,7 +93,6 @@ export function readProfileNames(userDataDir: string): Map<string, string> {
   return names
 }
 
-/** Profiles of a user-data dir that exist on disk; falls back to scanning for Default / Profile N. */
 export function listProfiles(userDataDir: string): ChromiumProfile[] {
   const names = readProfileNames(userDataDir)
   let dirs = [...names.keys()]
@@ -113,11 +107,7 @@ export function listProfiles(userDataDir: string): ChromiumProfile[] {
     .filter((p) => existsSync(join(p.path, 'History')) || existsSync(join(p.path, 'Bookmarks')))
 }
 
-/**
- * Runs `read` on a temp copy of a SQLite database and its -wal/-journal, so a running browser's
- * files are never opened. The `tables` it reads must be plain tables: a crafted file could make
- * them views that never finish (a recursive query) and hang YARC.
- */
+/** `tables` must be plain tables: a crafted file could make them views that never finish and hang YARC. */
 export async function readDatabaseCopy<T>(src: string, tables: string[], read: (db: DatabaseSync) => T): Promise<T> {
   const tmp = await mkdtemp(join(tmpdir(), 'yarc-import-'))
   try {
@@ -154,7 +144,6 @@ export async function readDatabaseCopy<T>(src: string, tables: string[], read: (
   }
 }
 
-/** Most recent visits (oldest first), excluding subframes and hidden URLs. Times in ms epoch. */
 export async function readHistory(profileDir: string, limit = 50_000): Promise<ImportedVisit[]> {
   const src = join(profileDir, 'History')
   if (!existsSync(src)) return []
@@ -208,10 +197,6 @@ function convertBookmarks(nodes: BookmarkNode[] | undefined, now: number, depth 
   return out
 }
 
-/**
- * Bookmarks (and AccountBookmarks) as a pinned tree: bookmark-bar entries at the top level,
- * "Other bookmarks" and "Mobile bookmarks" as folders when not empty.
- */
 export function readBookmarks(profileDir: string, now = Date.now()): PinnedNode[] {
   const out: PinnedNode[] = []
   for (const file of ['Bookmarks', 'AccountBookmarks']) {

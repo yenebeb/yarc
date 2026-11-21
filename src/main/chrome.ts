@@ -1,4 +1,3 @@
-// "Open in Chrome": the escape hatch for sites that only accept a managed Google Chrome.
 import { spawn } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'

@@ -1,4 +1,3 @@
-// The browser controller: owns state, live tabs, spaces and the main window.
 import {
   app,
   BrowserWindow,
@@ -76,19 +75,59 @@ import { MainWindow, PAD, type ViewSlot } from './window'
 import { applyView, captureView, cascade, inAnyView, newView, stateForView, viewFromState } from './window-state'
 
 const isMac = process.platform === 'darwin'
+const hasSystemAudioCapture = process.platform === 'win32'
 
-/** Built in by electron.vite.config.ts from build/changelog.json; empty outside release builds. */
+// Defined by electron.vite.config.ts from build/changelog.json; empty outside release builds.
 declare const __CHANGELOG__: Changelog
 const CHANGELOG: Changelog = __CHANGELOG__
 const MAX_ARCHIVE = 1000
 const UNLOAD_HIDDEN_AFTER = 3600_000
-/**
- * The hidden sidebar stays out while the cursor is within this many pixels past its edge, and
- * goes away once the cursor has been further for PEEK_HIDE_DELAY ms, like Arc. Room to grab the
- * edge and resize, and no flicker from mouse enter/leave events at the screen's edge.
- */
-const PEEK_GRACE = 32
-const PEEK_HIDE_DELAY = 300
+const HOUSEKEEPING_EVERY = 5 * 60_000
+// Slack past the peeking sidebar's edge: room to grab it to resize, and no enter/leave flicker at the screen's edge.
+const PEEK_GRACE_PX = 32
+const PEEK_HIDE_DELAY_MS = 300
+// Sidebar geometry, kept in step with styles.css.
+const SIDEBAR_PAD = 8
+const FLOATING_SIDEBAR_INSET = 4
+const TOP_BAR_HEIGHT = 32
+const URL_FIELD_GAP = 6
+const URL_FIELD_HEIGHT = 36
+
+const COMMAND_ACTIONS: Partial<Record<CommandId, Action>> = {
+  newTab: { type: 'overlay', mode: { kind: 'command', target: 'tab' } },
+  splitAdd: { type: 'overlay', mode: { kind: 'command', target: 'split' } },
+  find: { type: 'overlay', mode: { kind: 'find' } },
+  history: { type: 'overlay', mode: { kind: 'library', tab: 'history' } },
+  downloads: { type: 'overlay', mode: { kind: 'library', tab: 'downloads' } },
+  library: { type: 'overlay', mode: { kind: 'library', tab: 'archive' } },
+  settings: { type: 'overlay', mode: { kind: 'settings' } },
+  newSpace: { type: 'overlay', mode: { kind: 'space-editor' } },
+  tour: { type: 'overlay', mode: { kind: 'tour', step: 'welcome' } },
+  toggleSidebar: { type: 'toggleSidebar' },
+  copyUrl: { type: 'copyUrl' },
+  copyUrlMarkdown: { type: 'copyUrl', markdown: true },
+  littleArc: { type: 'littleArc' },
+  reopenClosed: { type: 'reopenClosed' },
+  clearToday: { type: 'clearToday' },
+  nextSpace: { type: 'switchSpaceRelative', delta: 1 },
+  prevSpace: { type: 'switchSpaceRelative', delta: -1 },
+  splitClose: { type: 'unsplit' },
+  devtools: { type: 'devtools' },
+  reload: { type: 'reload' },
+  hardReload: { type: 'reload', hard: true },
+  stop: { type: 'stop' },
+  back: { type: 'back' },
+  forward: { type: 'forward' },
+  zoomIn: { type: 'zoom', delta: 1 },
+  zoomOut: { type: 'zoom', delta: -1 },
+  zoomReset: { type: 'zoom', delta: 0 },
+  newFolder: { type: 'newFolder' },
+  openInChrome: { type: 'openInChrome' },
+  importArc: { type: 'import', source: 'arc' },
+  importZen: { type: 'import', source: 'zen' },
+  importChrome: { type: 'import', source: 'chrome' },
+  extensions: { type: 'extensionsStore' }
+}
 
 interface ClosedTab {
   url: string
@@ -96,15 +135,9 @@ interface ClosedTab {
   spaceId: ID
 }
 
-/**
- * One main window: its sidebar UI and overlay, what it shows (`view`, persisted), and its transient
- * UI state. All windows share the sidebar's contents, like Arc (docs/multi-window.md).
- */
 class Win {
   peek: Peek | undefined
-  /** True while the collapsed sidebar is shown over the page. */
   sidebarPeek = false
-  /** The tab being dragged from the sidebar, while the page area shows split drop zones. */
   tabDrag: ID | undefined
   peekWatch: ReturnType<typeof setInterval> | undefined
   fullscreenTab: LiveTab | undefined
@@ -127,27 +160,17 @@ export class Browser implements TabHost, FloatingHost {
   readonly extensions: Extensions
   readonly adblock: AdBlock
   readonly updater: Updater
-  /** Set on an incognito window's controller: the main one, whose ad blocker and updater it shares. */
   readonly main: Browser | undefined
-  /** The open main windows. */
   private wins: Win[] = []
-  /**
-   * The window commands act on: the focused one, or the one whose UI, keys or page started the work.
-   * After the last window closes (macOS) it stays, closed, until a window opens again.
-   */
+  /** The window commands act on; after the last window closes on macOS it stays, closed. */
   private cur!: Win
-  /** The current window last logged as missing from the saved windows, to log it once. */
   private reportedLost: Win | undefined
   readonly live = new Map<ID, LiveTab>()
-  /** Tabs playing media out of sight (media-state.ts), and the window that floats a video. */
   private media: MediaState = emptyMedia()
   private readonly floating = new FloatingPlayer(this)
-  /** The tabs some window shows live, as of the last layout: one that leaves it may float or get a card. */
   private onScreen = new Set<ID>()
-  /** Tabs found playing a video when they left: their card offers to float it again. */
   private videoTabs = new Set<ID>()
   private hiddenSince = new Map<ID, number>()
-  /** Streams pages one window shows live to the other windows that show them too (as stills). */
   private mirror = new Mirror((wc, still) => this.sendStill(wc, still))
   private mru: ID[] = []
   private closed: ClosedTab[] = []
@@ -157,27 +180,15 @@ export class Browser implements TabHost, FloatingHost {
   private slowEmitTimer: NodeJS.Timeout | undefined
   readonly littles = new Set<LittleWindow>()
 
-  /**
-   * The Little Windows that are still open. Read this, not `littles`: Electron marks a closing
-   * window destroyed a moment before its 'closed' event takes it off the list.
-   */
+  /** Read this, not `littles`: Electron marks a closing window destroyed before 'closed' takes it off the list. */
   openLittles(): LittleWindow[] {
     return [...this.littles].filter((l) => !l.win.isDestroyed())
   }
-  /**
-   * The tour's step while it runs. Its card can be out of sight while the user tries a step (the
-   * command bar, the peeking sidebar, a tab drag); it comes back when that closes.
-   */
   private tour: TourStep | undefined
-  /** The single window's bounds before YARC had several windows; read once, for the first window. */
   private legacyWindowFile: string | undefined
-  /** Every controller with a window: the main one, plus one per incognito window. IPC goes to the sender's. */
   private static readonly all = new Set<Browser>()
 
-  /**
-   * Pass `main` for an incognito window: a temporary profile, state and history in memory, no
-   * extensions, all thrown away when its window closes, like Arc's incognito windows.
-   */
+  /** Pass `main` for an incognito window: state and history in memory, no extensions, all gone when it closes. */
   constructor(main?: Browser) {
     this.main = main
     this.extensions = new Extensions(this)
@@ -202,12 +213,10 @@ export class Browser implements TabHost, FloatingHost {
     return !!this.main
   }
 
-  /** The current window's MainWindow (closed after the last window closed on macOS). */
   get window(): MainWindow {
     return this.cur?.main
   }
 
-  /** Opens an incognito window, with `url` or with the command bar. */
   openIncognito(url?: string): Browser {
     const main = this.main ?? this
     main.tourEvent('newIncognitoWindow')
@@ -226,15 +235,10 @@ export class Browser implements TabHost, FloatingHost {
     return this.store.activeSpace
   }
 
-  // ---------------------------------------------------------------- startup
-
-  /**
-   * Last run's session cookies, set again before start() loads any page (src/main/session-cookies.ts).
-   * Never holds the launch up for long: after a second the windows open anyway.
-   */
+  /** Call before start(), so pages load with last run's session cookies. Waits a second at most. */
   async restoreSessions(): Promise<void> {
     const restored = this.profiles.restoreSessionCookies(this.state.profiles.map((p) => p.id))
-    await Promise.race([restored, new Promise((resolve) => setTimeout(resolve, 1000))])
+    await Promise.race([restored, sleep(1000)])
   }
 
   start(): void {
@@ -246,25 +250,19 @@ export class Browser implements TabHost, FloatingHost {
     this.store.beforeWrite = () => this.captureCurrent()
     const saved = this.state.windows
     if (!saved.length) saved.push({ ...viewFromState(this.state, newId()), ...this.legacyBounds() })
-    // The last focused window is last in the list: it opens in front.
-    saved.forEach((view, i) => this.openWindow(view, i < saved.length - 1))
+    const lastFocused = saved[saved.length - 1]
+    saved.forEach((view) => this.openWindow(view, view !== lastFocused))
     if (this.incognito) return
     setInterval(() => {
       this.autoArchive()
       this.unloadHiddenTabs()
       this.closeIdleLittles()
-    }, 5 * 60_000)
+    }, HOUSEKEEPING_EVERY)
     this.autoArchive()
     this.updater.sync()
     this.showStartupScreen()
   }
 
-  /**
-   * The welcome screen on a first run, What's New on the first launch after an update or with
-   * feature spotlights not seen yet. Never in incognito windows (start() returns before this) and,
-   * so e2e tests see a plain window, not under YARC_TEST unless YARC_STARTUP_SCREENS is set too.
-   * Spotlights count as seen once shown, and a first run sees them all: the tour covers the basics.
-   */
   private showStartupScreen(): void {
     const current = app.getVersion()
     const unseen = unseenSpotlights(SPOTLIGHTS, this.state.seenSpotlights)
@@ -274,43 +272,43 @@ export class Browser implements TabHost, FloatingHost {
       this.state.seenSpotlights = [...new Set([...(this.state.seenSpotlights ?? []), ...unseen])]
       this.changed()
     }
-    if (intro.kind === 'none' || (process.env.YARC_TEST && !process.env.YARC_STARTUP_SCREENS)) return
+    const plainWindowForTests = process.env.YARC_TEST && !process.env.YARC_STARTUP_SCREENS
+    if (intro.kind === 'none' || plainWindowForTests) return
     const mode: OverlayMode = intro.kind === 'welcome' ? { kind: 'tour', step: 'welcome' } : intro
     const win = this.window.win
     if (win.isVisible()) this.setOverlay(mode)
     else win.once('show', () => this.setOverlay(mode))
   }
 
-  /** The user did something a try-it step of the tour asks for: go on to the next step. */
   private tourEvent(event: TourEvent): void {
     const step = this.tour
     if (!step) return
     const next = stepAfter(step, event)
     if (next === step) return
     this.tour = next
-    // Otherwise the card comes back with the next step when the overlay in front of it closes.
     const kind = this.window.overlayMode.kind
-    if (kind === 'tour' || kind === 'none') this.setOverlay({ kind: 'tour', step: next }, false)
+    const cardCanShow = kind === 'tour' || kind === 'none'
+    if (cardCanShow) this.setOverlay({ kind: 'tour', step: next }, false)
   }
 
-  /** No panel in front of the page: an empty overlay, or only a floating tour card. */
   private pageInFront(): boolean {
     const mode = this.window.overlayMode
     return mode.kind === 'none' || mode.kind === 'notice' || (mode.kind === 'tour' && isFloating(mode.step))
   }
 
-  /**
-   * Opens a main window showing `view`. Without one: a saved window that isn't open (the last
-   * window, closed on macOS), else a new one showing what the current window showed.
-   */
-  openWindow(view?: WindowView, background = false): Win {
-    if (!view) {
-      view = this.state.windows.find((v) => !this.wins.some((w) => w.view === v))
-      if (!view) {
-        view = viewFromState(this.state, newId())
-        this.state.windows.push(view)
-      }
-    }
+  private panelInFront(): boolean {
+    return !this.pageInFront() && this.window.overlayMode.kind !== 'sidebar'
+  }
+
+  private unopenedOrNewView(): WindowView {
+    const unopened = this.state.windows.find((v) => !this.wins.some((w) => w.view === v))
+    if (unopened) return unopened
+    const view = viewFromState(this.state, newId())
+    this.state.windows.push(view)
+    return view
+  }
+
+  openWindow(view = this.unopenedOrNewView(), background = false): Win {
     const w = new Win(new MainWindow(view.bounds, background), view)
     this.wins.push(w)
     logInfo(`${this.incognito ? 'incognito ' : ''}window ${short(view.id)} opened`)
@@ -318,31 +316,27 @@ export class Browser implements TabHost, FloatingHost {
     const win = w.main.win
     if (view.maximized) win.maximize()
     w.main.setTrafficLights(this.state.settings.sidebarVisible)
-    for (const wc of [win.webContents, w.main.overlay.webContents]) {
-      wc.on('before-input-event', (e, input) => {
-        this.use(w)
-        this.handleInput(e, input)
-      })
+    const onInput = (e: Event, input: Input): void => {
+      this.use(w)
+      this.handleInput(e, input)
     }
+    for (const wc of [win.webContents, w.main.overlay.webContents]) wc.on('before-input-event', onInput)
     w.main.prompt = new PromptView(
       win,
       (id, answer) => {
         this.use(w)
         this.answerPrompt(id, answer)
       },
-      (e, input) => {
-        this.use(w)
-        this.handleInput(e, input)
-      }
+      onInput
     )
     win.on('focus', () => {
       this.use(w)
-      this.toFront(w)
-      // Pages it shares with another window come back to it, like Arc.
+      this.saveAsLastFocused(w)
+      // Takes back the pages it shares with other windows.
       this.layout()
     })
     win.on('resize', () =>
-      this.on(w, () => {
+      this.inWin(w, () => {
         this.layout()
         this.saveBounds(w)
       })
@@ -350,14 +344,14 @@ export class Browser implements TabHost, FloatingHost {
     win.on('move', () => this.saveBounds(w))
     for (const ev of ['maximize', 'unmaximize', 'enter-full-screen', 'leave-full-screen'] as const) {
       win.on(ev as 'maximize', () =>
-        this.on(w, () => {
+        this.inWin(w, () => {
           this.layout()
           this.emit()
           this.saveBounds(w)
         })
       )
     }
-    // Pages stay alive for the other windows: take them out before the window goes.
+    // Detach the pages before the window goes, so they stay alive for the other windows.
     win.on('close', () => {
       w.main.show([])
       w.main.setTop(undefined)
@@ -367,17 +361,14 @@ export class Browser implements TabHost, FloatingHost {
     // A page taking the keyboard doesn't blur the sidebar's focused element (a rename field), so tell it.
     for (const wc of [win.webContents, w.main.overlay.webContents]) wc.on('blur', () => !wc.isDestroyed() && wc.send(IPC.blur))
     w.main.overlay.webContents.on('blur', () => {
-      // Closing the window blurs the overlay too, after the window is gone.
       if (!w.open) return
       const k = w.main.overlayMode.kind
       if (k !== 'command' && k !== 'switcher') return
-      // These panels cover the whole window (clicking the backdrop closes them), so a blur while the
-      // window keeps focus is a page taking the keyboard: Windows does that whenever a page finishes
-      // loading. Hand the keyboard back; only leaving the window closes the panel.
+      // Windows blurs the overlay whenever a page finishes loading: hand the keyboard back; only leaving the window closes these panels.
       setTimeout(() => {
         if (!w.open || w.main.overlayMode.kind !== k) return
         if (win.isFocused()) w.main.overlay.webContents.focus()
-        else this.on(w, () => this.setOverlay({ kind: 'none' }, false))
+        else this.inWin(w, () => this.setOverlay({ kind: 'none' }, false))
       }, 50)
     })
     const active = this.space.activeItemId
@@ -386,10 +377,8 @@ export class Browser implements TabHost, FloatingHost {
     return w
   }
 
-  /** ⌘N: another window on the current window's space, with no tab selected and the command bar open, like Arc. */
   openNewWindow(): void {
     if (this.main) return this.main.openNewWindow()
-    // From a menu: next to the window in front.
     this.useFocused()
     const from = this.cur?.open ? this.cur.main.win.getNormalBounds() : undefined
     const bounds = from ? cascade(from, screen.getDisplayMatching(from).workArea) : undefined
@@ -398,7 +387,7 @@ export class Browser implements TabHost, FloatingHost {
     const w = this.openWindow(view)
     this.store.save()
     // Showing moves the focus, which would close a command bar opened before.
-    w.main.win.once('show', () => this.on(w, () => this.runCommand('newTab')))
+    w.main.win.once('show', () => this.inWin(w, () => this.runCommand('newTab')))
   }
 
   private onWindowClosed(w: Win): void {
@@ -408,16 +397,13 @@ export class Browser implements TabHost, FloatingHost {
     w.peek?.destroy()
     w.peek = undefined
     if (this.wins.length) {
-      // Its pages stay for the other windows; the window isn't restored at the next launch.
       if (!this.quitting) this.state.windows = this.state.windows.filter((v) => v !== w.view)
       if (this.cur === w) this.use(this.wins[this.wins.length - 1])
-      // Pages the closed window had live go live in a window that shows a still of them.
-      for (const other of this.wins) if (this.waitsForPage(other)) this.on(other, () => this.layout())
+      for (const other of this.wins) if (this.waitsForPage(other)) this.inWin(other, () => this.layout())
       this.syncMirrors()
       this.store.save()
       return this.emitSoon()
     }
-    // The last window keeps its view (reopened from the Dock on macOS, or at the next launch).
     this.floating.release()
     this.media = emptyMedia()
     this.onScreen.clear()
@@ -426,7 +412,7 @@ export class Browser implements TabHost, FloatingHost {
     if (this.incognito) this.dispose()
   }
 
-  /** Makes `w` the window commands act on: the state's per-window fields become its own (window-state.ts). */
+  /** Makes `w` current: the state's per-window fields become its own (window-state.ts). */
   private use(w: Win): void {
     if (w === this.cur) return
     if (!w.open && this.wins.length) logProblem(`window ${short(w.view.id)} made current after it closed`)
@@ -435,8 +421,7 @@ export class Browser implements TabHost, FloatingHost {
     applyView(this.state, w.view)
   }
 
-  /** Runs `fn` on window `w` (for timers and window events), then goes back to the current window. */
-  private on(w: Win, fn: () => void): void {
+  private inWin(w: Win, fn: () => void): void {
     const prev = this.cur
     this.use(w)
     try {
@@ -446,24 +431,20 @@ export class Browser implements TabHost, FloatingHost {
     }
   }
 
-  /** The focused main window becomes current, for menu commands. */
   useFocused(): void {
     const focused = BrowserWindow.getFocusedWindow()
     const w = this.wins.find((x) => x.main.win === focused)
     if (w) this.use(w)
   }
 
-  /** Brings the current window's values into its saved view, before the state is written. */
   private captureCurrent(): void {
     if (!this.cur) return
-    // The current window's values would be saved for no window: the open ones keep stale ones.
-    const lost = this.wins.length > 0 && (!this.cur.open || !this.state.windows.includes(this.cur.view))
-    if (lost && this.reportedLost !== this.cur) logProblem(`saving while the current window ${short(this.cur.view.id)} is closed or not saved`)
-    this.reportedLost = lost ? this.cur : undefined
+    const curViewLost = this.wins.length > 0 && (!this.cur.open || !this.state.windows.includes(this.cur.view))
+    if (curViewLost && this.reportedLost !== this.cur) logProblem(`saving while the current window ${short(this.cur.view.id)} is closed or not saved`)
+    this.reportedLost = curViewLost ? this.cur : undefined
     captureView(this.state, this.cur.view)
   }
 
-  /** Which window is current and which are open and saved, for the error log. */
   private describeWindows(): string {
     const cur = this.cur
     const flags = cur ? `${cur.open ? '' : ' (closed)'}${this.state.windows.includes(cur.view) ? '' : ' (not saved)'}` : ''
@@ -471,8 +452,7 @@ export class Browser implements TabHost, FloatingHost {
     return `${this.incognito ? 'incognito' : 'main'}: current ${cur ? short(cur.view.id) + flags : 'none'}, open [${ids(this.wins.map((w) => w.view))}], saved [${ids(this.state.windows)}]`
   }
 
-  /** Keeps the last focused window last in the saved list, so it opens in front at the next launch. */
-  private toFront(w: Win): void {
+  private saveAsLastFocused(w: Win): void {
     const list = this.state.windows
     const i = list.indexOf(w.view)
     if (i < 0 || i === list.length - 1) return
@@ -481,7 +461,6 @@ export class Browser implements TabHost, FloatingHost {
     this.store.save()
   }
 
-  /** The window whose page `tab` is (its Peek, or a page it shows), else the current one. */
   private winOf(tab: LiveTab): Win {
     return this.wins.find((w) => w.peek?.tab === tab || (w.open && w.main.isShown(tab.view))) ?? this.cur
   }
@@ -490,7 +469,6 @@ export class Browser implements TabHost, FloatingHost {
     return this.wins.some((w) => w.main.win === win)
   }
 
-  /** An incognito window closed: forget its pages, cookies, storage and history. */
   private dispose(): void {
     Browser.all.delete(this)
     for (const l of this.openLittles()) l.discard()
@@ -501,13 +479,11 @@ export class Browser implements TabHost, FloatingHost {
   private saveBounds(w: Win): void {
     const win = w.main.win
     if (win.isDestroyed() || win.isFullScreen()) return
-    // Normal bounds, so un-maximizing after a restart returns to the old size.
     w.view.bounds = win.getNormalBounds()
     w.view.maximized = win.isMaximized()
     this.store.save()
   }
 
-  /** The bounds the single window had before YARC had several (window.json). */
   private legacyBounds(): Pick<WindowView, 'bounds' | 'maximized'> {
     try {
       if (!this.legacyWindowFile || !existsSync(this.legacyWindowFile)) return {}
@@ -520,13 +496,11 @@ export class Browser implements TabHost, FloatingHost {
 
   private downloadBurst = new DownloadBurst()
 
-  /** The share picker on screen: its answer goes to `callback`. */
   private sharePick: { id: string; sources: Map<string, DesktopCapturerSource>; audio: boolean; callback: (streams: Streams | null) => void } | undefined
 
-  /** A page asked to share the screen (Windows, Linux): shows the picker in the page's window. */
   private async pickShare(req: DisplayMediaRequestHandlerHandlerRequest, callback: (streams: Streams | null) => void): Promise<void> {
-    // macOS uses its own picker (useSystemPicker); YARC has none of its own there.
-    if (!req.videoRequested || process.platform === 'darwin') return callback(null)
+    // macOS shows its own picker (useSystemPicker); YARC has none there.
+    if (!req.videoRequested || isMac) return callback(null)
     let sources: DesktopCapturerSource[]
     try {
       sources = await desktopCapturer.getSources({ types: ['screen', 'window'], thumbnailSize: { width: 320, height: 200 } })
@@ -535,7 +509,6 @@ export class Browser implements TabHost, FloatingHost {
       return callback(null)
     }
     if (!sources.length) return callback(null)
-    // A newer request replaces one still waiting.
     if (this.sharePick) this.answerShare(this.sharePick.id, undefined, false, false)
     const wc = req.frame ? webContents.fromFrame(req.frame) : undefined
     const tab = wc ? [...this.live.values()].find((t) => t.wc === wc) : undefined
@@ -546,8 +519,7 @@ export class Browser implements TabHost, FloatingHost {
       kind: 'share-picker',
       id,
       site: siteName(req.securityOrigin),
-      // System audio only exists on Windows (Electron's loopback capture).
-      systemAudio: req.audioRequested && process.platform === 'win32',
+      systemAudio: req.audioRequested && hasSystemAudioCapture,
       sources: sources.map((s) => ({
         id: s.id,
         name: s.name,
@@ -557,8 +529,7 @@ export class Browser implements TabHost, FloatingHost {
     })
   }
 
-  /** The picker's answer: share `sourceId`, or nothing. `close`: also close the picker (not when it's already closing). */
-  private answerShare(id: string, sourceId: string | undefined, systemAudio: boolean, close = true): void {
+  private answerShare(id: string, sourceId: string | undefined, systemAudio: boolean, closePicker = true): void {
     const pick = this.sharePick
     if (!pick || pick.id !== id) return
     this.sharePick = undefined
@@ -566,23 +537,22 @@ export class Browser implements TabHost, FloatingHost {
     let streams: Streams | null = null
     if (source) {
       streams = { video: source }
-      if (systemAudio && pick.audio && process.platform === 'win32') streams.audio = 'loopback'
+      if (systemAudio && pick.audio && hasSystemAudioCapture) streams.audio = 'loopback'
     }
     try {
       pick.callback(streams)
     } catch (err) {
-      // The page navigated away or closed meanwhile.
       console.warn('[share] the page is gone', err)
     }
-    if (close && this.window.overlayMode.kind === 'share-picker') this.setOverlay({ kind: 'none' })
+    if (closePicker && this.window.overlayMode.kind === 'share-picker') this.setOverlay({ kind: 'none' })
   }
 
   private onProfileCreated(rt: ProfileRuntime): void {
     rt.session.on('will-download', (e, item, wc) => {
       const site = hostOf(wc && !wc.isDestroyed() ? wc.getURL() : item.getURL())
-      // Like Chrome, only downloads the page starts on its own count: a user saving several attachments isn't held back.
       const tab = wc ? [...this.live.values()].find((t) => t.wc === wc) : undefined
-      if (tab && !tab.userActivated && !this.downloadBurst.allow(`${rt.id}|${site}`)) {
+      const startedByPage = tab && !tab.userActivated
+      if (startedByPage && !this.downloadBurst.allow(`${rt.id}|${site}`)) {
         e.preventDefault()
         this.toast(`Blocked more downloads from ${site || 'this page'}`)
         return
@@ -616,17 +586,11 @@ export class Browser implements TabHost, FloatingHost {
       })
       this.emitSoon()
     })
-    // getDisplayMedia (sharing the screen in Meet, Zoom, Teams…). On macOS the system's picker
-    // asks and the handler isn't called; on Windows and Linux YARC's picker does (pickShare).
     rt.session.setDisplayMediaRequestHandler((req, callback) => void this.pickShare(req, callback), { useSystemPicker: true })
     this.adblock.attach(rt.session)
-    // Like Chrome, extensions stay out of incognito.
     if (!this.incognito) void this.extensions.setup(rt)
   }
 
-  // ---------------------------------------------------------------- state out
-
-  /** What window `w`'s sidebar and overlay show: the shared state with that window's own view of it. */
   snapshot(w: Win = this.cur, mode = w.main.overlayMode): AppState {
     return this.withPanelData(this.snapshotWith(w, this.liveInfo()), mode)
   }
@@ -654,7 +618,6 @@ export class Browser implements TabHost, FloatingHost {
     const open = !win.isDestroyed()
     const mode = w.main.overlayMode
     return {
-      // The current window's view is in the state itself; the others have theirs laid over it.
       ...(w === this.cur ? this.state : stateForView(this.state, w.view)),
       live,
       downloads: this.downloads,
@@ -696,7 +659,6 @@ export class Browser implements TabHost, FloatingHost {
     this.slowEmitTimer ??= setTimeout(() => this.emit(), 1000)
   }
 
-  /** Re-render every window, incognito ones too: for state they share, like the updater's. */
   emitAll(): void {
     for (const b of Browser.all) b.emitSoon()
   }
@@ -711,9 +673,11 @@ export class Browser implements TabHost, FloatingHost {
     this.emitSoon()
   }
 
-  // ---------------------------------------------------------------- tabs
+  private relayout(): void {
+    this.layout()
+    this.changed()
+  }
 
-  /** The page that commands (reload, back, find, zoom…) act on: the Peek page while one is open. */
   activeTab(): LiveTab | undefined {
     if (this.cur.peek && !this.cur.peek.tab.destroyed) return this.cur.peek.tab
     const id = this.space.activeItemId
@@ -773,7 +737,6 @@ export class Browser implements TabHost, FloatingHost {
     this.changed()
   }
 
-  /** Puts the active item (and its split partners) in the content area. */
   layout(): void {
     const w = this.window
     if (!w || w.win.isDestroyed()) return
@@ -803,7 +766,6 @@ export class Browser implements TabHost, FloatingHost {
           const tab = this.liveFor(item)
           tab.view.setBorderRadius(8)
           if (split) {
-            // Each pane of a split has its own bar on top, drawn by the UI under the page (Arc).
             const r = pane.rect
             const bar = { x: r.x, y: r.y, width: r.width, height: PANE_BAR }
             const rect = { x: r.x, y: r.y + PANE_BAR, width: r.width, height: Math.max(0, r.height - PANE_BAR) }
@@ -826,11 +788,9 @@ export class Browser implements TabHost, FloatingHost {
     this.syncMirrors()
     this.syncMedia()
     this.emitSoon()
-    // A page this window let go of goes live again in a window that shows a still of it.
-    for (const other of this.wins) if (other !== this.cur && this.waitsForPage(other)) this.on(other, () => this.layout())
+    for (const other of this.wins) if (other !== this.cur && this.waitsForPage(other)) this.inWin(other, () => this.layout())
   }
 
-  /** True when `w` shows a still of a page that no window has live, so it should take the page. */
   private waitsForPage(w: Win): boolean {
     if (!w.open) return false
     return w.layout.views.some((v) => {
@@ -839,12 +799,9 @@ export class Browser implements TabHost, FloatingHost {
     })
   }
 
-  /**
-   * Shows these pages in the current window. A page can be in one window only: one that another
-   * window shows moves here, and that window shows a live still of it until it gets it back.
-   */
+  /** A page can be in one window only: one another window shows moves here, and that window shows a still of it. */
   private show(slots: ViewSlot[]): void {
-    // Back on screen: the floating video goes back into its page first (a view has one parent).
+    // A view has one parent: the floating video goes back into its page first.
     const floatingId = this.floating.tabId
     if (floatingId && slots.some((s) => s.view === this.floating.view)) this.setMedia(shown(this.media, floatingId))
     for (const other of this.wins) {
@@ -854,7 +811,6 @@ export class Browser implements TabHost, FloatingHost {
     this.window.show(slots)
   }
 
-  /** Takes a page out of `w`, which now shows a still image of it (IPC.snapshot), kept live by the mirror. */
   private lend(w: Win, view: WebContentsView): void {
     w.main.detach(view)
     const pane = w.layout.views.find((v) => this.live.get(v.id)?.view === view)
@@ -871,7 +827,6 @@ export class Browser implements TabHost, FloatingHost {
     this.emitSoon()
   }
 
-  /** Mirrors exactly the pages some window shows a still of. */
   private syncMirrors(): void {
     const pages = new Set<WebContents>()
     for (const w of this.wins) {
@@ -884,9 +839,6 @@ export class Browser implements TabHost, FloatingHost {
     this.mirror.watch(pages)
   }
 
-  // ---------------------------------------------------------------- media out of sight
-
-  /** Tabs that left every window since the last layout may float or get a card; those back on screen lose theirs. */
   private syncMedia(): void {
     const now = new Set<ID>()
     for (const w of this.wins) if (w.open) for (const v of w.layout.views) if (!v.elsewhere) now.add(v.id)
@@ -896,12 +848,11 @@ export class Browser implements TabHost, FloatingHost {
     for (const id of before) if (!now.has(id)) void this.tabLeft(id)
   }
 
-  /** A playing video floats, other playing media gets a card, a paused tab nothing (docs/arc-reference.md, "Mini Player"). */
   private async tabLeft(id: ID): Promise<void> {
     const tab = this.live.get(id)
     if (!tab || tab.destroyed || (!tab.playing && !tab.wc.isCurrentlyAudible())) return
     const found = await probeMedia(tab.wc)
-    const still = () => !this.onScreen.has(id) && this.live.get(id) === tab && !tab.destroyed
+    const still = () => this.outOfSight(id, tab)
     if (!still()) return
     const playing: LeftWith = found === null ? (tab.wc.isCurrentlyAudible() ? 'audio' : 'nothing') : found === 'audio' ? 'audio' : 'video'
     if (playing === 'video') this.videoTabs.add(id)
@@ -911,22 +862,22 @@ export class Browser implements TabHost, FloatingHost {
     await this.floatTab(tab, still)
   }
 
-  /** Floats `tab`'s video, or gives it a card when it has none to float. */
+  private outOfSight(id: ID, tab: LiveTab): boolean {
+    return !this.onScreen.has(id) && this.live.get(id) === tab && !tab.destroyed
+  }
+
   private async floatTab(tab: LiveTab, wanted: () => boolean): Promise<void> {
     const id = tab.itemId
     const ok = await this.floating.open(tab, this.floatAnchor(), wanted)
     if (!wanted()) return
-    // The player now shows this tab: the one it showed before (if any) becomes a card.
     this.setMedia(ok ? float(this.media, id) : left(this.media, id, 'audio', false))
   }
 
-  /** The player opens by the window the user is in. */
   private floatAnchor(): FloatAnchor {
     const win = this.cur?.open ? this.cur.main.win.getBounds() : screen.getPrimaryDisplay().workArea
     return { win, sidebarRight: this.state.settings.sidebarRight }
   }
 
-  /** The new media state; the floating player lets go of a tab that no longer floats. */
   private setMedia(next: MediaState): void {
     const before = this.media
     if (next === before) return
@@ -935,27 +886,21 @@ export class Browser implements TabHost, FloatingHost {
     this.emitSoon()
   }
 
-  /** A tab closed or its page went away. */
   private mediaGone(id: ID): void {
     this.onScreen.delete(id)
     this.videoTabs.delete(id)
     this.setMedia(closed(this.media, id))
   }
 
-  /**
-   * Try It on the floating player's spotlight: a demo video plays in a new tab, then YARC goes back
-   * to the tab you were on, so the video floats. In an empty space the demo stays, for you to leave.
-   */
   private async floatingPlayerDemo(): Promise<void> {
     if (!this.state.settings.floatVideos) return this.toast('Turn on floating videos in Settings first')
     const from = this.space.activeItemId
     const demo = this.newTab(FLOATING_DEMO_URL)
     demo.title = 'Floating Player Demo'
     const tab = this.live.get(demo.id)
-    for (let i = 0; i < 50 && tab && !tab.playing && !tab.destroyed; i++) await new Promise((r) => setTimeout(r, 100))
+    for (let i = 0; i < 50 && tab && !tab.playing && !tab.destroyed; i++) await sleep(100)
     if (!tab?.playing || this.space.activeItemId !== demo.id) return
-    // A moment on the page first, so it's clear where the video comes from.
-    await new Promise((r) => setTimeout(r, 1200))
+    await sleep(1200)
     if (this.space.activeItemId !== demo.id) return
     if (from && findItem(this.state, from)) this.activate(from)
     else this.toast('Switch to another tab to see the video float')
@@ -963,7 +908,6 @@ export class Browser implements TabHost, FloatingHost {
 
   backToTab(id: ID): void {
     if (!findItem(this.state, id)) return
-    // Back in the tab's own space (activate() switches to it), in the window the user is in.
     this.focusWindow()
     this.activate(id)
   }
@@ -987,10 +931,9 @@ export class Browser implements TabHost, FloatingHost {
     }
     if (!tab || tab.destroyed) return this.setMedia(closed(this.media, id))
     if (op === 'toggle') return void (await toggleMedia(tab.wc))
-    if (!this.onScreen.has(id)) await this.floatTab(tab, () => !this.onScreen.has(id) && this.live.get(id) === tab && !tab.destroyed)
+    if (!this.onScreen.has(id)) await this.floatTab(tab, () => this.outOfSight(id, tab))
   }
 
-  /** Sends a new still of a mirrored page to every window that shows it elsewhere. */
   private sendStill(wc: WebContents, image: string): void {
     const id = this.itemIdFor(wc)
     if (!id) return
@@ -1001,62 +944,56 @@ export class Browser implements TabHost, FloatingHost {
 
   private overlayRect(mode: OverlayMode): Rectangle | undefined {
     const { width, height } = this.window.size()
+    const whole = { x: 0, y: 0, width, height }
     const s = this.state.settings
+    const c = this.cur.layout.content
+    const centeredX = (w: number) => Math.round(c.x + (c.width - w) / 2)
     switch (mode.kind) {
       case 'none':
         return undefined
       case 'sidebar': {
-        // While a tab is dragged out of it, the peeking sidebar's overlay also covers the page for the drop zones.
-        if (this.cur.tabDrag) return { x: 0, y: 0, width, height }
+        if (this.cur.tabDrag) return whole
         const w = s.sidebarWidth + PAD
         return { x: s.sidebarRight ? width - w : 0, y: 0, width: w, height }
       }
       case 'split-drop':
-        return this.cur.layout.content
+      case 'peek':
+        return c
       case 'notice': {
-        const c = this.cur.layout.content
         const w = Math.min(440, c.width - 24)
-        return { x: Math.round(c.x + (c.width - w) / 2), y: c.y + 16, width: w, height: 44 }
+        return { x: centeredX(w), y: c.y + 16, width: w, height: 44 }
       }
       case 'find': {
-        const c = this.cur.layout.content
         const w = Math.min(380, c.width - 16)
         return { x: c.x + c.width - w - 12, y: c.y + 12, width: w, height: 60 }
       }
-      case 'peek':
-        return this.cur.layout.content
       case 'tour': {
-        if (!isFloating(mode.step)) return { x: 0, y: 0, width, height }
-        // A card at the bottom of the page area, leaving the page and the sidebar usable.
-        const c = this.cur.layout.content
+        if (!isFloating(mode.step)) return whole
         const w = Math.min(460, c.width - 24)
         const h = 176
-        return { x: Math.round(c.x + (c.width - w) / 2), y: c.y + c.height - h - 16, width: w, height: h }
+        return { x: centeredX(w), y: c.y + c.height - h - 16, width: w, height: h }
       }
       default:
-        return { x: 0, y: 0, width, height }
+        return whole
     }
   }
 
   setOverlay(mode: OverlayMode, refocus = true): void {
+    const current = this.window.overlayMode
     if (mode.kind === 'tour') this.tour = mode.step
     else if (this.tour && mode.kind === 'none') {
-      // Esc on a centered tour card ends the tour (so do its buttons: endTour). Anything else that
-      // clears the overlay, like the command bar closing or a tab opening, brings the card back.
-      const current = this.window.overlayMode
-      if (current.kind === 'tour' && !isFloating(current.step)) this.tour = undefined
+      const closingCenteredCard = current.kind === 'tour' && !isFloating(current.step)
+      if (closingCenteredCard) this.tour = undefined
       else mode = { kind: 'tour', step: this.tour }
     }
-    // Closing the share picker any other way (Escape, a click outside, another panel) is Cancel.
-    const current = this.window.overlayMode
     if (current.kind === 'share-picker' && mode.kind !== 'share-picker') this.answerShare(current.id, undefined, false, false)
     if (mode.kind !== 'peek') this.dropPeek()
-    if (this.window.overlayMode.kind === 'find' && mode.kind !== 'find') this.activeTab()?.wc.stopFindInPage('keepSelection')
+    if (current.kind === 'find' && mode.kind !== 'find') this.activeTab()?.wc.stopFindInPage('keepSelection')
     if (mode.kind !== 'sidebar') this.cur.sidebarPeek = false
     if (mode.kind !== 'sidebar' && mode.kind !== 'split-drop') this.cur.tabDrag = undefined
     this.watchPeek(mode.kind === 'sidebar' && !this.cur.tabDrag)
     if (mode.kind !== 'switcher') this.cur.switcher = undefined
-    if (mode.kind !== 'none' && mode.kind !== this.window.overlayMode.kind) this.window.sendToOverlay(IPC.state, this.snapshot(this.cur, mode))
+    if (mode.kind !== 'none' && mode.kind !== current.kind) this.window.sendToOverlay(IPC.state, this.snapshot(this.cur, mode))
     this.window.setOverlay(mode, this.overlayRect(mode))
     if (!this.state.settings.sidebarVisible) this.window.setTrafficLights(mode.kind === 'sidebar')
     if (mode.kind === 'none' && refocus) this.activeTab()?.wc.focus()
@@ -1065,31 +1002,25 @@ export class Browser implements TabHost, FloatingHost {
     this.emitSoon()
   }
 
-  // ---------------------------------------------------------------- permission prompts
-
-  /**
-   * Shows the site permission prompt for a page on screen, like Arc: requests from tabs in the
-   * background wait until their tab is shown. Panels that cover the window (command bar, settings…)
-   * hide it until they close.
-   */
   syncPrompts(): void {
     const queue = this.profiles.permissionQueue
-    // Pages that can show a prompt: tabs, each window's Peek and Little Window. Anything else (an
-    // extension page, say) has nowhere to ask, so it hears "no".
-    const pages = new Set<number>([...this.live.values()].filter((t) => !t.destroyed).map((t) => t.wc.id))
-    for (const w of this.wins) if (w.peek && !w.peek.tab.destroyed) pages.add(w.peek.tab.wc.id)
-    for (const l of this.openLittles()) if (l.pageId !== undefined) pages.add(l.pageId)
+    const canPrompt = this.pagesThatCanPrompt()
     for (const wcId of queue.waitingPages()) {
-      if (pages.has(wcId)) continue
+      if (canPrompt.has(wcId)) continue
       const req = queue.next([wcId])
       if (req) queue.answer(req.id, 'dismiss')
     }
     for (const l of this.openLittles()) l.syncPrompt(queue)
-    // Each window asks for the pages it shows live.
-    for (const w of this.wins) if (w.open) this.on(w, () => this.syncPrompt())
+    for (const w of this.wins) if (w.open) this.inWin(w, () => this.syncPrompt())
   }
 
-  /** The current window's prompt: the next question from a page it shows. */
+  private pagesThatCanPrompt(): Set<number> {
+    const pages = new Set<number>([...this.live.values()].filter((t) => !t.destroyed).map((t) => t.wc.id))
+    for (const w of this.wins) if (w.peek && !w.peek.tab.destroyed) pages.add(w.peek.tab.wc.id)
+    for (const l of this.openLittles()) if (l.pageId !== undefined) pages.add(l.pageId)
+    return pages
+  }
+
   private syncPrompt(): void {
     const queue = this.profiles.permissionQueue
     const w = this.window
@@ -1099,7 +1030,6 @@ export class Browser implements TabHost, FloatingHost {
     w.prompt.show(queue.next(this.pagesOnScreen()), this.promptAnchor())
   }
 
-  /** The webContents on screen, the one the URL field shows first: Peek, the active tab, then its split partners. */
   private pagesOnScreen(): number[] {
     const ids: number[] = []
     if (this.cur.peek && !this.cur.peek.tab.destroyed) ids.push(this.cur.peek.tab.wc.id)
@@ -1112,33 +1042,34 @@ export class Browser implements TabHost, FloatingHost {
     return ids
   }
 
-  /** Arc's prompt points at the site controls at the right end of the sidebar's URL field. */
   private promptAnchor(): PromptAnchor {
     const s = this.state.settings
     const content = this.cur.layout.content
     const floating = !s.sidebarVisible && this.window.overlayMode.kind === 'sidebar'
     if ((s.sidebarVisible || floating) && !this.cur.fullscreenTab) {
-      const { width } = this.window.size()
-      // The URL field: below the sidebar's 8px padding, 32px top bar and 6px gap; 36px tall (styles.css).
-      const inset = floating ? 4 : 0
-      // Where the top bar starts: in the caption buttons' strip on Windows, or below it on the right.
-      const cap = this.window.captionHeight()
-      const barTop = !cap ? inset + 8 : s.sidebarRight ? cap + (floating ? 8 : 0) : floating ? inset + 8 : 0
-      const fieldRight = s.sidebarRight ? width - 10 : inset + s.sidebarWidth - 6
-      return { arrow: true, x: fieldRight - 22, y: barTop + 32 + 6 + 36 + 2 }
+      const inset = floating ? FLOATING_SIDEBAR_INSET : 0
+      const fieldRight = s.sidebarRight ? this.window.size().width - 10 : inset + s.sidebarWidth - 6
+      const fieldBottom = this.topBarY(floating, inset) + TOP_BAR_HEIGHT + URL_FIELD_GAP + URL_FIELD_HEIGHT
+      return { arrow: true, x: fieldRight - 22, y: fieldBottom + 2 }
     }
-    // No URL field on screen: the top-left corner of the page, where it would be.
     const x = s.sidebarRight ? content.x + content.width - PROMPT_WIDTH - 12 : content.x + 12
     return { arrow: false, x, y: content.y + 12 }
   }
 
+  private topBarY(floating: boolean, inset: number): number {
+    const cap = this.window.captionHeight()
+    const right = this.state.settings.sidebarRight
+    // Windows' caption buttons sit top right: a left sidebar's top bar shares their strip, a right one's goes below.
+    if (!cap || (floating && !right)) return inset + SIDEBAR_PAD
+    if (right) return cap + (floating ? SIDEBAR_PAD : 0)
+    return 0
+  }
+
   private answerPrompt(id: string, answer: 'allow' | 'deny' | 'dismiss'): void {
     this.profiles.permissionQueue.answer(id, answer)
-    // The keyboard goes back to the page, unless another question took it.
     if (!this.window.prompt?.visible && this.window.overlayMode.kind === 'none') this.activeTab()?.wc.focus()
   }
 
-  /** While the hidden sidebar is out, hides it once the cursor has stayed away from it (PEEK_GRACE). */
   private watchPeek(on: boolean): void {
     const w = this.cur
     clearInterval(w.peekWatch)
@@ -1151,17 +1082,14 @@ export class Browser implements TabHost, FloatingHost {
       const b = win.getContentBounds()
       const s = this.state.settings
       const p = screen.getCursorScreenPoint()
-      const reach = s.sidebarWidth + PAD + PEEK_GRACE
+      const reach = s.sidebarWidth + PAD + PEEK_GRACE_PX
       const near = s.sidebarRight ? p.x >= b.x + b.width - reach : p.x <= b.x + reach
-      if (near && p.y >= b.y - PEEK_GRACE && p.y <= b.y + b.height + PEEK_GRACE) awaySince = 0
+      if (near && p.y >= b.y - PEEK_GRACE_PX && p.y <= b.y + b.height + PEEK_GRACE_PX) awaySince = 0
       else if (!awaySince) awaySince = Date.now()
-      else if (Date.now() - awaySince >= PEEK_HIDE_DELAY) this.on(w, () => this.setOverlay({ kind: 'none' }, false))
+      else if (Date.now() - awaySince >= PEEK_HIDE_DELAY_MS) this.inWin(w, () => this.setOverlay({ kind: 'none' }, false))
     }, 50)
   }
 
-  // ---------------------------------------------------------------- Peek
-
-  /** Opens a page in Peek, over the current tab, with the opener's profile. */
   openPeek(opener: LiveTab, url: string): void {
     this.dropPeek()
     this.cur.peek = new Peek(this, this.profiles.get(opener.profileId), url)
@@ -1175,20 +1103,23 @@ export class Browser implements TabHost, FloatingHost {
     else this.dropPeek()
   }
 
-  /** Moves the Peek page into a Today tab, keeping its state (or into a split with the current tab). */
   expandPeek(split = false): void {
     const peek = this.cur.peek
     if (!peek || peek.tab.destroyed) return
     this.cur.peek = undefined
     this.window.setTop(undefined)
     this.setOverlay({ kind: 'none' }, false)
-    const tab = peek.release()
+    const id = this.takeInAsTodayTab(peek.release(), this.space)
+    if (split) this.splitWith(id)
+    else this.activate(id)
+  }
+
+  private takeInAsTodayTab(tab: LiveTab, space: Space): ID {
     const item: TabItem = { id: newId(), url: tab.wc.getURL(), title: tab.wc.getTitle(), favicon: tab.favicon, lastActive: Date.now() }
-    this.space.today.unshift(item)
+    space.today.unshift(item)
     tab.itemId = item.id
     this.live.set(item.id, tab)
-    if (split) this.splitWith(item.id)
-    else this.activate(item.id)
+    return item.id
   }
 
   private dropPeek(): void {
@@ -1200,7 +1131,6 @@ export class Browser implements TabHost, FloatingHost {
     this.emitSoon()
   }
 
-  /** The Peek card: nearly the content's height, with room beside it for the buttons. */
   private peekRects(): { card: Rectangle; local: Rect } {
     const c = this.cur.layout.content
     const margin = Math.round(Math.max(56, c.width * 0.08))
@@ -1222,7 +1152,6 @@ export class Browser implements TabHost, FloatingHost {
     this.toast(`Blocked a pop-up from ${hostOf(tab.wc.getURL()) || 'this page'}${hostOf(url) ? ` to ${hostOf(url)}` : ''}`)
   }
 
-  /** Links from pinned tabs and favorites to other sites open in Peek, like Arc. */
   interceptLink(tab: LiveTab, url: string): boolean {
     if (!this.state.settings.peekPinnedLinks || !/^https?:/i.test(url)) return false
     const found = findItem(this.state, tab.itemId)
@@ -1231,7 +1160,6 @@ export class Browser implements TabHost, FloatingHost {
     return true
   }
 
-  /** Creates a new unpinned tab at the top of Today. */
   newTab(url: string, opts: { activate?: boolean; spaceId?: ID } = {}): TabItem {
     const space = (opts.spaceId && this.store.space(opts.spaceId)) || this.space
     const item: TabItem = { id: newId(), url, title: url, lastActive: Date.now() }
@@ -1260,10 +1188,9 @@ export class Browser implements TabHost, FloatingHost {
     return space.splits.find((sp) => paneIds(sp.root).includes(id))
   }
 
-  /** Takes a tab out of its split; a split left with one tab ends. */
-  private removeFromSplits(space: Space, id: ID): void {
+  private removeFromSplits(space: Space, id: ID, except?: Split): void {
     space.splits = space.splits.flatMap((sp) => {
-      if (!paneIds(sp.root).includes(id)) return [sp]
+      if (sp === except || !paneIds(sp.root).includes(id)) return [sp]
       const root = removePane(sp.root, id)
       return root ? [{ ...sp, root }] : []
     })
@@ -1291,24 +1218,28 @@ export class Browser implements TabHost, FloatingHost {
     this.mru = this.mru.filter((m) => m !== id)
     if (loc.kind === 'today') {
       loc.list.splice(loc.index, 1)
-      this.archive(found.item, space.id)
-      this.closed.push({ url: found.item.url, title: found.item.title, spaceId: space.id })
-    } else {
-      // Pinned tabs and favorites stay in the sidebar; closing unloads them and resets to their saved URL.
-      if (found.item.savedUrl) found.item.url = found.item.savedUrl
-    }
+      this.archiveClosed(found.item, space.id)
+    } else if (found.item.savedUrl) found.item.url = found.item.savedUrl
     if (wasActive) {
       space.activeItemId = this.nextActiveAfter(space, id, partner)
       if (space.activeItemId) return this.activate(space.activeItemId)
     }
-    this.layout()
-    this.changed()
+    this.relayout()
   }
 
   private archive(item: Pick<TabItem, 'url' | 'title' | 'favicon'>, spaceId: ID): void {
     if (!/^https?:/.test(item.url)) return
     this.state.archive.unshift({ id: newId(), url: item.url, title: item.title, favicon: item.favicon, spaceId, archivedAt: Date.now() })
     if (this.state.archive.length > MAX_ARCHIVE) this.state.archive.length = MAX_ARCHIVE
+  }
+
+  private archiveClosed(item: Pick<TabItem, 'url' | 'title' | 'favicon'>, spaceId: ID): void {
+    this.archive(item, spaceId)
+    this.closed.push({ url: item.url, title: item.title, spaceId })
+  }
+
+  private shownOrPlaying(id: ID): boolean {
+    return inAnyView(this.state.windows, id) || (this.live.get(id)?.info().audible ?? false)
   }
 
   private autoArchive(): void {
@@ -1320,9 +1251,7 @@ export class Browser implements TabHost, FloatingHost {
     for (const space of this.state.spaces) {
       const keep: TabItem[] = []
       for (const t of space.today) {
-        // Shown in a window (selected or in a split), or playing sound.
-        const busy = inAnyView(this.state.windows, t.id) || (this.live.get(t.id)?.info().audible ?? false)
-        if (!busy && t.lastActive < cutoff) {
+        if (!this.shownOrPlaying(t.id) && t.lastActive < cutoff) {
           this.archive(t, space.id)
           this.dropLive(t.id)
           any = true
@@ -1351,16 +1280,14 @@ export class Browser implements TabHost, FloatingHost {
   clearToday(): void {
     const space = this.space
     for (const t of [...space.today]) {
-      this.archive(t, space.id)
+      this.archiveClosed(t, space.id)
       this.removeFromSplits(space, t.id)
       this.dropLive(t.id)
-      this.closed.push({ url: t.url, title: t.title, spaceId: space.id })
     }
     const wasToday = space.today.some((t) => t.id === space.activeItemId)
     space.today = []
     if (wasToday) space.activeItemId = undefined
-    this.layout()
-    this.changed()
+    this.relayout()
   }
 
   reopenClosed(): void {
@@ -1426,7 +1353,6 @@ export class Browser implements TabHost, FloatingHost {
       target = folder ? folder.children : space.pinned
     }
     if (isFolder && to.section !== 'pinned') return
-    // A split is one row in the sidebar, so its tabs in this list move together (not into Favorites).
     const split = isFolder || to.section === 'favorites' ? undefined : this.splitOf(space, id)
     const ids = split ? paneIds(split.root) : [id]
     const group = fromList.filter((n) => ids.includes(n.id))
@@ -1449,8 +1375,7 @@ export class Browser implements TabHost, FloatingHost {
         if (space.activeItemId === n.id) this.activate(n.id)
       }
     }
-    this.layout()
-    this.changed()
+    this.relayout()
   }
 
   moveToSpace(id: ID, spaceId: ID): void {
@@ -1468,10 +1393,7 @@ export class Browser implements TabHost, FloatingHost {
     if (from.activeItemId === id) {
       from.activeItemId = undefined
       this.activate(id)
-    } else {
-      this.layout()
-      this.changed()
-    }
+    } else this.relayout()
   }
 
   splitWith(id: ID, at?: SplitAt): void {
@@ -1495,11 +1417,7 @@ export class Browser implements TabHost, FloatingHost {
     this.tourEvent('split')
   }
 
-  /**
-   * A tab dragged onto `side` of `target` (a sidebar row or a page): both show as a split, the
-   * dragged tab on that side. A page already in a split gets the tab next to it; a tab already in
-   * the split moves. Does nothing when the split is full (four tabs).
-   */
+  /** Shows `id` on `side` of `target`, joining or moving within target's split; does nothing when that split is full. */
   placeInSplit(id: ID, target: ID, side: Side): void {
     const space = this.space
     const visible = new Set(spaceItems(this.state, space).map((i) => i.id))
@@ -1507,12 +1425,7 @@ export class Browser implements TabHost, FloatingHost {
     const split = this.splitOf(space, target)
     const root = placePane(split?.root, target, id, side)
     if (!root) return
-    // Leaving another split, the tab can't take that split with it.
-    space.splits = space.splits.flatMap((sp) => {
-      if (sp === split || !paneIds(sp.root).includes(id)) return [sp]
-      const rest = removePane(sp.root, id)
-      return rest ? [{ ...sp, root: rest }] : []
-    })
+    this.removeFromSplits(space, id, split)
     if (split) split.root = root
     else space.splits.push({ id: newId(), root })
     this.gatherSplit(space, id)
@@ -1520,12 +1433,7 @@ export class Browser implements TabHost, FloatingHost {
     this.tourEvent('split')
   }
 
-  /**
-   * After a key-down the browser handles (every shortcut, Ctrl+Tab included), Chromium drops that
-   * view's key-ups until its next key-down. The overlay has the keyboard while the switcher shows,
-   * and once it had handled one shortcut, releasing Ctrl never reached handleInput: the switcher
-   * stayed open. A Ctrl key-down, sent once this Ctrl+Tab is done, lets the release through.
-   */
+  /** Chromium drops a view's key-ups after a key-down the browser handled, until its next key-down: send one so releasing Ctrl gets through. */
   private letSwitcherSeeRelease(): void {
     const w = this.cur
     const overlay = w.main.overlay.webContents
@@ -1534,10 +1442,6 @@ export class Browser implements TabHost, FloatingHost {
     })
   }
 
-  /**
-   * Puts the tabs of the split holding `id` next to each other in each sidebar list, where the
-   * first of them is: the sidebar shows them as one row, like Arc.
-   */
   private gatherSplit(space: Space, id: ID): void {
     const split = this.splitOf(space, id)
     if (!split) return
@@ -1547,26 +1451,21 @@ export class Browser implements TabHost, FloatingHost {
     for (const node of walkPinned(space.pinned)) if (node.kind === 'folder') node.children = gather(node.children, ids)
   }
 
-  /** Move Left/Right (or Up/Down) on a pane's split menu. */
   moveInSplit(id: ID, delta: -1 | 1): void {
     const split = this.splitOf(this.space, id)
     const root = split && movePane(split.root, id, delta)
     if (!split || !root) return
     split.root = root
-    this.layout()
-    this.changed()
+    this.relayout()
   }
 
-  /** Convert to Vertical / Horizontal Split View on a pane's split menu. */
   flipSplit(id: ID): void {
     const split = this.splitOf(this.space, id)
     if (!split) return
     split.root = flipSplit(split.root)
-    this.layout()
-    this.changed()
+    this.relayout()
   }
 
-  /** Separate Tab from Split: the tab shows on its own; the others stay a split (if two or more are left). */
   separateFromSplit(id: ID): void {
     const space = this.space
     if (!this.splitOf(space, id)) return
@@ -1574,13 +1473,11 @@ export class Browser implements TabHost, FloatingHost {
     this.activate(id)
   }
 
-  /** A sidebar tab drag starts (`id`) or ends: the page area shows split drop zones meanwhile. */
   setTabDrag(id: ID | undefined): void {
     if (id === this.cur.tabDrag) return
     const kind = this.window.overlayMode.kind
     if (id) {
-      // Drop zones only over a plain page or beside the peeking sidebar, not under panels or Peek.
-      if (!this.pageInFront() && kind !== 'sidebar') return
+      if (this.panelInFront()) return
       this.cur.tabDrag = id
       this.setOverlay(kind === 'sidebar' ? { kind: 'sidebar' } : { kind: 'split-drop' }, false)
     } else {
@@ -1595,8 +1492,7 @@ export class Browser implements TabHost, FloatingHost {
     const space = this.space
     const target = id ?? space.activeItemId
     space.splits = space.splits.filter((sp) => !target || !paneIds(sp.root).includes(target))
-    this.layout()
-    this.changed()
+    this.relayout()
   }
 
   switchSpace(id: ID): void {
@@ -1607,8 +1503,7 @@ export class Browser implements TabHost, FloatingHost {
     if (space.activeItemId && findItem(this.state, space.activeItemId)) this.activate(space.activeItemId)
     else {
       space.activeItemId = undefined
-      this.layout()
-      this.changed()
+      this.relayout()
     }
   }
 
@@ -1648,8 +1543,6 @@ export class Browser implements TabHost, FloatingHost {
     else this.changed()
   }
 
-  // ---------------------------------------------------------------- input
-
   handleInput(e: Event, input: Input): void {
     if (this.cur.switcher && input.type === 'keyUp' && (input.key === 'Control' || input.key === 'Meta')) {
       const target = this.cur.switcher.order[this.cur.switcher.index]
@@ -1658,13 +1551,10 @@ export class Browser implements TabHost, FloatingHost {
       if (target) this.activate(target)
       return
     }
-    if (input.type === 'keyDown' && input.key === 'Escape') {
-      // A floating tour card leaves Esc to the page; it has its own close button.
-      if (!this.pageInFront() && this.window.overlayMode.kind !== 'sidebar') {
-        e.preventDefault()
-        this.setOverlay({ kind: 'none' })
-        return
-      }
+    if (input.type === 'keyDown' && input.key === 'Escape' && this.panelInFront()) {
+      e.preventDefault()
+      this.setOverlay({ kind: 'none' })
+      return
     }
     const cmd = commandForInput(input, isMac)
     if (!cmd) return
@@ -1673,6 +1563,8 @@ export class Browser implements TabHost, FloatingHost {
   }
 
   runCommand(cmd: CommandId | string): void {
+    const action = Object.hasOwn(COMMAND_ACTIONS, cmd) && COMMAND_ACTIONS[cmd as CommandId]
+    if (action) return void this.dispatch(action)
     const tab = this.activeTab()
     const space = this.space
     const num = /^(space|tab)(\d)$/.exec(cmd)
@@ -1689,20 +1581,10 @@ export class Browser implements TabHost, FloatingHost {
       return
     }
     switch (cmd as CommandId) {
-      case 'newTab':
-        return this.setOverlay({ kind: 'command', target: 'tab' })
       case 'editUrl':
         // The command bar replaces Peek; edit the Peek page's URL as a real tab.
         if (this.cur.peek) this.expandPeek()
         return this.setOverlay({ kind: 'command', target: 'current', editCurrent: true, initial: tab?.wc.getURL() ?? '' })
-      case 'toggleSidebar':
-        return void this.dispatch({ type: 'toggleSidebar' })
-      case 'copyUrl':
-        return void this.dispatch({ type: 'copyUrl' })
-      case 'copyUrlMarkdown':
-        return void this.dispatch({ type: 'copyUrl', markdown: true })
-      case 'littleArc':
-        return void this.openLittle()
       case 'newWindow':
         return this.openNewWindow()
       case 'newIncognitoWindow':
@@ -1711,13 +1593,9 @@ export class Browser implements TabHost, FloatingHost {
         if (this.cur.peek) return this.closePeek()
         if (space.activeItemId) this.close(space.activeItemId)
         return
-      case 'reopenClosed':
-        return this.reopenClosed()
       case 'togglePin':
         if (space.activeItemId) this.togglePin(space.activeItemId)
         return
-      case 'clearToday':
-        return this.clearToday()
       case 'nextTab':
       case 'prevTab': {
         const items = spaceItems(this.state, space)
@@ -1743,62 +1621,13 @@ export class Browser implements TabHost, FloatingHost {
         this.letSwitcherSeeRelease()
         return
       }
-      case 'nextSpace':
-      case 'prevSpace':
-        return void this.dispatch({ type: 'switchSpaceRelative', delta: cmd === 'nextSpace' ? 1 : -1 })
-      case 'splitAdd':
-        return this.setOverlay({ kind: 'command', target: 'split' })
-      case 'splitClose':
-        return this.unsplit()
-      case 'find':
-        return this.setOverlay({ kind: 'find' })
       case 'findNext':
       case 'findPrev':
         this.window.sendToOverlay(IPC.find, { step: cmd === 'findNext' ? 1 : -1 })
         return
-      case 'history':
-        return this.setOverlay({ kind: 'library', tab: 'history' })
-      case 'downloads':
-        return this.setOverlay({ kind: 'library', tab: 'downloads' })
-      case 'library':
-        return this.setOverlay({ kind: 'library', tab: 'archive' })
-      case 'devtools':
-        return void this.dispatch({ type: 'devtools' })
-      case 'reload':
-        return void this.dispatch({ type: 'reload' })
-      case 'hardReload':
-        return void this.dispatch({ type: 'reload', hard: true })
-      case 'stop':
-        return void tab?.wc.stop()
-      case 'zoomIn':
-        return void this.dispatch({ type: 'zoom', delta: 1 })
-      case 'zoomOut':
-        return void this.dispatch({ type: 'zoom', delta: -1 })
-      case 'zoomReset':
-        return void this.dispatch({ type: 'zoom', delta: 0 })
-      case 'back':
-        return void (tab?.wc.navigationHistory.canGoBack() && tab.wc.navigationHistory.goBack())
-      case 'forward':
-        return void (tab?.wc.navigationHistory.canGoForward() && tab.wc.navigationHistory.goForward())
-      case 'settings':
-        return this.setOverlay({ kind: 'settings' })
-      case 'newSpace':
-        return this.setOverlay({ kind: 'space-editor' })
-      case 'newFolder':
-        return void this.dispatch({ type: 'newFolder' })
       case 'duplicate':
         if (tab) this.newTab(tab.wc.getURL())
         return
-      case 'openInChrome':
-        return void this.dispatch({ type: 'openInChrome' })
-      case 'importArc':
-        return void this.dispatch({ type: 'import', source: 'arc' })
-      case 'importZen':
-        return void this.dispatch({ type: 'import', source: 'zen' })
-      case 'importChrome':
-        return void this.dispatch({ type: 'import', source: 'chrome' })
-      case 'extensions':
-        return void this.dispatch({ type: 'extensionsStore' })
       case 'focusPage':
         return void tab?.wc.focus()
       case 'setDefaultBrowser':
@@ -1807,8 +1636,6 @@ export class Browser implements TabHost, FloatingHost {
         return void this.updater.check(true)
       case 'installUpdate':
         return void this.updater.apply()
-      case 'tour':
-        return this.setOverlay({ kind: 'tour', step: 'welcome' })
       case 'whatsNew':
         return this.setOverlay({ kind: 'whats-new', releases: recentChanges(CHANGELOG, app.getVersion()), spotlights: recentSpotlights(SPOTLIGHTS) })
       case 'floatingPlayerDemo':
@@ -1816,11 +1643,13 @@ export class Browser implements TabHost, FloatingHost {
     }
   }
 
-  // ---------------------------------------------------------------- actions
+  private tabFor(a: Action): LiveTab | undefined {
+    const paneBarAction = a.type === 'back' || a.type === 'forward' || a.type === 'reload' || a.type === 'stop' || a.type === 'copyUrl'
+    return paneBarAction && a.id ? this.live.get(a.id) : this.activeTab()
+  }
 
   async dispatch(a: Action): Promise<void> {
-    // A split pane's bar acts on its own tab; everything else on the active one.
-    const tab = 'id' in a && a.id && (a.type === 'back' || a.type === 'forward' || a.type === 'reload' || a.type === 'stop' || a.type === 'copyUrl') ? this.live.get(a.id) : this.activeTab()
+    const tab = this.tabFor(a)
     const space = this.space
     switch (a.type) {
       case 'activate':
@@ -1866,8 +1695,7 @@ export class Browser implements TabHost, FloatingHost {
         this.dropLive(a.id)
         if (item?.savedUrl) item.url = item.savedUrl
         if (space.activeItemId === a.id) space.activeItemId = this.nextActiveAfter(space, a.id)
-        this.layout()
-        return this.changed()
+        return this.relayout()
       }
       case 'mute': {
         const t = this.live.get(a.id)
@@ -1986,8 +1814,7 @@ export class Browser implements TabHost, FloatingHost {
         if (!group || a.sizes.length !== group.children.length) return
         const sum = a.sizes.reduce((x, y) => x + y, 0)
         group.sizes = a.sizes.map((x) => Math.max(0.1, x / sum))
-        this.layout()
-        return this.changed()
+        return this.relayout()
       }
       case 'toggleSidebar': {
         const s = this.state.settings
@@ -1995,14 +1822,12 @@ export class Browser implements TabHost, FloatingHost {
         this.cur.sidebarPeek = false
         if (this.window.overlayMode.kind === 'sidebar') this.window.setOverlay({ kind: 'none' }, undefined)
         this.window.setTrafficLights(s.sidebarVisible)
-        this.layout()
-        this.changed()
+        this.relayout()
         if (this.tour && this.window.overlayMode.kind === 'none') this.setOverlay({ kind: 'tour', step: this.tour }, false)
         return this.tourEvent('toggleSidebar')
       }
       case 'sidebarPeek': {
-        if (this.state.settings.sidebarVisible || this.cur.sidebarPeek === a.show) return
-        if (!this.pageInFront() && this.window.overlayMode.kind !== 'sidebar') return
+        if (this.state.settings.sidebarVisible || this.cur.sidebarPeek === a.show || this.panelInFront()) return
         this.cur.sidebarPeek = a.show
         return this.setOverlay(a.show ? { kind: 'sidebar' } : { kind: 'none' }, false)
       }
@@ -2012,13 +1837,12 @@ export class Browser implements TabHost, FloatingHost {
         this.tour = undefined
         return this.setOverlay({ kind: 'none' })
       case 'settings': {
-        Object.assign(this.state.settings, settingsPatch(this.state.settings, a.patch))
+        Object.assign(this.state.settings, validSettingsPatch(this.state.settings, a.patch))
         this.syncAdblock()
         if (a.patch.theme) nativeTheme.themeSource = a.patch.theme
         if (a.patch.sidebarVisible !== undefined) this.window.setTrafficLights(a.patch.sidebarVisible)
         if (a.patch.autoUpdate !== undefined) this.updater.sync()
-        this.layout()
-        return this.changed()
+        return this.relayout()
       }
       case 'searchEngine':
         if (!Object.hasOwn(SEARCH_ENGINES, a.engine)) return
@@ -2113,12 +1937,11 @@ export class Browser implements TabHost, FloatingHost {
       }
       case 'sitePermission': {
         if (!this.store.profile(a.profileId) || typeof a.origin !== 'string' || typeof a.key !== 'string') return
-        // Any stored row can be forgotten; only a web or extension origin can be allowed or blocked.
-        if (a.setting !== 'reset' && (permissionOrigin(a.origin) !== a.origin || !(PERMISSION_KEYS as readonly string[]).includes(a.key) || !['allow', 'block'].includes(a.setting))) return
+        const settable = permissionOrigin(a.origin) === a.origin && (PERMISSION_KEYS as readonly string[]).includes(a.key) && ['allow', 'block'].includes(a.setting)
+        if (a.setting !== 'reset' && !settable) return
         const decisions = this.profiles.decisions(a.profileId)
         if (a.setting === 'reset') decisions.reset(a.origin, a.key)
         else decisions.set(a.origin, a.key, a.setting)
-        // A question waiting on this site may be answered now.
         this.profiles.permissionQueue.settle()
         return this.emitSoon()
       }
@@ -2134,8 +1957,6 @@ export class Browser implements TabHost, FloatingHost {
         return
     }
   }
-
-  // ---------------------------------------------------------------- TabHost
 
   onTabChanged(tab: LiveTab, change: { url?: string; title?: string; favicon?: string; navigated?: boolean }): void {
     const item = findItem(this.state, tab.itemId)?.item
@@ -2159,7 +1980,7 @@ export class Browser implements TabHost, FloatingHost {
     }
     if (persist) this.store.save()
     if (this.floating.tabId === tab.itemId) {
-      // Another page loaded: its video is gone. Same-page navigations (YouTube's next video) keep it.
+      // Same-page navigations (YouTube's next video) aren't `navigated` and keep the video.
       if (change.navigated) this.setMedia(closed(this.media, tab.itemId))
       else this.floating.update()
     }
@@ -2169,7 +1990,6 @@ export class Browser implements TabHost, FloatingHost {
   onTabDestroyed(tab: LiveTab): void {
     if (this.live.get(tab.itemId) !== tab) return
     this.mediaGone(tab.itemId)
-    // Destroyed without going through close(): the page closed itself.
     const found = findItem(this.state, tab.itemId)
     if (found?.loc.kind === 'today') this.close(tab.itemId)
     else {
@@ -2179,7 +1999,6 @@ export class Browser implements TabHost, FloatingHost {
     }
   }
 
-  /** History is best-effort: a failing write must never take down the main process. */
   private recordHistory(tab: LiveTab, write: (h: ProfileRuntime['history']) => void): void {
     if (this.quitting) return
     try {
@@ -2219,7 +2038,7 @@ export class Browser implements TabHost, FloatingHost {
       this.setOverlay(notice, false)
       const w = this.cur
       setTimeout(() => {
-        if (w.open && this.wins.includes(w)) this.on(w, () => this.window.overlayMode === notice && this.setOverlay({ kind: 'none' }, false))
+        if (w.open && this.wins.includes(w)) this.inWin(w, () => this.window.overlayMode === notice && this.setOverlay({ kind: 'none' }, false))
       }, 3500)
     } else if (!on && this.window.overlayMode.kind === 'notice') this.setOverlay({ kind: 'none' }, false)
   }
@@ -2229,7 +2048,6 @@ export class Browser implements TabHost, FloatingHost {
   }
 
   adoptOpenedPage(opener: LiveTab, options: BrowserWindowConstructorOptions | undefined, disposition: OpenDisposition, url: string): WebContents {
-    // The new tab opens in the opener's window (the current one for a Little Window page).
     this.use(this.winOf(opener))
     const openerItem = findItem(this.state, opener.itemId)
     const spaceId = openerItem && openerItem.loc.kind !== 'favorite' ? openerItem.loc.spaceId : this.space.id
@@ -2257,8 +2075,6 @@ export class Browser implements TabHost, FloatingHost {
     buildContextMenu(this, tab, params).popup({ window: this.window.win })
   }
 
-  // ---------------------------------------------------------------- Little Window
-
   openLittle(url?: string, profileId = this.littleProfile(url), bounds?: Rectangle): LittleWindow {
     const little = new LittleWindow(this, this.profiles.get(profileId), url, bounds)
     this.tourEvent('littleArc')
@@ -2267,14 +2083,12 @@ export class Browser implements TabHost, FloatingHost {
     return little
   }
 
-  /** The profile a Little Window page opens in: the one picked for the site, the Settings choice, else the active space's. */
   private littleProfile(url?: string): ID {
     const known = (id: ID | undefined) => (id && this.store.profile(id) ? id : undefined)
     const s = this.state.settings
     return known(this.state.littleArc.profileByHost[hostOf(url ?? '')]) ?? known(s.littleArcProfileId) ?? this.space.profileId
   }
 
-  /** Reopens a Little Window page with another profile (the toolbar's profile chip) and remembers that for the site. */
   switchLittleProfile(little: LittleWindow, profileId: ID): void {
     const url = little.url
     const host = hostOf(url)
@@ -2284,17 +2098,13 @@ export class Browser implements TabHost, FloatingHost {
     little.discard()
   }
 
-  /** A closed Little Window's page goes to the Archive and can be reopened, in the space "Open in" would use. */
   archiveLittle(profileId: ID, page: Pick<TabItem, 'url' | 'title' | 'favicon'>): void {
-    const space = this.littleTargetSpace(profileId)
-    this.archive(page, space.id)
-    this.closed.push({ url: page.url, title: page.title, spaceId: space.id })
+    this.archiveClosed(page, this.littleTargetSpace(profileId).id)
     this.changed()
     // Little Windows close after the state was written for quitting.
     if (this.quitting) this.store.flush()
   }
 
-  /** Little Windows left in the background for the time picked in Settings close, like Arc's. */
   private closeIdleLittles(): void {
     const now = Date.now()
     for (const l of this.openLittles()) if (l.expired(now, this.state.settings.littleCloseAfterHours)) l.win.close()
@@ -2305,28 +2115,19 @@ export class Browser implements TabHost, FloatingHost {
     this.store.save()
   }
 
-  /** The space "Open in" uses: the active space when it has the window's profile, else the first space that does. */
   littleTargetSpace(profileId: ID): Space {
     if (this.space.profileId === profileId) return this.space
     return this.state.spaces.find((s) => s.profileId === profileId) ?? this.space
   }
 
-  /** Moves a Little Window page into the main window as a Today tab, keeping its state. */
   adoptLittle(little: LittleWindow, spaceId?: ID): void {
     this.ensureWindow()
     const space = (spaceId && this.store.space(spaceId)) || this.littleTargetSpace(little.profile.id)
     const tab = little.release()
     this.extensions.moveTab(tab, this.window.win)
-    const item: TabItem = { id: newId(), url: tab.wc.getURL(), title: tab.wc.getTitle(), favicon: tab.favicon, lastActive: Date.now() }
-    space.today.unshift(item)
     tab.host = this
-    tab.itemId = item.id
-    this.live.set(item.id, tab)
-    this.activate(item.id)
-    const win = this.window.win
-    if (win.isMinimized()) win.restore()
-    win.show()
-    win.focus()
+    this.activate(this.takeInAsTodayTab(tab, space))
+    this.focusWindow()
   }
 
   /** Links opened from other apps. */
@@ -2342,22 +2143,14 @@ export class Browser implements TabHost, FloatingHost {
     }
   }
 
-  // ---------------------------------------------------------------- IPC
-
-  /** The main window whose sidebar or overlay is `wc`. */
   private winFor(wc: WebContents): Win | undefined {
     return this.wins.find((w) => w.open && (w.main.ui === wc || w.main.overlay.webContents === wc))
   }
 
-  /** Whether one of this controller's Little Windows is `wc`. */
   private ownsLittle(wc: WebContents): boolean {
     return this.openLittles().some((l) => l.win.webContents === wc)
   }
 
-  /**
-   * Registered once, by the main controller. Each call goes to the controller of the window that
-   * sent it; a main window's call makes that window the current one.
-   */
   private registerIpc(): void {
     const of = (e: IpcMainInvokeEvent): Browser => {
       for (const b of Browser.all) {
@@ -2391,10 +2184,7 @@ export class Browser implements TabHost, FloatingHost {
 
   private pendingReloads = new Map<LiveTab, NodeJS.Timeout>()
 
-  /**
-   * Reloads once after rapid repeated requests (e.g. double-clicking the shield). Overlapping
-   * reloads while the ad blocker rewrites requests can crash Electron's browser process.
-   */
+  /** Coalesces rapid reloads (double-clicking the shield): overlapping ones while the ad blocker rewrites requests can crash Electron. */
   private reloadSoon(tab: LiveTab): void {
     clearTimeout(this.pendingReloads.get(tab))
     this.pendingReloads.set(
@@ -2413,8 +2203,8 @@ export class Browser implements TabHost, FloatingHost {
     this.adblock.allowlist = new Set(this.state.settings.adblockAllowlist)
   }
 
-  /** Windows doesn't let apps claim the default themselves; macOS asks the user to confirm. */
   makeDefaultBrowser(): void {
+    // Windows doesn't let apps claim the default themselves.
     if (process.platform === 'win32') {
       void shell.openExternal('ms-settings:defaultapps?registeredAppUser=YARC')
       if (!app.isPackaged) this.toast('Install YARC first, then pick it in Default apps')
@@ -2432,12 +2222,10 @@ export class Browser implements TabHost, FloatingHost {
     this.profiles.closeAll()
   }
 
-  /** On macOS the app outlives its windows; reopen one before using it. */
   ensureWindow(): void {
     if (!this.cur?.open) this.openWindow()
   }
 
-  /** Brings the current (last focused) window to the front, or reopens one. */
   focusWindow(): void {
     if (!this.cur?.open) return void this.openWindow()
     const win = this.cur.main.win
@@ -2466,8 +2254,7 @@ const ENUMS: Partial<Record<keyof Settings, readonly string[]>> = {
   searchEngine: Object.keys(SEARCH_ENGINES)
 }
 
-/** The part of a Settings change from the UI that fits: known keys, each with the type (and value set) it has now. */
-function settingsPatch(current: Settings, patch: unknown): Partial<Settings> {
+function validSettingsPatch(current: Settings, patch: unknown): Partial<Settings> {
   const clean: Record<string, unknown> = {}
   if (!patch || typeof patch !== 'object') return clean
   for (const [key, value] of Object.entries(patch)) {
@@ -2486,7 +2273,10 @@ function settingsPatch(current: Settings, patch: unknown): Partial<Settings> {
   return clean as Partial<Settings>
 }
 
-/** The start of an id: enough to tell windows apart in the log. */
 function short(id: ID): string {
   return id.slice(0, 8)
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
 }

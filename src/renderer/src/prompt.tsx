@@ -1,6 +1,3 @@
-// The site permission prompt: "Allow meet.google.com to access your camera?"
-// with Not Now / Allow, in a popover pointing at the URL field. The main process sizes and places
-// this view (prompt-view.ts); the page only draws the popover and reports how tall it came out.
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { promptText, siteName, type PermissionPrompt } from '../../shared/permissions'
@@ -9,19 +6,20 @@ import { Icon } from './icons'
 import './styles.css'
 import './prompt.css'
 
-/** Room around the popover for its shadow and arrow; matches MARGIN in prompt-view.ts. */
+/** Room for the popover's shadow and arrow; matches MARGIN in prompt-view.ts. */
 const MARGIN = 16
+const ARM_DELAY_MS = 600
 
 function App() {
   const [prompt, setPrompt] = useState<PermissionPrompt | null>(null)
-  // Allow starts disabled for a moment, so a click meant for the page can't land on it (main ignores those too).
+  // Allow starts disabled, so a click meant for the page can't land on it.
   const [armed, setArmed] = useState(false)
   const box = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     setArmed(false)
     if (!prompt) return
-    const timer = setTimeout(() => setArmed(true), 600)
+    const timer = setTimeout(() => setArmed(true), ARM_DELAY_MS)
     return () => clearTimeout(timer)
   }, [prompt?.id])
 

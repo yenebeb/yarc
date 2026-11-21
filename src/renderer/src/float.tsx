@@ -1,21 +1,16 @@
-// The floating player's controls, drawn over the video (floating-player.ts puts the page under
-// this view). They show while the pointer is over the player or the video is paused. Drag anywhere
-// to move the player; double-click goes back to the tab.
 import { useEffect, useRef, useState, type MouseEvent, type PointerEvent } from 'react'
 import { createRoot } from 'react-dom/client'
 import type { FloatOp, FloatState } from '../../shared/ipc'
-import { arc, displayHost } from './api'
+import { arc, cx, displayHost } from './api'
 import { Icon } from './icons'
 import './float.css'
 
-/** How far the pointer moves before a press becomes a drag (a double-click's presses don't move). */
+/** So a double-click's presses don't move the player. */
 const DRAG_SLOP = 3
-/** Wide enough for the skip buttons beside play/pause. */
-const SKIP_WIDTH = 280
+const MIN_WIDTH_FOR_SKIP_BUTTONS = 280
 
 const send = (op: FloatOp) => void arc.float(op)
 
-/** Buttons work on their own; a press on them never drags or double-clicks the player. */
 const onButton = (e: { target: EventTarget }) => e.target instanceof Element && !!e.target.closest('button')
 
 function useWidth(): number {
@@ -81,7 +76,7 @@ function App() {
   const playing = s?.playing ?? true
   return (
     <div
-      className={`float${playing ? '' : ' paused'}`}
+      className={cx('float', !playing && 'paused')}
       onPointerDown={down}
       onPointerMove={move}
       onPointerUp={up}
@@ -103,7 +98,7 @@ function App() {
         </button>
       </div>
       <div className="float-middle">
-        {width >= SKIP_WIDTH && (
+        {width >= MIN_WIDTH_FOR_SKIP_BUTTONS && (
           <button className="float-btn float-skip" onClick={() => send({ kind: 'skip', seconds: -15 })} title="Back 15 Seconds">
             <Icon name="skipBack" size={20} />
             <span>15</span>
@@ -112,7 +107,7 @@ function App() {
         <button className="float-btn float-play" onClick={() => send({ kind: 'toggle' })} title={playing ? 'Pause' : 'Play'}>
           <Icon name={playing ? 'pause' : 'play'} size={22} />
         </button>
-        {width >= SKIP_WIDTH && (
+        {width >= MIN_WIDTH_FOR_SKIP_BUTTONS && (
           <button className="float-btn float-skip" onClick={() => send({ kind: 'skip', seconds: 15 })} title="Ahead 15 Seconds">
             <Icon name="skipAhead" size={20} />
             <span>15</span>

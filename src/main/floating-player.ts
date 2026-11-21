@@ -1,7 +1,3 @@
-// The floating player: a playing video keeps going in a small window of its own, in front of every
-// app, after you leave its tab (docs/arc-reference.md, "Mini Player"). The tab's own page moves
-// into the window, its video lifted into the page's top layer to fill it (media-page.ts), with
-// YARC's controls on top. Drag it anywhere, resize it from its edges; double-click goes back to the tab.
 import { BaseWindow, WebContentsView, screen, type BaseWindowConstructorOptions, type Rectangle } from 'electron'
 import { IPC, type FloatOp, type FloatState } from '../shared/ipc'
 import type { ID } from '../shared/types'
@@ -14,15 +10,11 @@ import { loadRenderer, uiWebPreferences } from './window'
 const mac = process.platform === 'darwin'
 
 export interface FloatingHost {
-  /** Double-click or the back button: show the tab again, in its space. */
   backToTab(id: ID): void
-  /** –: the video keeps playing, as a sidebar card. */
   minimizeFloating(): void
-  /** ✕: the video pauses; its tab keeps a card. */
   closeFloating(): void
 }
 
-/** Where the player opens the first time: by this browser window, on the sidebar's side. */
 export interface FloatAnchor {
   win: Rectangle
   sidebarRight: boolean
@@ -36,19 +28,15 @@ export class FloatingPlayer {
   private tab: LiveTab | undefined
   private cssKey: string | undefined
   private ready = false
-  /** Where the user last left the player, for the next video. */
-  private last: Rectangle | undefined
+  private lastBounds: Rectangle | undefined
   private drag: { dx: number; dy: number; width: number; height: number } | undefined
-  /** Counts opens, so a slow one that lost the race gives up. */
-  private opening = 0
-  /** Lifts the video again if the page put it back (media-page.ts). */
+  private latestOpen = 0
   private keepLifted: ReturnType<typeof setInterval> | undefined
 
   constructor(private host: FloatingHost) {
     FloatingPlayer.registerIpc()
   }
 
-  /** The tab whose video floats. */
   get tabId(): ID | undefined {
     return this.tab?.itemId
   }
@@ -61,12 +49,9 @@ export class FloatingPlayer {
     return this.win && !this.win.isDestroyed() ? this.win : undefined
   }
 
-  /**
-   * Floats `tab`'s playing video. False when there's none (it stopped, or the page won't allow it);
-   * `wanted` is asked again once the page answered, in case the user went back to the tab meanwhile.
-   */
+  /** `wanted` is asked again once the page answered, in case the user went back to the tab meanwhile. */
   async open(tab: LiveTab, anchor: FloatAnchor, wanted: () => boolean): Promise<boolean> {
-    const attempt = ++this.opening
+    const attempt = ++this.latestOpen
     const wc = tab.wc
     let key: string | undefined
     try {
@@ -75,12 +60,11 @@ export class FloatingPlayer {
       return false
     }
     const size = await liftVideo(wc)
-    if (!size || attempt !== this.opening || !wanted() || wc.isDestroyed()) {
+    if (!size || attempt !== this.latestOpen || !wanted() || wc.isDestroyed()) {
       void lowerVideo(wc)
       if (!wc.isDestroyed()) void wc.removeInsertedCSS(key).catch(() => {})
       return false
     }
-    // Only now, so a video that can't float leaves the one floating before alone.
     this.release()
     this.tab = tab
     this.cssKey = key
@@ -91,7 +75,6 @@ export class FloatingPlayer {
     return true
   }
 
-  /** Takes the page out of the player, its video back in place, and closes the player. */
   release(): LiveTab | undefined {
     const tab = this.tab
     this.tab = undefined
@@ -115,7 +98,6 @@ export class FloatingPlayer {
     return tab
   }
 
-  /** The tab's title or playing state changed: the controls follow. */
   update(): void {
     const tab = this.tab
     if (!tab || !this.ready || !this.controls || this.controls.webContents.isDestroyed()) return
@@ -126,8 +108,8 @@ export class FloatingPlayer {
 
   private show(anchor: FloatAnchor, size: VideoSize): void {
     const ratio = videoRatio(size.width, size.height)
-    const area = screen.getDisplayMatching(this.last ?? anchor.win).workArea
-    const bounds = floatingBounds({ win: anchor.win, area, ratio, sidebarRight: anchor.sidebarRight, last: this.last })
+    const area = screen.getDisplayMatching(this.lastBounds ?? anchor.win).workArea
+    const bounds = floatingBounds({ win: anchor.win, area, ratio, sidebarRight: anchor.sidebarRight, last: this.lastBounds })
     const options: BaseWindowConstructorOptions = {
       ...bounds,
       show: false,
@@ -186,7 +168,7 @@ export class FloatingPlayer {
 
   private remember(): void {
     const win = this.window
-    if (win) this.last = win.getBounds()
+    if (win) this.lastBounds = win.getBounds()
   }
 
   private op(op: FloatOp): void {
@@ -213,7 +195,7 @@ export class FloatingPlayer {
     }
   }
 
-  /** Moves the player with the pointer: x, y are the pointer's screen position. */
+  /** x, y: the pointer's screen position. */
   private dragTo(phase: 'start' | 'move' | 'end', x: number, y: number): void {
     const win = this.window
     if (!win) return

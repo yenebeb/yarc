@@ -1,6 +1,4 @@
-// Peek: a page floating over the current tab, like Arc's. Links from pinned tabs and favorites to
-// other sites open here, so the pinned page stays put. Close it to go back, or expand it into a tab.
-import type { BrowserWindowConstructorOptions, ContextMenuParams, Event, Input, Result, WebContents } from 'electron'
+import type { BrowserWindowConstructorOptions, ContextMenuParams, Event, Input, Result } from 'electron'
 import { getDomain } from 'tldts-experimental'
 import { matches } from '../shared/keymap'
 import type { Browser } from './browser'
@@ -21,7 +19,6 @@ export class Peek implements TabHost {
     browser.extensions.addTab(this.tab, browser.window.win)
   }
 
-  /** Hands the page to the browser, which gives it a place in the sidebar. */
   release(): LiveTab {
     this.done = true
     this.tab.host = this.browser
@@ -33,10 +30,11 @@ export class Peek implements TabHost {
     this.tab.destroy()
   }
 
-  // TabHost
-  onTabChanged(tab: LiveTab, change: { url?: string; navigated?: boolean }): void {
-    this.browser.onPeekChanged(tab, change)
-  }
+  onTabChanged = (tab: LiveTab, change: { url?: string; navigated?: boolean }) => this.browser.onPeekChanged(tab, change)
+  onFoundInPage = (tab: LiveTab, result: Result) => this.browser.onFoundInPage(tab, result)
+  adoptOpenedPage = (opener: LiveTab, options: BrowserWindowConstructorOptions | undefined, disposition: OpenDisposition, url: string) =>
+    this.browser.adoptOpenedPage(opener, options, disposition, url)
+  onTabFocus(): void {}
 
   onTabInput(_tab: LiveTab, e: Event, input: Input): void {
     if (input.type === 'keyDown' && matches(input, process.platform === 'darwin' ? 'Cmd+O' : 'Ctrl+O')) {
@@ -47,25 +45,15 @@ export class Peek implements TabHost {
   }
 
   onTabDestroyed(): void {
-    // The page closed itself.
-    if (!this.done) this.browser.closePeek()
+    const pageClosedItself = !this.done
+    if (pageClosedItself) this.browser.closePeek()
   }
 
-  onTabFocus(): void {}
-
   onTabFullscreen(tab: LiveTab, on: boolean): void {
-    // A full-screen video gets a real tab, which owns the full-screen layout.
+    // A real tab owns the full-screen layout.
     if (!on) return
     this.browser.expandPeek()
     this.browser.onTabFullscreen(tab, on)
-  }
-
-  onFoundInPage(tab: LiveTab, result: Result): void {
-    this.browser.onFoundInPage(tab, result)
-  }
-
-  adoptOpenedPage(opener: LiveTab, options: BrowserWindowConstructorOptions | undefined, disposition: OpenDisposition, url: string): WebContents {
-    return this.browser.adoptOpenedPage(opener, options, disposition, url)
   }
 
   showContextMenu(tab: LiveTab, params: ContextMenuParams): void {
@@ -73,7 +61,7 @@ export class Peek implements TabHost {
   }
 }
 
-/** Same registrable domain (mail.google.com and calendar.google.com are one site). */
+/** mail.google.com and calendar.google.com are one site. */
 export function sameSite(a: string, b: string): boolean {
   const site = (url: string) => {
     try {

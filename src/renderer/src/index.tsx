@@ -1,15 +1,15 @@
-// The main window UI: docked sidebar plus what sits around the web page views.
 import { useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { dividers, dragBorder, type Divider } from '../../shared/split'
 import { findItem } from '../../shared/tree'
 import type { AppState, Rect } from '../../shared/types'
-import { activeSpace, arc, dispatch, displayHost, isMac, useAppState, useSpaceTheme } from './api'
+import { activeSpace, arc, cx, dispatch, displayHost, isMac, useAppState, useSpaceTheme } from './api'
 import { Icon } from './icons'
 import { Sidebar } from './Sidebar'
 import './styles.css'
 
-// The window has vibrancy on macOS; the theme is drawn translucent over it.
+const TOAST_MS = 2200
+
 if (isMac) document.body.classList.add('vibrant')
 
 function App() {
@@ -23,7 +23,7 @@ function App() {
   const fullscreenPage = state.layout.views.length === 1 && state.layout.content.x === 0 && state.layout.content.y === 0
 
   return (
-    <div className={`${isMac ? 'mac' : 'win'}${hidden ? ' sidebar-hidden' : ''}${state.fullscreen ? ' fullscreen' : ''}`} style={{ height: '100%' }}>
+    <div className={cx(isMac ? 'mac' : 'win', hidden && 'sidebar-hidden', state.fullscreen && 'fullscreen')} style={{ height: '100%' }}>
       {!hidden && !fullscreenPage ? <Sidebar state={state} /> : null}
       {!isMac && !state.fullscreen && !fullscreenPage ? <CaptionStrip state={state} /> : null}
       {hidden ? (
@@ -44,11 +44,9 @@ function App() {
   )
 }
 
-/** The title bar strip above the page, beside the native caption buttons (Windows, Linux): drags the window. */
 function CaptionStrip({ state }: { state: AppState }) {
   const { content } = state.layout
   const s = state.settings
-  // Over the sidebar too where nothing of it is up there: when it's hidden or on the right (styles.css).
   const left = s.sidebarVisible && !s.sidebarRight ? content.x : 0
   return <div className="caption-strip" style={{ left, right: 0, height: content.y }} />
 }
@@ -61,22 +59,20 @@ function useToast(): string | undefined {
       arc.onToast((t) => {
         setText(t)
         clearTimeout(timer.current)
-        timer.current = setTimeout(() => setText(undefined), 2200)
+        timer.current = setTimeout(() => setText(undefined), TOAST_MS)
       }),
     []
   )
   return text
 }
 
-/** Still images of pages another window shows live (IPC.snapshot, refreshed as they paint), by item id. */
 function useStills(): Record<string, string> {
   const [stills, setStills] = useState<Record<string, string>>({})
   useEffect(() => arc.onSnapshot(({ id, image }) => setStills((s) => ({ ...s, [id]: image }))), [])
   return stills
 }
 
-/** True for a dark `rgb(…)` color, so the bar's buttons and text go light on it. */
-function isDark(color: string | undefined): boolean {
+function isDarkRgb(color: string | undefined): boolean {
   const m = color?.match(/(\d+),\s*(\d+),\s*(\d+)/)
   if (!m) return false
   const [r, g, b] = [m[1], m[2], m[3]].map(Number)
@@ -85,11 +81,6 @@ function isDark(color: string | undefined): boolean {
 
 type PaneView = AppState['layout']['views'][number] & { bar: Rect }
 
-/**
- * The bar on top of each pane of a split, like Arc's: back and forward on the left, the page's host
- * in the middle, close on the right. The focused pane also has reload and the split view button; the
- * others show that button when the pointer comes near close. The bar takes the color of the page's top.
- */
 function PaneBar({ state, view, active }: { state: AppState; view: PaneView; active: boolean }) {
   const live = state.live[view.id]
   const item = findItem(state, view.id)?.item
@@ -101,10 +92,10 @@ function PaneBar({ state, view, active }: { state: AppState; view: PaneView; act
   }
   return (
     <>
-      {/* Behind the page: shows in the page's rounded corners, so the bar and page read as one card. */}
+      {/* Shows in the page's rounded corners, so bar and page read as one card. */}
       <div className="pane-card" style={{ left: bar.x, top: bar.y, width: bar.width, height: bar.height + view.rect.height, background: color }} />
       <div
-        className={`pane-bar${active ? ' active' : ''}${isDark(color) ? ' dark' : ''}`}
+        className={cx('pane-bar', active && 'active', isDarkRgb(color) && 'dark')}
         style={{ left: bar.x, top: bar.y, width: bar.width, height: bar.height, background: color }}
         onMouseDown={focus}
       >
@@ -160,7 +151,6 @@ function PaneBar({ state, view, active }: { state: AppState; view: PaneView; act
   )
 }
 
-/** Empty state, pages shown in another window, split view handles, pane bars and the focus ring around the active split pane. */
 function ContentDecor({ state }: { state: AppState }) {
   const { content, views, splitId } = state.layout
   const space = activeSpace(state)
@@ -168,13 +158,8 @@ function ContentDecor({ state }: { state: AppState }) {
   const stills = useStills()
 
   if (views.length === 0) {
-    return (
-      // An empty space is a blank card, as in Arc.
-      <div className="content-empty" style={{ left: content.x, top: content.y, width: content.width, height: content.height }} />
-    )
+    return <div className="content-empty" style={{ left: content.x, top: content.y, width: content.width, height: content.height }} />
   }
-  // A page can be live in one window only; here it shows greyed out, mirrored from the window
-  // that has it (a few frames a second). A click, or focusing this window, brings it here.
   const elsewhere = views
     .filter((v) => v.elsewhere)
     .map((v) => (
@@ -207,13 +192,12 @@ function ContentDecor({ state }: { state: AppState }) {
         />
       ) : null}
       {dividers(split.root, content).map((d) => {
-        // A handle a little wider than the gap, so it's easy to grab.
-        const rect = d.dir === 'row' ? { ...d.rect, x: d.rect.x - 2, width: d.rect.width + 4 } : { ...d.rect, y: d.rect.y - 2, height: d.rect.height + 4 }
+        const grabArea = d.dir === 'row' ? { ...d.rect, x: d.rect.x - 2, width: d.rect.width + 4 } : { ...d.rect, y: d.rect.y - 2, height: d.rect.height + 4 }
         return (
           <div
             key={`${d.path.join('.')}-${d.index}`}
             className={`split-handle ${d.dir}`}
-            style={{ left: rect.x, top: rect.y, width: rect.width, height: rect.height }}
+            style={{ left: grabArea.x, top: grabArea.y, width: grabArea.width, height: grabArea.height }}
             onPointerDown={(e) => {
               e.currentTarget.setPointerCapture(e.pointerId)
               drag.current = { splitId: split.id, divider: d, start: along(d, e) }

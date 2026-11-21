@@ -2,15 +2,20 @@ import { useEffect, useRef, useState, type DragEvent, type MouseEvent, type Reac
 import type { DropTarget } from '../../shared/actions'
 import type { EditRequest } from '../../shared/ipc'
 import { MAX_PANES, paneIds } from '../../shared/split'
-import { isAwayFromSaved } from '../../shared/tree'
+import { isAwayFromSaved, spaceItems } from '../../shared/tree'
 import { SIDEBAR_WIDTH, type AppState, type ID, type PinnedNode, type Space, type TabItem, type UpdateStatus } from '../../shared/types'
-import { activeSpace, arc, dispatch, displayHost, isMac } from './api'
+import { activeSpace, arc, cx, dispatch, displayHost, isMac } from './api'
 import { Favicon, Icon } from './icons'
 
 const DRAG_TYPE = 'application/x-arc-item'
+const SWIPE_MIN_HORIZONTAL_RATIO = 1.5
+const SWIPE_GESTURE_GAP_MS = 400
+const SWIPE_DISTANCE = 120
+const SWIPE_COOLDOWN_MS = 500
 
-/** Where a dragged item would land: between rows, into a folder, or beside a tab as a split view. */
 type RowDrop = 'before' | 'after' | 'into' | 'split-left' | 'split-right'
+
+const DROP_CLASS: Record<RowDrop, string> = { before: 'drop-before', after: 'drop-after', into: 'drop-into', 'split-left': 'drop-split', 'split-right': 'drop-split' }
 
 /** `target`: over a split row, the tab whose half the dragged tab would go beside. */
 type DropHint = { id: string; pos: RowDrop; target?: ID } | { section: 'favorites' | 'pinned' | 'today' | `space:${string}` }
@@ -23,7 +28,6 @@ interface Ctx {
   hint: DropHint | undefined
   setHint: (h: DropHint | undefined) => void
   dragging: boolean
-  /** The tab being dragged, if a tab (not a folder) is. */
   dragTab: TabItem | undefined
 }
 
@@ -51,7 +55,6 @@ export function Sidebar({ state, floating }: { state: AppState; floating?: boole
   const newTabRow = useRef<HTMLDivElement>(null)
 
   useEffect(() => arc.onEdit(setEdit), [])
-  // Like Arc, show the highlighted "New Tab" row while the command bar makes a new tab.
   useEffect(() => {
     if (state.newTabOpen) newTabRow.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
   }, [state.newTabOpen])
@@ -59,24 +62,22 @@ export function Sidebar({ state, floating }: { state: AppState; floating?: boole
   const dragTab = dragId ? findTab(state, space, dragId) : undefined
   const ctx: Ctx = { state, space, edit, setEdit, hint, setHint, dragging, dragTab }
   const activeId = space.activeItemId
-  // While Peek is open, the URL field shows the Peek page, like Arc.
   const live = state.peek ?? (activeId ? state.live[activeId] : undefined)
   const activeItem = activeId ? findTab(state, space, activeId) : undefined
   const url = live?.url ?? activeItem?.url ?? ''
   const favorites = profile?.favorites ?? []
   const right = state.settings.sidebarRight && !floating
 
-  const onWheel = (e: React.WheelEvent) => {
-    // Two-finger horizontal swipe switches spaces, like Arc.
-    if (Math.abs(e.deltaX) < Math.abs(e.deltaY) * 1.5) return
+  const switchSpaceOnSwipe = (e: React.WheelEvent) => {
+    if (Math.abs(e.deltaX) < Math.abs(e.deltaY) * SWIPE_MIN_HORIZONTAL_RATIO) return
     const now = Date.now()
-    if (now - swipe.current.t > 400) swipe.current.x = 0
+    if (now - swipe.current.t > SWIPE_GESTURE_GAP_MS) swipe.current.x = 0
     swipe.current.t = now
     swipe.current.x += e.deltaX
-    if (Math.abs(swipe.current.x) > 120) {
+    if (Math.abs(swipe.current.x) > SWIPE_DISTANCE) {
       dispatch({ type: 'switchSpaceRelative', delta: swipe.current.x > 0 ? 1 : -1 })
       swipe.current.x = 0
-      swipe.current.t = now + 500
+      swipe.current.t = now + SWIPE_COOLDOWN_MS
     }
   }
 
@@ -91,34 +92,33 @@ export function Sidebar({ state, floating }: { state: AppState; floating?: boole
 
   return (
     <div
-      className={`sidebar${floating ? ' floating' : ''}${right ? ' right' : ''}`}
+      className={cx('sidebar', floating && 'floating', right && 'right')}
       style={{ width: state.settings.sidebarWidth, [right ? 'right' : 'left']: 0 }}
-      onWheel={onWheel}
+      onWheel={switchSpaceOnSwipe}
       onDragStart={(e) => {
         setDragging(true)
-        // The item handlers below have just set what's dragged. A tab can also go onto the page, as a split.
+        // The row's own handler has just set what's dragged.
         const id = readDrag(e)
         setDragId(id)
         if (id && findTab(state, space, id)) dispatch({ type: 'tabDrag', id })
       }}
       onDragEnd={() => {
-        // Fires however the drag ends: a drop anywhere, Escape, or a drop outside the window.
+        // Fires however the drag ends, even with Escape or outside the window.
         setDragging(false)
         setDragId(undefined)
         setHint(undefined)
         dispatch({ type: 'tabDrag' })
       }}
     >
-      {/* The hidden sidebar goes away once the cursor stays away from it: the main process watches (watchPeek). */}
       <ResizeHandle width={state.settings.sidebarWidth} right={right} />
       <TopBar state={state} />
 
       <div className="urlbar" onClick={() => void arc.dispatch({ type: 'command', id: 'editUrl' })} title={url}>
         <Icon name={!url ? 'search' : url.startsWith('https:') ? 'lock' : 'globe'} size={13} />
-        <span className={`host${url ? '' : ' placeholder'}`}>{url ? displayHost(url) : 'Search or Enter URL…'}</span>
+        <span className={cx('host', !url && 'placeholder')}>{url ? displayHost(url) : 'Search or Enter URL…'}</span>
         {live && /^https?:/.test(live.url) ? (
           <button
-            className={`icon-btn shield${live.shielded ? '' : ' off'}`}
+            className={cx('icon-btn shield', !live.shielded && 'off')}
             title={live.shielded ? `${live.blocked} ads & trackers blocked. Click to allow ads on this site.` : 'Ads allowed on this site. Click to block them again.'}
             onClick={(e) => {
               e.stopPropagation()
@@ -142,7 +142,7 @@ export function Sidebar({ state, floating }: { state: AppState; floating?: boole
         </div>
       ) : dragging ? (
         <div
-          className={`favorites-drop${hint && 'section' in hint && hint.section === 'favorites' ? ' drop-into' : ''}`}
+          className={cx('favorites-drop', hint && 'section' in hint && hint.section === 'favorites' && 'drop-into')}
           onDragOver={(e) => {
             e.preventDefault()
             setHint({ section: 'favorites' })
@@ -169,7 +169,7 @@ export function Sidebar({ state, floating }: { state: AppState; floating?: boole
           onDrop={(e) => onDrop(e, { section: 'pinned', index: space.pinned.length })}
         >
           {space.pinned.length === 0 && dragging ? (
-            <div className={`row empty-hint${hint && 'section' in hint && hint.section === 'pinned' ? ' drop-into' : ''}`}>Drop here to pin</div>
+            <div className={cx('row empty-hint', hint && 'section' in hint && hint.section === 'pinned' && 'drop-into')}>Drop here to pin</div>
           ) : null}
           <PinnedList nodes={space.pinned} ctx={ctx} onDrop={onDrop} />
         </div>
@@ -183,7 +183,7 @@ export function Sidebar({ state, floating }: { state: AppState; floating?: boole
           ) : null}
         </div>
 
-        <div ref={newTabRow} className={`row newtab${state.newTabOpen ? ' active' : ''}`} onClick={() => dispatch({ type: 'overlay', mode: { kind: 'command', target: 'tab' } })}>
+        <div ref={newTabRow} className={cx('row newtab', state.newTabOpen && 'active')} onClick={() => dispatch({ type: 'overlay', mode: { kind: 'command', target: 'tab' } })}>
           <Icon name="plus" size={15} />
           <span className="title">New Tab</span>
         </div>
@@ -204,11 +204,6 @@ export function Sidebar({ state, floating }: { state: AppState; floating?: boole
   )
 }
 
-/**
- * Tabs playing out of sight (and paused ones that did), above the bottom bar, in every space and
- * window: the newest in front, older ones peeking out behind it until the pointer spreads them.
- * A tab on screen in this window has no card.
- */
 function MediaCards({ state }: { state: AppState }) {
   const [open, setOpen] = useState(false)
   const { cards, videos } = state.media
@@ -219,7 +214,7 @@ function MediaCards({ state }: { state: AppState }) {
   const visible = open ? newestFirst : newestFirst.slice(0, 1)
   return (
     <div
-      className={`media-cards${open ? ' open' : ''}`}
+      className={cx('media-cards', open && 'open')}
       data-behind={open ? 0 : Math.min(2, list.length - 1)}
       onMouseEnter={() => setOpen(true)}
       onMouseLeave={() => setOpen(false)}
@@ -274,11 +269,6 @@ function MediaCard({ id, state, video, expanded }: { id: ID; state: AppState; vi
   )
 }
 
-/**
- * Arc's sidebar update banner, as a small pill above the bottom bar: a downloaded update installs
- * on quit, and this restarts into it now. The relaunch card only opens by itself after a long wait.
- * Hiding it lasts until YARC restarts, so a newer release doesn't bring it back.
- */
 function UpdatePill({ update }: { update: UpdateStatus }) {
   const [dismissed, setDismissed] = useState(false)
   if ((update.state !== 'ready' && update.state !== 'available') || dismissed) return null
@@ -303,25 +293,9 @@ function UpdatePill({ update }: { update: UpdateStatus }) {
 }
 
 function findTab(state: AppState, space: Space, id: ID): TabItem | undefined {
-  const profile = state.profiles.find((p) => p.id === space.profileId)
-  const fav = profile?.favorites.find((f) => f.id === id)
-  if (fav) return fav
-  const today = space.today.find((t) => t.id === id)
-  if (today) return today
-  const walk = (nodes: PinnedNode[]): TabItem | undefined => {
-    for (const n of nodes) {
-      if (n.kind === 'tab' && n.id === id) return n
-      if (n.kind === 'folder') {
-        const hit = walk(n.children)
-        if (hit) return hit
-      }
-    }
-    return undefined
-  }
-  return walk(space.pinned)
+  return spaceItems(state, space).find((t) => t.id === id)
 }
 
-/** The sidebar's inner edge: drag it to make the sidebar wider or narrower, like Arc. */
 function ResizeHandle({ width, right }: { width: number; right: boolean }) {
   const drag = useRef<{ startX: number; width: number } | undefined>(undefined)
   return (
@@ -378,7 +352,7 @@ function FavoriteTile({ item, index, ctx, onDrop }: { item: TabItem; index: numb
   const h = hint && 'id' in hint && hint.id === item.id ? hint.pos : undefined
   return (
     <div
-      className={`favorite${active ? ' active' : ''}${live ? ' live' : ''}${h ? ' drop-into' : ''}`}
+      className={cx('favorite', active && 'active', live && 'live', h && 'drop-into')}
       title={itemTitle(state, item)}
       draggable
       onDragStart={(e) => startDrag(e, item.id)}
@@ -402,10 +376,7 @@ function PinnedList({ nodes, ctx, onDrop, folderId }: { nodes: PinnedNode[]; ctx
   return <SidebarList list={nodes} ctx={ctx} section="pinned" folderId={folderId} onDrop={onDrop} />
 }
 
-/**
- * The tabs of each split in a sidebar list, shown as one row where the first of them is (Arc):
- * `rows` maps that first tab to the split's tabs in this list, left to right; `hidden` are the rest.
- */
+/** `rows`: each split's first tab in this list → its tabs here; `hidden`: the others, drawn in that row. */
 function splitRows(space: Space, list: { id: ID }[]): { rows: Map<ID, ID[]>; hidden: Set<ID> } {
   const rows = new Map<ID, ID[]>()
   const hidden = new Set<ID>()
@@ -420,7 +391,6 @@ function splitRows(space: Space, list: { id: ID }[]): { rows: Map<ID, ID[]>; hid
   return { rows, hidden }
 }
 
-/** A list of Today tabs, or of pinned tabs and folders, with each split as one row. */
 function SidebarList({
   list,
   ctx,
@@ -449,11 +419,6 @@ function SidebarList({
   )
 }
 
-/**
- * What dropping on a row does. A folder row's middle drops into the folder. A tab row's middle
- * makes a split view with the dragged tab, on the left or right as the cursor is (Arc); its top
- * and bottom quarters reorder, like the edges of every row.
- */
 function useRowDrop(ctx: Ctx, id: ID, middle: 'into' | 'split' | undefined) {
   const { hint, setHint } = ctx
   const pos = hint && 'id' in hint && hint.id === id ? hint.pos : undefined
@@ -468,12 +433,9 @@ function useRowDrop(ctx: Ctx, id: ID, middle: 'into' | 'split' | undefined) {
     if (canSplit && y > r.height * 0.25 && y < r.height * 0.75) next = e.clientX < r.left + r.width / 2 ? 'split-left' : 'split-right'
     if (pos !== next) setHint({ id, pos: next })
   }
-  const cls =
-    pos === 'before' ? ' drop-before' : pos === 'after' ? ' drop-after' : pos === 'into' ? ' drop-into' : pos === 'split-left' || pos === 'split-right' ? ' drop-split' : ''
-  return { pos, onDragOver, cls }
+  return { pos, onDragOver, cls: pos && DROP_CLASS[pos] }
 }
 
-/** Over a tab or split row: the row as the split it would become, the dragged tab beside `target` (like Arc's split rows). */
 function SplitPreview({ state, items, target, dragged, side }: { state: AppState; items: TabItem[]; target: ID; dragged: TabItem; side: 'left' | 'right' }) {
   const shown = items.filter((x) => x.id !== dragged.id)
   const at = shown.findIndex((x) => x.id === target) + (side === 'right' ? 1 : 0)
@@ -483,7 +445,7 @@ function SplitPreview({ state, items, target, dragged, side }: { state: AppState
       {shown.map((item, i) => (
         <span key={item.id} className="half-wrap">
           {i > 0 ? <span className="split-divider" /> : null}
-          <span className={`half${item === dragged ? ' incoming' : ''}`}>
+          <span className={cx('half', item === dragged && 'incoming')}>
             <Favicon url={item.url} favicon={state.live[item.id]?.favicon ?? item.favicon} />
             <span className="title">{itemTitle(state, item)}</span>
           </span>
@@ -493,11 +455,6 @@ function SplitPreview({ state, items, target, dragged, side }: { state: AppState
   )
 }
 
-/**
- * A split view as one sidebar row, like Arc: a half per tab, favicon and title, the focused one
- * brighter. Clicking a half shows the split with that pane focused; dragging one moves the split
- * (in the sidebar) or that tab (onto the page). Dropping a tab on a half's middle adds it beside it.
- */
 function SplitRow({
   ids,
   ctx,
@@ -522,11 +479,11 @@ function SplitRow({
   const active = ids.includes(space.activeItemId ?? '')
   const canSplit = !!dragTab && (ids.includes(dragTab.id) || ids.length < MAX_PANES)
   const splitting = (h?.pos === 'split-left' || h?.pos === 'split-right') && h.target && dragTab
-  const cls = h?.pos === 'before' ? ' drop-before' : h?.pos === 'after' ? ' drop-after' : splitting ? ' drop-split' : ''
+  const reordering = h?.pos === 'before' || h?.pos === 'after'
 
   return (
     <div
-      className={`row split-row${active ? ' active' : ''}${cls}`}
+      className={cx('row split-row', active && 'active', (reordering || splitting) && h && DROP_CLASS[h.pos])}
       onDragOver={(e) => {
         e.preventDefault()
         e.stopPropagation()
@@ -534,11 +491,10 @@ function SplitRow({
         const y = e.clientY - r.top
         let next: DropHint = { id: key, pos: y < r.height / 2 ? 'before' : 'after' }
         if (canSplit && y > r.height * 0.25 && y < r.height * 0.75) {
-          // The half under the cursor, and which side of its middle.
-          const w = r.width / items.length
-          const i = Math.min(items.length - 1, Math.max(0, Math.floor((e.clientX - r.left) / w)))
-          const left = e.clientX < r.left + w * i + w / 2
-          if (items[i].id !== dragTab?.id) next = { id: key, pos: left ? 'split-left' : 'split-right', target: items[i].id }
+          const halfWidth = r.width / items.length
+          const half = Math.min(items.length - 1, Math.max(0, Math.floor((e.clientX - r.left) / halfWidth)))
+          const left = e.clientX < r.left + halfWidth * half + halfWidth / 2
+          if (items[half].id !== dragTab?.id) next = { id: key, pos: left ? 'split-left' : 'split-right', target: items[half].id }
         }
         if (!h || h.pos !== next.pos || h.target !== ('target' in next ? next.target : undefined)) setHint(next)
       }}
@@ -560,7 +516,7 @@ function SplitRow({
           <span key={item.id} className="half-wrap">
             {i > 0 ? <span className="split-divider" /> : null}
             <span
-              className={`half${space.activeItemId === item.id ? ' focused' : ''}${live ? '' : ' unloaded'}`}
+              className={cx('half', space.activeItemId === item.id && 'focused', !live && 'unloaded')}
               draggable
               title={live?.url ?? item.url}
               onDragStart={(e) => startDrag(e, item.id)}
@@ -581,14 +537,12 @@ function SplitRow({
   )
 }
 
-/** Inline rename. Enter or leaving the field saves; Escape, or no change, keeps the title as it was. */
 function RenameInput({ initial, onDone }: { initial: string; onDone: (value: string | undefined) => void }) {
   const ref = useRef<HTMLInputElement>(null)
   useEffect(() => {
     ref.current?.focus()
     ref.current?.select()
-    // Typing must reach this field, not the page that has the keyboard. Once it's ours, losing it
-    // (to a page, a tab switch, the command bar) ends the rename like a click elsewhere does.
+    // Take the keyboard from the page; losing it afterwards ends the rename like a click elsewhere.
     let stopListening: (() => void) | undefined
     let mounted = true
     void arc.focus().then(() => {
@@ -633,7 +587,7 @@ function FolderRow({
   return (
     <>
       <div
-        className={`row folder${node.open ? ' open' : ''}${cls}`}
+        className={cx('row folder', node.open && 'open', cls)}
         draggable={!editing}
         onDragStart={(e) => startDrag(e, node.id)}
         onDragOver={onDragOver}
@@ -711,7 +665,7 @@ function TabRow({
 
   return (
     <div
-      className={`row${active ? ' active' : ''}${inSplit ? ' in-split' : ''}${live ? '' : ' unloaded'}${cls}`}
+      className={cx('row', active && 'active', inSplit && 'in-split', !live && 'unloaded', cls)}
       draggable={!editing}
       onDragStart={(e) => startDrag(e, item.id)}
       onDragOver={onDragOver}
@@ -726,8 +680,7 @@ function TabRow({
         onDrop(e, section === 'pinned' ? { section, folderId, index: pos === 'after' ? index + 1 : index } : { section, index: pos === 'after' ? index + 1 : index })
       }}
       onClick={(e: MouseEvent) => {
-        // A double-click's first click selects the tab and its second starts a rename: selecting
-        // again would hand the keyboard back to the page.
+        // A double-click's second click starts a rename; activating again would give the page the keyboard.
         if (e.detail > 1) return
         if (e.shiftKey && !active) dispatch({ type: 'splitWith', id: item.id })
         else dispatch({ type: 'activate', id: item.id })
@@ -737,7 +690,7 @@ function TabRow({
       onContextMenu={() => dispatch({ type: 'itemMenu', id: item.id })}
       title={live?.url ?? item.url}
     >
-      <span className={`favicon-wrap${away ? ' away' : ''}`}>
+      <span className={cx('favicon-wrap', away && 'away')}>
         <Favicon url={item.url} favicon={live?.favicon ?? item.favicon} />
         {away ? (
           <button
@@ -798,7 +751,7 @@ function BottomBar({ ctx }: { ctx: Ctx }) {
           return (
             <button
               key={s.id}
-              className={`space-dot${s.id === space.id ? ' active' : ''}${over ? ' drop-into' : ''}`}
+              className={cx('space-dot', s.id === space.id && 'active', over && 'drop-into')}
               title={s.name}
               onClick={() => dispatch({ type: 'switchSpace', id: s.id })}
               onContextMenu={() => dispatch({ type: 'spaceMenu', id: s.id })}

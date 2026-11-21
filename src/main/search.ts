@@ -1,4 +1,3 @@
-// Command bar results: open tabs across spaces, history, commands and search suggestions.
 import { net } from 'electron'
 import { BINDINGS } from '../shared/keymap'
 import { spaceItems } from '../shared/tree'
@@ -13,7 +12,6 @@ export function search(browser: Browser, raw: string): SearchResult[] {
   const active = browser.store.activeSpace
   const live = browser.live
 
-  // Open tabs and sidebar items, active space first.
   const tabs: Candidate[] = []
   const seen = new Set<string>()
   const spaces = [active, ...state.spaces.filter((s) => s !== active)]
@@ -38,7 +36,6 @@ export function search(browser: Browser, raw: string): SearchResult[] {
     }
   }
   if (!query) {
-    // Nothing typed: the open tabs, the active space's loaded ones first.
     const weight = (t: Candidate) => (t.source === 'tab' ? (t.inActiveSpace ? 2 : 0) + (t.loaded ? 1 : 0) : 0)
     return [...tabs].sort((a, b) => weight(b) - weight(a)).slice(0, 8).map((t) => t.result)
   }
@@ -72,9 +69,8 @@ export function search(browser: Browser, raw: string): SearchResult[] {
     result: { kind: 'archive', id: `arch:${a.id}`, title: a.title, subtitle: `Archived · ${a.url}`, url: a.url, favicon: a.favicon, target: a.id }
   }))
 
-  // Open tabs before the same page in history or the archive.
-  const urls = new Set([typed.url, ...tabs.map((t) => t.result.url)])
-  const elsewhere = [...history, ...archive].filter((c) => !c.result.url || !urls.has(c.result.url))
+  const openUrls = new Set([typed.url, ...tabs.map((t) => t.result.url)])
+  const elsewhere = [...history, ...archive].filter((c) => !c.result.url || !openUrls.has(c.result.url))
   return arrange(query, typed, [...commands, ...tabs, ...elsewhere])
 }
 
@@ -89,7 +85,7 @@ export async function suggest(browser: Browser, query: string): Promise<string[]
         ? `https://api.bing.com/osjson.aspx?query=${encodeURIComponent(q)}`
         : `https://suggestqueries.google.com/complete/search?client=chrome&q=${encodeURIComponent(q)}`
   try {
-    // An incognito window asks through its own in-memory session, never the default one.
+    // Incognito asks through its own in-memory session, never the default one.
     const fetcher = browser.incognito ? browser.profiles.get(browser.space.profileId).session : net
     const res = await fetcher.fetch(endpoint, { signal: AbortSignal.timeout(1500) })
     const data = (await res.json()) as [string, string[]]

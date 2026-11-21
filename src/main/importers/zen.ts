@@ -1,5 +1,3 @@
-// Read-only access to Zen browser data. Zen is Firefox-based: one folder per profile, listed in
-// profiles.ini. Source files are never written; places.sqlite is read from a temp copy.
 import { existsSync, readFileSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
@@ -13,7 +11,6 @@ export interface ZenProfile {
   path: string
 }
 
-/** Zen's data folders (they hold profiles.ini) that exist on this computer. */
 export function findZenRoots(): string[] {
   const home = homedir()
   const roots =
@@ -25,12 +22,11 @@ export function findZenRoots(): string[] {
   return roots.filter((root) => existsSync(join(root, 'profiles.ini')))
 }
 
-/** Newest first: Zen's own session file, then the first window of Firefox's session store (older Zen keeps spaces there). */
+/** Newest first; older Zen keeps spaces in the first window of Firefox's session store. */
 const SESSION_FILES = ['zen-sessions.jsonlz4', join('sessionstore-backups', 'recovery.jsonlz4'), 'sessionstore.jsonlz4']
 
 export const isZenProfile = (dir: string): boolean => SESSION_FILES.some((file) => existsSync(join(dir, file)))
 
-/** Profiles of a Zen data folder that have session data, the one Zen opens by default first. */
 export function listZenProfiles(root: string): ZenProfile[] {
   let text: string
   try {
@@ -49,7 +45,7 @@ export function findZenProfiles(): ZenProfile[] {
   return findZenRoots().flatMap(listZenProfiles)
 }
 
-/** A profile folder, or a Zen data folder (holding profiles.ini) whose default profile is used. */
+/** `path` is a profile folder, or a Zen data folder whose default profile is used. */
 export function resolveZenProfile(path: string): ZenProfile {
   if (isZenProfile(path)) return { name: basename(path), path }
   const [profile] = listZenProfiles(path)
@@ -57,7 +53,6 @@ export function resolveZenProfile(path: string): ZenProfile {
   return profile
 }
 
-/** The session's { tabs, folders, spaces } for parseZenSession. */
 export async function readZenSession(dir: string): Promise<unknown> {
   for (const file of SESSION_FILES) {
     const path = join(dir, file)
@@ -85,7 +80,6 @@ export function readZenContainers(dir: string): Map<number, string> {
   }
 }
 
-/** Most recent visits (oldest first), without embeds, downloads, framed pages and hidden URLs. Times in ms epoch. */
 export async function readZenHistory(dir: string, limit = 50_000): Promise<ImportedVisit[]> {
   const src = join(dir, 'places.sqlite')
   if (!existsSync(src)) return []

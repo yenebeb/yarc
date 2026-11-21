@@ -1,25 +1,6 @@
-/* Settings, Library and Space editor panels. Builds on .panel.sheet in styles.css. */
-
-.sheet header .title-emoji {
-  font-size: 18px;
-}
-
 .sheet .body {
   min-height: 0;
   flex: 1;
-}
-
-.sheet .section-label {
-  margin: 18px 0 4px;
-  font-size: 11px;
-  font-weight: 650;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--text-3);
-}
-
-.sheet .section-label:first-child {
-  margin-top: 4px;
 }
 
 .sheet .note {
@@ -77,7 +58,6 @@
   width: 160px;
 }
 
-/* list rows used by every panel */
 .sheet .list-row {
   min-height: 36px;
 }
@@ -125,7 +105,6 @@
   padding: 12px 0 0;
 }
 
-/* downloads */
 .dl-main {
   flex: 1;
   min-width: 0;
@@ -166,7 +145,6 @@
   }
 }
 
-/* spaces list */
 .space-emoji {
   width: 24px;
   height: 24px;
@@ -195,7 +173,6 @@
   font-weight: 600;
 }
 
-/* space editor */
 .space-editor {
   width: min(520px, calc(100vw - 48px));
 }
@@ -342,9 +319,6 @@
   display: contents;
 }
 
-/* ------------------------------------------------------------------ welcome & what's new */
-
-/* Onboarding and release cards: centered, roomy, the space color washing the top. */
 .scrim.intro-scrim {
   background: rgb(10 5 25 / 0.42);
   backdrop-filter: blur(6px);
@@ -491,7 +465,6 @@
   margin-top: 4px;
 }
 
-/* Feature spotlights: a picture across the top of the card, then what the feature is. */
 .intro.whats-new.spotlit {
   width: min(520px, calc(100vw - 48px));
   overflow: hidden;
@@ -556,7 +529,6 @@
   margin-top: 10px;
 }
 
-/* MiniWindow (spotlight-pictures.tsx): a small YARC window to draw a feature in. */
 .mini-window {
   position: relative;
   width: 300px;
@@ -598,15 +570,13 @@
   box-shadow: 0 1px 2px rgb(0 0 0 / 0.08);
 }
 
-/* The floating player's picture (6 s loop): the video leaves the page for the window's corner. */
 .fp-scene {
   position: relative;
   width: 300px;
   height: 168px;
 }
 
-/* The selected tab: the first row, then the second once you "switch". MiniWindow's rows sit at
-   6px (window padding) + 16px (sidebar padding), 14px apart. */
+/* MiniWindow's rows sit at 6px (window padding) + 16px (sidebar padding), 14px apart. */
 .fp-tab {
   position: absolute;
   left: 8px;
@@ -618,7 +588,6 @@
   animation: fp-tab 6s ease-in-out infinite;
 }
 
-/* The other page: a few lines of text, shown once the video has left. */
 .fp-other {
   position: absolute;
   inset: 14px 16px;
@@ -644,7 +613,7 @@
   width: 80%;
 }
 
-/* The video: fills the page (left 76px = window padding + sidebar + gap), then floats. */
+/* left 76px = window padding + sidebar + gap. */
 .fp-video {
   position: absolute;
   left: 76px;
@@ -748,7 +717,6 @@
   }
 }
 
-/* The relaunch card: a long list of updates scrolls, the buttons stay put. */
 .intro.update-ready .intro-body {
   max-height: min(46vh, 360px);
   overflow-y: auto;
@@ -792,7 +760,6 @@
   font-size: 12px;
 }
 
-/* Which tour step this is. */
 .tour-dots {
   display: inline-flex;
   gap: 5px;
@@ -815,7 +782,6 @@
   background: var(--accent);
 }
 
-/* A try-it step: a card that fills its small overlay at the bottom of the page area. */
 .panel.tour-float {
   inset: 0;
   left: 0;
@@ -874,7 +840,6 @@
   flex: 1;
 }
 
-/* What to do to go on: a try-it pill, tinted by the space. */
 .tour-try {
   display: inline-flex;
   align-items: center;
@@ -891,7 +856,6 @@
   background: var(--panel);
 }
 
-/* The screen picker (panels/SharePicker.tsx): tabs for screens and windows, a grid of previews. */
 .share-picker {
   top: 12vh;
   width: min(720px, calc(100vw - 48px));

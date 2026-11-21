@@ -1,4 +1,3 @@
-// Browsing history, one SQLite database per profile (node:sqlite, no native modules).
 import { chmodSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
@@ -18,22 +17,22 @@ export interface ImportedVisit {
 
 const KEEP_FOR = 365 * 864e5
 
-/** A LIKE pattern matching `text` anywhere, with % and _ in it taken literally (ESCAPE '\\'). */
+/** For LIKE … ESCAPE '\\'. */
 function contains(text: string): string {
   return `%${text.replace(/[\\%_]/g, (m) => `\\${m}`)}%`
 }
 
 export class History {
   private db: DatabaseSync
-  /** Pages can still report navigations while the app quits; writes after close are dropped. */
+  /** Pages can still report navigations while the app quits. */
   private closed = false
 
-  /** Without a folder (incognito), the history lives in memory and is gone when it closes. */
+  /** Without a folder (incognito), it lives in memory. */
   constructor(dir: string | undefined, now = Date.now()) {
     if (dir) mkdirSync(dir, { recursive: true, mode: 0o700 })
     const file = dir ? join(dir, 'history.sqlite') : ':memory:'
     this.db = new DatabaseSync(file)
-    // Only this user can read it (SQLite creates it with the default, usually world-readable, mode).
+    // SQLite creates it with the default, usually world-readable, mode.
     if (dir) chmodSync(file, 0o600)
     this.db.exec(`
       PRAGMA journal_mode = WAL;
@@ -51,7 +50,6 @@ export class History {
     this.prune(now)
   }
 
-  /** Visits older than KEEP_FOR are forgotten (Chrome keeps 90 days; a year here, for imported history). */
   private prune(now: number): void {
     const before = now - KEEP_FOR
     this.db.prepare('DELETE FROM visits WHERE time < ?').run(before)
@@ -74,10 +72,7 @@ export class History {
     if (title && !this.closed) this.db.prepare('UPDATE urls SET title = ? WHERE url = ?').run(title, url)
   }
 
-  /**
-   * Pages for the command bar: every word of the query in the title or URL. The pages whose title or
-   * address starts with the query come first, then the most visited; the caller ranks them.
-   */
+  /** Pages starting with the query come first, then the most visited; the caller ranks them. */
   search(query: string, limit = 100): HistoryEntry[] {
     const words = query.trim().split(/\s+/).filter(Boolean)
     if (!words.length) return []

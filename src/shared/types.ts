@@ -1,21 +1,18 @@
-// State shared between the main process and the UI renderers.
-// The main process owns the truth; renderers receive full snapshots.
 import type { SitePermissionRow } from './permissions'
 import type { Side } from './split'
 import type { TourStep } from './tour'
 
 export type ID = string
 
-/** A tab-like sidebar entry. Favorites and pinned tabs keep `savedUrl` as their "home". */
 export interface TabItem {
   id: ID
   url: string
   title: string
   favicon?: string
-  /** Home URL for favorites and pinned tabs. Undefined for unpinned (Today) tabs. */
+  /** Home URL for favorites and pinned tabs; unset for Today tabs. */
   savedUrl?: string
   savedTitle?: string
-  /** Epoch ms of last activation, used for auto-archive and MRU. */
+  /** Epoch ms; drives auto-archive and MRU. */
   lastActive: number
 }
 
@@ -36,26 +33,23 @@ export type PinnedNode = PinnedTab | PinnedFolder
 export interface Profile {
   id: ID
   name: string
-  /** Favorites belong to a profile, so every space using this profile shares them. */
   favorites: TabItem[]
 }
 
-/** One page in a split view. */
 export interface SplitPane {
   itemId: ID
 }
 
-/** Panes or nested groups laid out side by side ('row') or stacked ('column'). */
 export interface SplitGroup {
   dir: 'row' | 'column'
   children: SplitNode[]
-  /** Relative sizes along `dir`, one per child, summing to 1. */
+  /** One per child, summing to 1. */
   sizes: number[]
 }
 
 export type SplitNode = SplitPane | SplitGroup
 
-/** A split view: 2-4 tabs shown together, in any mix of side-by-side and stacked panes. */
+/** 2-4 tabs shown together. */
 export interface Split {
   id: ID
   root: SplitGroup
@@ -65,13 +59,12 @@ export interface Space {
   id: ID
   name: string
   emoji?: string
-  /** Theme color (hex). */
   color: string
-  /** Sidebar text appearance over the theme color, from Arc; unset follows the system. */
+  /** Sidebar text appearance over the theme color; unset follows the system. */
   appearance?: 'light' | 'dark'
   profileId: ID
   pinned: PinnedNode[]
-  /** Unpinned ("Today") tabs, newest first. */
+  /** Newest first. */
   today: TabItem[]
   splits: Split[]
   activeItemId?: ID
@@ -88,32 +81,26 @@ export interface ArchivedTab {
 
 export type SearchEngine = 'google' | 'duckduckgo' | 'bing' | 'kagi' | 'brave'
 
-/** Sidebar width limits in px: dragging its edge, the Settings slider and the Arc import. */
 export const SIDEBAR_WIDTH = { min: 200, max: 480 }
 
 export interface Settings {
   sidebarVisible: boolean
   sidebarWidth: number
   sidebarRight: boolean
-  /** Hours of inactivity before an unpinned tab is archived. 0 = never. */
+  /** 0 = never. */
   archiveAfterHours: number
   searchEngine: SearchEngine
-  /** Open links from other apps in a Little Window (true) or as a new tab in the current space (false). */
   littleArcForExternalLinks: boolean
-  /** Hours a Little Window can stay in the background before it closes (its page goes to the Archive). 0 = never. */
+  /** 0 = never. */
   littleCloseAfterHours: number
-  /** Profile used by Little Windows; empty = profile of the active space. */
+  /** Empty = profile of the active space. */
   littleArcProfileId: ID | ''
   /** Links from pinned tabs and favorites to other sites open in Peek instead of replacing the page. */
   peekPinnedLinks: boolean
   theme: 'system' | 'light' | 'dark'
-  /** Built-in ad & tracker blocking. */
   adblock: boolean
-  /** Hostnames where blocking is turned off. */
   adblockAllowlist: string[]
-  /** Check for new versions at startup and every few hours (installed app only). */
   autoUpdate: boolean
-  /** A playing video keeps going in the floating player when you leave its tab. */
   floatVideos: boolean
 }
 
@@ -126,21 +113,15 @@ export interface PersistedState {
   settings: Settings
   archive: ArchivedTab[]
   littleArc: LittleArcMemory
-  /** The YARC version that last ran with this state, so the next newer one shows What's New. */
+  /** So the next newer version shows What's New. */
   lastSeenVersion?: string
-  /** The feature spotlights this profile has seen in What's New (src/shared/spotlights.ts). */
   seenSpotlights?: string[]
-  /** A downloaded update the user hasn't restarted into yet (src/main/update-escalation.ts). */
   waitingUpdate?: WaitingUpdate
-  /** The open main windows (the last focused one last), restored at launch. */
+  /** The last focused one last. */
   windows: WindowView[]
 }
 
-/**
- * Kept while an update waits, so the wait survives a restart that didn't install it (a crash, a
- * failed install). `from` is the version that was running; once another version runs, the update
- * went in and the record is stale.
- */
+/** Survives a restart that didn't install the update; stale once a version other than `from` runs. */
 export interface WaitingUpdate {
   from: string
   /** When this version first had an update ready, in ms since the epoch. */
@@ -149,13 +130,12 @@ export interface WaitingUpdate {
   askedAt?: number
 }
 
-/** What one main window shows; the sidebar's contents are shared by all windows, like Arc. */
+/** What one main window shows; the sidebar's contents are shared by all windows. */
 export interface WindowView {
   id: ID
   activeSpaceId: ID
-  /** The tab each space shows in this window, by space id. */
+  /** Space id → tab id. */
   selected: Record<ID, ID>
-  /** Each space's split views in this window, by space id. */
   splits: Record<ID, Split[]>
   sidebarVisible: boolean
   /** Normal (un-maximized) bounds. */
@@ -163,22 +143,18 @@ export interface WindowView {
   maximized?: boolean
 }
 
-/** One version's entries in What's New. */
 export interface ReleaseNotes {
   version: string
   changes: string[]
 }
 
 export interface LittleArcMemory {
-  /** The size the user last gave a Little Window; absent = a size that suits the screen. */
+  /** Absent = a size that suits the screen. */
   size?: { width: number; height: number }
-  /** Hostname → profile picked with the toolbar's profile chip, like Arc remembers it per site. */
   profileByHost: Record<string, ID>
 }
 
-/** Live (runtime-only) info for an item that currently has a web page attached. */
 export interface LiveInfo {
-  /** webContents id, used by <browser-action-list tab=…>. */
   wcId: number
   url: string
   title: string
@@ -186,16 +162,16 @@ export interface LiveInfo {
   loading: boolean
   audible: boolean
   muted: boolean
-  /** The page's media is playing (it may be silent); false once paused or ended. */
+  /** May be silent; false once paused or ended. */
   playing: boolean
   canGoBack: boolean
   canGoForward: boolean
   zoom: number
   /** Ads/trackers blocked on the current page. */
   blocked: number
-  /** Blocking is on for this page (globally enabled and the site isn't allowlisted). */
+  /** Globally enabled and the site isn't allowlisted. */
   shielded: boolean
-  /** The color along the top of the page, for its bar in a split view (Arc tints it like the page). */
+  /** The color along the top of the page, for its bar in a split view. */
   barColor?: string
 }
 
@@ -225,40 +201,26 @@ export interface AppState extends PersistedState {
   fullscreen: boolean
   /** True while the collapsed sidebar is temporarily shown over the page. */
   sidebarPeek: boolean
-  /** The tab being dragged from the sidebar, while the page area shows split drop zones. */
+  /** While set, the page area shows split drop zones. */
   tabDrag?: ID
-  /** The command bar is open to make a new tab (the sidebar highlights "New Tab", like Arc). */
+  /** The command bar is open to make a new tab, so the sidebar highlights "New Tab". */
   newTabOpen: boolean
-  /** The page shown in Peek, if one is open. */
   peek?: LiveInfo
-  /**
-   * Where web pages currently sit in the window, so the UI can draw split handles and focus rings.
-   * `elsewhere`: the page is shown in another window, which has it live; this one shows a still of it.
-   * `bar`: in a split view, the pane's bar above the page (back, forward, host, close).
-   */
+  /** `elsewhere`: live in another window, shown here as a still. `bar`: a split pane's bar above the page. */
   layout: { content: Rect; views: { id: ID; rect: Rect; bar?: Rect; elsewhere?: boolean }[]; splitId?: ID }
   update: UpdateStatus
-  /** Each profile's answers to site permission prompts, for Settings. */
   sitePermissions: Record<ID, SitePermissionRow[]>
-  /**
-   * Tabs playing media out of sight: `cards` at the bottom of the sidebar (oldest first) and the
-   * tab in the floating player. `videos`: the cards whose tab has a video, which can float again.
-   */
+  /** Tabs playing out of sight. `cards`: oldest first. `videos`: cards whose video can float again. */
   media: { cards: ID[]; floating?: ID; videos: ID[] }
 }
 
-/**
- * A newer YARC. Windows and macOS download it in the background ('downloading', then 'ready'
- * to restart into); Linux, and a Mac that can't replace its app, only learn it exists ('available')
- * and download it by hand.
- */
+/** 'available': Linux, or a Mac that can't replace its app, downloads it by hand. */
 export type UpdateStatus =
   | { state: 'none' }
   | { state: 'downloading'; version: string }
-  | { state: 'ready'; version: string; /** Every version since the running one, newest first, for the relaunch card. */ notes?: ReleaseNotes[] }
+  | { state: 'ready'; version: string; /** Every version since the running one, newest first. */ notes?: ReleaseNotes[] }
   | { state: 'available'; version: string }
 
-/** Where a tab opened from a pane's split menu goes. */
 export interface SplitAt {
   target: ID
   side: Side
@@ -271,38 +233,31 @@ export interface Rect {
   height: number
 }
 
-/** A screen or window the share picker offers, with a small preview (a data: URL). */
 export interface ShareSource {
   id: string
   name: string
   screen: boolean
+  /** A data: URL. */
   thumbnail: string
 }
 
 export type OverlayMode =
   | { kind: 'none' }
-  /** `splitAt`: from a pane's split menu (Add Right Split…), the new tab goes on `side` of `target`. */
   | { kind: 'command'; initial?: string; editCurrent?: boolean; target?: 'tab' | 'split' | 'current'; splitAt?: SplitAt }
   | { kind: 'find' }
-  /** A page asked to share the screen (getDisplayMedia): pick a screen or window, or cancel. */
   | { kind: 'share-picker'; id: string; site: string; sources: ShareSource[]; systemAudio: boolean }
-  /** A short message over the top of the page that doesn't take the keyboard (full screen: "Press Esc to exit"). */
+  /** A short message over the top of the page that doesn't take the keyboard. */
   | { kind: 'notice'; text: string }
   | { kind: 'settings' }
   | { kind: 'library'; tab?: 'archive' | 'history' | 'downloads' | 'spaces' }
   | { kind: 'space-editor'; spaceId?: ID }
   | { kind: 'sidebar' }
   | { kind: 'switcher'; order: ID[]; index: number }
-  /** A Peek page floats over the content; the overlay draws the dimmed backdrop and its buttons beside `card`. */
+  /** The overlay draws the dimmed backdrop and Peek's buttons beside `card`. */
   | { kind: 'peek'; card: Rect }
-  /** A sidebar tab is being dragged: the overlay covers the page area and draws split drop zones. */
   | { kind: 'split-drop' }
-  /** The tour: first run, or Take the Tour. Try-it steps float over the page (shared/tour.ts). */
   | { kind: 'tour'; step: TourStep }
-  /**
-   * Feature spotlights (ids, src/shared/spotlights.ts) as large cards, then the changes in the
-   * versions since the user's last one, newest first.
-   */
+  /** Spotlight cards first, then the releases since the user's last version, newest first. */
   | { kind: 'whats-new'; releases: ReleaseNotes[]; spotlights: string[] }
   | { kind: 'update' }
 

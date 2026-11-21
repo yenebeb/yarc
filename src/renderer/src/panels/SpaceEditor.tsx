@@ -1,7 +1,6 @@
-// Create or edit a space: name, icon, color and profile.
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import type { AppState } from '../../../shared/types'
-import { activeSpace, dispatch, isMac } from '../api'
+import { activeSpace, cx, dispatch, isMac } from '../api'
 import { Icon } from '../icons'
 import { firstGrapheme, SPACE_COLORS } from './util'
 import './panels.css'
@@ -112,7 +111,7 @@ export function SpaceEditor({ state, close, spaceId }: { state: AppState; close:
           <div className="field">
             <span>Icon</span>
             <div className="emoji-grid">
-              <button type="button" className={`none${emoji ? '' : ' on'}`} title="No icon" onClick={() => pickEmoji('')}>
+              <button type="button" className={cx('none', !emoji && 'on')} title="No icon" onClick={() => pickEmoji('')}>
                 None
               </button>
               {EMOJI.map((e) => (
@@ -145,7 +144,7 @@ export function SpaceEditor({ state, close, spaceId }: { state: AppState; close:
                 <button
                   type="button"
                   key={c}
-                  className={`sw${color.toLowerCase() === c ? ' on' : ''}`}
+                  className={cx('sw', color.toLowerCase() === c && 'on')}
                   style={{ background: c }}
                   title={c}
                   aria-label={`Color ${c}`}
