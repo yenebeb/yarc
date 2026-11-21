@@ -396,6 +396,23 @@
   min-height: 0;
 }
 
+.intro-fine {
+  margin: 4px 0;
+  text-align: center;
+  color: var(--text-2);
+  font-size: 12px;
+}
+
+.link-btn {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
 .intro h2 {
   margin: 0;
   font-size: 14px;

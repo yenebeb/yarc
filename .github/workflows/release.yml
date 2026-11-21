@@ -111,7 +111,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git tag -a "v$version" -m "YARC v$version"
           git push origin "v$version"
-          gh release create "v$version" --draft --verify-tag --title "YARC v$version" --generate-notes \
+          gh release create "v$version" --draft --verify-tag --title "YARC v$version" --generate-notes ${latest:+--notes-start-tag "$latest"} \
             --notes "Downloads: Windows \`YARC-Setup-*-x64.exe\` (or \`-arm64.exe\`), macOS \`YARC-*-arm64.dmg\` (Apple silicon) or \`-x64.dmg\` (Intel), Linux \`.AppImage\`. Not code-signed: on Windows click More info > Run anyway; on macOS open it once, then System Settings > Privacy & Security > Open Anyway."
           echo "version=$version" >> "$GITHUB_OUTPUT"
       # What's New in the app: each PR's "What's New" lines (or its title, for older PRs) per release

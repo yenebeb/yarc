@@ -17,6 +17,14 @@ export interface Spotlight {
 /** Newest first. */
 export const SPOTLIGHTS: Spotlight[] = [
   {
+    id: 'usage-count',
+    title: 'YARC now counts its installs, and only that',
+    text:
+      'Once a day, YARC tells GitHub that an install on your platform, say macOS on Apple silicon, was open. No ID, nothing about you ' +
+      'or what you browse: it only shows which platforms to spend time on. You can turn it off in Settings.',
+    actions: [{ label: 'Settings', command: 'settings' }]
+  },
+  {
     id: 'canvases',
     title: 'Collect bits of the web on a canvas',
     text:

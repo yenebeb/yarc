@@ -23,6 +23,7 @@ export const DEFAULT_SETTINGS: Settings = {
   adblockAllowlist: [],
   autoUpdate: true,
   floatVideos: true,
+  countUsage: true,
   theme: 'system'
 }
 
@@ -71,6 +72,7 @@ export function normalize(raw: Partial<PersistedState>): PersistedState {
     lastSeenVersion: raw.lastSeenVersion,
     seenSpotlights: Array.isArray(raw.seenSpotlights) ? raw.seenSpotlights.filter((id) => typeof id === 'string') : undefined,
     waitingUpdate: raw.waitingUpdate,
+    usageCounted: raw.usageCounted,
     windows: (raw.windows ?? []).filter((w) => w && typeof w.id === 'string').map((w) => ({ ...w, selected: w.selected ?? {}, splits: w.splits ?? {} }))
   }
 }
