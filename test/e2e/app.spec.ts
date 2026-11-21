@@ -82,6 +82,19 @@ test('starts with a default space and the sidebar', async () => {
   await expect(ui.locator('.space-name')).toContainText('Personal')
 })
 
+test("clicking the current space's icon opens its menu", async () => {
+  const ui = await pageWithUrl('index.html')
+  await app.evaluate(({ Menu }) => {
+    const popup = Menu.prototype.popup
+    Menu.prototype.popup = function (this: Electron.Menu) {
+      ;(globalThis as any).poppedMenu = this.items.map((i) => i.label)
+      Menu.prototype.popup = popup
+    }
+  })
+  await ui.locator('.space-dot.active').click()
+  await expect.poll(() => app.evaluate(() => (globalThis as any).poppedMenu)).toContain('Edit Space…')
+})
+
 test('pages start below the native caption buttons on Windows and Linux', async () => {
   const ui = await pageWithUrl('index.html')
   const mac = process.platform === 'darwin'

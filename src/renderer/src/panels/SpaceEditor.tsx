@@ -45,6 +45,13 @@ export function SpaceEditor({ state, close, spaceId }: { state: AppState; close:
   const fallbackName = `Space ${state.spaces.length + 1}`
   const usersOf = (id: string) => state.spaces.filter((s) => s.id !== space?.id && s.profileId === id)
   const profileChanged = !!space && profileId !== space.profileId
+  const profileChoices = [
+    ...(isNew ? [{ id: 'new', name: 'New profile', detail: 'Its own logins, history and extensions' }] : []),
+    ...state.profiles.map((p) => {
+      const users = usersOf(p.id).map((s) => s.name).join(', ')
+      return { id: p.id, name: p.name, detail: users && `${isNew ? 'Shared with' : 'Also used by'} ${users}` }
+    })
+  ]
 
   const submit = (e?: FormEvent) => {
     e?.preventDefault()
@@ -156,21 +163,17 @@ export function SpaceEditor({ state, close, spaceId }: { state: AppState; close:
             </div>
           </div>
 
-          <label className="field">
+          <div className="field">
             <span>Profile</span>
-            <select value={profileId} onChange={(e) => setProfileId(e.target.value)}>
-              {isNew && <option value="new">New profile (separate logins, history &amp; extensions)</option>}
-              {state.profiles.map((p) => {
-                const users = usersOf(p.id)
-                const by = users.length ? ` — used by ${users.map((s) => s.name).join(', ')}` : ''
-                return (
-                  <option key={p.id} value={p.id}>
-                    {isNew ? `Share with: ${p.name}${by}` : `${p.name}${by}`}
-                  </option>
-                )
-              })}
-            </select>
-          </label>
+            <div className="segmented" role="radiogroup" aria-label="Profile">
+              {profileChoices.map((p) => (
+                <button type="button" role="radio" aria-checked={profileId === p.id} key={p.id} className={cx(profileId === p.id && 'on')} onClick={() => setProfileId(p.id)}>
+                  {p.name}
+                  {p.detail && <small>{p.detail}</small>}
+                </button>
+              ))}
+            </div>
+          </div>
           {isNew && profileId === 'new' && (
             <label className="field">
               <span>Profile name</span>

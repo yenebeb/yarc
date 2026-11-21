@@ -291,9 +291,12 @@
   box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 22%, transparent);
 }
 
-.settings .set-select select option {
-  background: var(--panel);
-  color: var(--text);
+:root:not([data-platform='darwin']) .settings .set-select select {
+  appearance: base-select;
+}
+
+:root:not([data-platform='darwin']) .settings .set-select select::picker-icon {
+  display: none;
 }
 
 .settings .set-select .icon {

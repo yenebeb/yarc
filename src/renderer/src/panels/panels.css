@@ -311,8 +311,41 @@
   font-variant-numeric: tabular-nums;
 }
 
-.space-editor select {
-  width: 100%;
+.segmented {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 10px;
+  background: var(--field);
+  border: 1px solid var(--panel-line);
+}
+
+.segmented button {
+  flex: 1 1 140px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  padding: 7px 11px;
+  border-radius: 7px;
+  text-align: left;
+  color: var(--text-2);
+}
+
+.segmented button:hover {
+  background: var(--hover);
+}
+
+.segmented button.on {
+  background: color-mix(in oklab, var(--accent) 16%, var(--panel));
+  color: var(--text);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--accent) 60%, transparent);
+}
+
+.segmented small {
+  font-size: 11.5px;
+  color: var(--text-3);
 }
 
 .contents {

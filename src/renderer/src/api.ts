@@ -11,6 +11,7 @@ declare global {
 
 export const arc = window.arc
 export const isMac = arc.platform === 'darwin'
+document.documentElement.dataset.platform = arc.platform
 export const dispatch = (a: Action) => void arc.dispatch(a)
 
 export function useAppState(): AppState | undefined {

@@ -1295,6 +1295,33 @@ select:focus {
   border-color: var(--accent);
 }
 
+/* Windows and Linux draw a native select's list in the OS's light colors, whatever the page's color-scheme. */
+:root:not([data-platform='darwin']) select,
+:root:not([data-platform='darwin']) select::picker(select) {
+  appearance: base-select;
+}
+
+:root:not([data-platform='darwin']) select::picker(select) {
+  margin-block: 4px;
+  padding: 4px;
+  color: var(--text);
+  background: var(--panel);
+  border: 1px solid var(--panel-line);
+  border-radius: 10px;
+  box-shadow: var(--shadow-lg);
+}
+
+:root:not([data-platform='darwin']) select option {
+  padding: 6px 10px;
+  border-radius: 6px;
+}
+
+:root:not([data-platform='darwin']) select option:hover,
+:root:not([data-platform='darwin']) select option:focus-visible {
+  background: var(--hover);
+  outline: none;
+}
+
 .btn {
   padding: 7px 14px;
   border-radius: 8px;
