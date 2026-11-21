@@ -1,7 +1,7 @@
 // End-to-end tests against the built app (run `pnpm build` first; `pnpm test:e2e` does).
 import { _electron as electron, expect, test, type ElectronApplication, type Page } from '@playwright/test'
 import { spawn } from 'node:child_process'
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { createServer, type Server } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
@@ -693,12 +693,12 @@ test('ad block scriptlets run while the page still loads, each in its own scope,
 })
 
 // What Windows/macOS do when YARC is the default browser: start a second instance with the URL.
-function launchSecondInstance(arg: string): void {
+function launchSecondInstance(arg: string, cwd = process.cwd()): void {
   const exe = process.env.YARC_EXE
   const env = { ...process.env, YARC_USER_DATA: userData, YARC_TEST: '1' }
   const child = exe
-    ? spawn(exe, ['--', arg], { env, stdio: 'ignore' })
-    : spawn(require('electron') as unknown as string, ['out/main/index.js', arg], { env, stdio: 'ignore' })
+    ? spawn(exe, ['--', arg], { cwd, env, stdio: 'ignore' })
+    : spawn(require('electron') as unknown as string, [join(process.cwd(), 'out/main/index.js'), arg], { cwd, env, stdio: 'ignore' })
   child.unref()
 }
 
@@ -713,6 +713,12 @@ test('links and .html files from other apps open in a Little Window', async () =
   launchSecondInstance(file)
   await expect.poll(littles, { timeout: 15_000 }).toBe(before + 2)
   await pageWithUrl('local%20page.html')
+  const site = join(userData, 'site')
+  mkdirSync(site)
+  writeFileSync(join(site, 'Résumé.html'), '<title>Résumé</title>')
+  launchSecondInstance('Résumé.html', site)
+  await expect.poll(littles, { timeout: 15_000 }).toBe(before + 3)
+  await pageWithUrl('site/R%C3%A9sum%C3%A9.html')
   await app.evaluate(() => {
     for (const l of (globalThis as any).arcBrowser.openLittles()) l.win.close()
   })

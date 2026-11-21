@@ -5,7 +5,7 @@
 ; Settings > Apps > Default apps and in "Open with" for http/https links and .html/.htm files.
 ;
 ; It deliberately does NOT make itself the default: Windows 10/11 protect UserChoice, so the
-; app opens ms-settings:defaultapps?registeredAppUser=Arc%20Shell itself and the user picks it.
+; app opens ms-settings:defaultapps?registeredAppUser=YARC itself and the user picks it.
 ; The RegisteredApplications value name below ("${PRODUCT_NAME}" = "YARC") must stay equal to
 ; that registeredAppUser value.
 ;

@@ -1,10 +1,10 @@
 import { app, BrowserWindow } from 'electron'
-import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { Browser } from './browser'
 import { askForClientCertificates } from './client-certificates'
 import { Extensions } from './extensions'
+import { urlArg } from './launch-args'
 import { startLog } from './log'
 import { installAppMenu, installDockMenu } from './menus'
 import { profileDir } from './profile-dir'
@@ -78,31 +78,22 @@ function installJumpList(): void {
   ])
 }
 
-// Double-clicked .html files (Windows) arrive as plain paths.
-function urlArg(argv: string[]): string | undefined {
-  for (const a of argv.slice(1)) {
-    if (/^(https?|file):/i.test(a)) return a
-    if (/\.(html?|xhtml|svg|pdf)$/i.test(a) && existsSync(a)) return pathToFileURL(a).href
-  }
-  return undefined
-}
-
 if (!app.requestSingleInstanceLock()) {
   app.quit()
 } else {
   let browser: Browser | undefined
-  let pendingUrl: string | undefined = urlArg(process.argv)
+  const pendingUrls = [urlArg(process.argv, process.cwd())].filter((u) => u !== undefined)
   let pendingTask: LaunchTask | undefined = taskArg(process.argv)
+  const openUrl = (url: string): void => {
+    if (browser) browser.openExternalUrl(url)
+    else pendingUrls.push(url)
+  }
 
-  app.on('second-instance', (_e, argv) => {
-    const url = urlArg(argv)
+  app.on('second-instance', (_e, argv, cwd) => {
+    const url = urlArg(argv, cwd)
     const task = taskArg(argv)
-    if (!browser) {
-      pendingUrl = url
-      pendingTask = task
-      return
-    }
-    if (url) browser.openExternalUrl(url)
+    if (url) openUrl(url)
+    else if (!browser) pendingTask = task ?? pendingTask
     else if (task) runTask(browser, task)
     else browser.focusWindow()
   })
@@ -110,15 +101,12 @@ if (!app.requestSingleInstanceLock()) {
   // Possibly before ready.
   app.on('open-url', (e, url) => {
     e.preventDefault()
-    if (browser) browser.openExternalUrl(url)
-    else pendingUrl = url
+    openUrl(url)
   })
 
   app.on('open-file', (e, path) => {
     e.preventDefault()
-    const url = pathToFileURL(path).href
-    if (browser) browser.openExternalUrl(url)
-    else pendingUrl = url
+    openUrl(pathToFileURL(path).href)
   })
 
   app.whenReady().then(async () => {
@@ -133,9 +121,8 @@ if (!app.requestSingleInstanceLock()) {
     installDockMenu(browser)
     browser.start()
     installJumpList()
-    if (pendingUrl) browser.openExternalUrl(pendingUrl)
+    if (pendingUrls.length) for (const url of pendingUrls.splice(0)) browser.openExternalUrl(url)
     else if (pendingTask) runTask(browser, pendingTask)
-    pendingUrl = undefined
     pendingTask = undefined
 
     app.on('activate', () => {
