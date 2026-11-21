@@ -99,6 +99,7 @@ const COMMAND_ACTIONS: Partial<Record<CommandId, Action>> = {
   downloads: { type: 'overlay', mode: { kind: 'library', tab: 'downloads' } },
   library: { type: 'overlay', mode: { kind: 'library', tab: 'archive' } },
   settings: { type: 'overlay', mode: { kind: 'settings' } },
+  trafficControl: { type: 'overlay', mode: { kind: 'settings', section: 'traffic' } },
   newSpace: { type: 'overlay', mode: { kind: 'space-editor' } },
   tour: { type: 'overlay', mode: { kind: 'tour', step: 'welcome' } },
   toggleSidebar: { type: 'toggleSidebar' },

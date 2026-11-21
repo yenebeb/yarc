@@ -786,6 +786,223 @@
   }
 }
 
+.tc-scene {
+  --tc-other: color-mix(in oklab, #3fa7d6 34%, var(--panel));
+  position: relative;
+  width: 300px;
+  height: 168px;
+}
+
+.tc-app {
+  position: absolute;
+  left: 0;
+  top: 34px;
+  width: 84px;
+  height: 100px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 10px;
+  background: var(--panel);
+  box-shadow:
+    0 0 0 1px var(--line),
+    0 10px 24px rgb(20 10 40 / 0.18);
+}
+
+.tc-app i {
+  height: 8px;
+  border-radius: 4px;
+  background: color-mix(in oklab, var(--text) 12%, transparent);
+}
+
+.tc-app i:first-child {
+  width: 70%;
+}
+
+.tc-chip {
+  width: 46px;
+  height: 10px;
+  border-radius: 5px;
+  background: color-mix(in oklab, var(--accent) 30%, transparent);
+}
+
+.tc-window {
+  position: absolute;
+  left: 104px;
+  top: 0;
+  width: 196px;
+  box-sizing: border-box;
+  animation: tc-space 6s ease-in-out infinite;
+}
+
+.tc-tab {
+  flex: none;
+  height: 0;
+  margin-bottom: -5px;
+  border-radius: 3px;
+  background: color-mix(in oklab, var(--accent) 55%, transparent);
+  animation: tc-tab 6s ease-in-out infinite;
+}
+
+.tc-spaces {
+  margin: auto 0 4px;
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+}
+
+.tc-spaces b {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: color-mix(in oklab, var(--text) 18%, transparent);
+}
+
+.tc-spaces b:first-child {
+  animation: tc-dot-off 6s ease-in-out infinite;
+}
+
+.tc-spaces b:last-child {
+  animation: tc-dot-on 6s ease-in-out infinite;
+}
+
+.tc-page {
+  position: absolute;
+  inset: 14px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  animation: tc-page 6s ease-in-out infinite;
+}
+
+.tc-page i {
+  height: 8px;
+  border-radius: 4px;
+  background: color-mix(in oklab, var(--text) 12%, transparent);
+}
+
+.tc-page i:first-child {
+  width: 60%;
+  height: 12px;
+  background: color-mix(in oklab, var(--text) 22%, transparent);
+}
+
+/* From the chip in .tc-app (12px + 3 rows down) to the top sidebar row of .tc-window (104 + 6 + 2, 6 + 16). */
+.tc-link {
+  position: absolute;
+  left: 12px;
+  top: 78px;
+  width: 46px;
+  height: 10px;
+  border-radius: 5px;
+  background: var(--accent);
+  opacity: 0;
+  animation: tc-link 6s cubic-bezier(0.5, 0, 0.2, 1) infinite;
+}
+
+@keyframes tc-link {
+  0%,
+  12% {
+    left: 12px;
+    top: 78px;
+    width: 46px;
+    opacity: 0;
+    box-shadow: none;
+  }
+  18% {
+    left: 12px;
+    top: 78px;
+    width: 46px;
+    opacity: 1;
+    box-shadow: 0 6px 14px rgb(20 10 40 / 0.3);
+  }
+  44% {
+    left: 112px;
+    top: 22px;
+    width: 60px;
+    height: 9px;
+    opacity: 1;
+  }
+  52%,
+  100% {
+    left: 112px;
+    top: 22px;
+    width: 60px;
+    height: 9px;
+    opacity: 0;
+    box-shadow: none;
+  }
+}
+
+@keyframes tc-space {
+  0%,
+  30%,
+  96%,
+  100% {
+    background: color-mix(in oklab, var(--space) 22%, var(--panel));
+  }
+  40%,
+  88% {
+    background: var(--tc-other);
+  }
+}
+
+@keyframes tc-dot-off {
+  0%,
+  30%,
+  96%,
+  100% {
+    background: color-mix(in oklab, var(--text) 55%, transparent);
+  }
+  40%,
+  88% {
+    background: color-mix(in oklab, var(--text) 18%, transparent);
+  }
+}
+
+@keyframes tc-dot-on {
+  0%,
+  30%,
+  96%,
+  100% {
+    background: color-mix(in oklab, var(--text) 18%, transparent);
+  }
+  40%,
+  88% {
+    background: color-mix(in oklab, var(--text) 55%, transparent);
+  }
+}
+
+@keyframes tc-tab {
+  0%,
+  40%,
+  96%,
+  100% {
+    height: 0;
+    margin-bottom: -5px;
+  }
+  48%,
+  88% {
+    height: 9px;
+    margin-bottom: 0;
+  }
+}
+
+@keyframes tc-page {
+  0%,
+  46%,
+  92%,
+  100% {
+    opacity: 0;
+  }
+  58%,
+  86% {
+    opacity: 1;
+  }
+}
+
 .intro.update-ready .intro-body {
   max-height: min(46vh, 360px);
   overflow-y: auto;

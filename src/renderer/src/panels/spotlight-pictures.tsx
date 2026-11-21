@@ -56,7 +56,42 @@ function Canvases() {
   )
 }
 
+function TrafficControl() {
+  return (
+    <div className="tc-scene">
+      <div className="tc-app">
+        <i />
+        <i />
+        <span className="tc-chip" />
+        <i />
+      </div>
+      <div className="mini-window tc-window">
+        <div className="mini-sidebar">
+          <span className="tc-tab" />
+          <i />
+          <i />
+          <i />
+          <span className="tc-spaces">
+            <b />
+            <b />
+            <b />
+          </span>
+        </div>
+        <div className="mini-page">
+          <div className="tc-page">
+            <i />
+            <i />
+            <i />
+          </div>
+        </div>
+      </div>
+      <span className="tc-link" />
+    </div>
+  )
+}
+
 const PICTURES: Record<string, () => ReactNode> = {
+  'traffic-control': TrafficControl,
   canvases: Canvases,
   'floating-player': FloatingPlayer
 }

@@ -3,14 +3,12 @@ import logo from '../../../../build/icon.svg'
 import { BINDINGS, bindingLabel } from '../../../shared/keymap'
 import { cleanMatch } from '../../../shared/link-routes'
 import { permissionLabel, siteName, type SitePermissionRow } from '../../../shared/permissions'
-import { SIDEBAR_WIDTH, type AppState, type Profile, type SearchEngine, type Settings as SettingsT } from '../../../shared/types'
+import { SIDEBAR_WIDTH, type AppState, type Profile, type SearchEngine, type Settings as SettingsT, type SettingsSection as Section } from '../../../shared/types'
 import { SEARCH_ENGINES } from '../../../shared/url'
 import { activeSpace, dispatch, isMac } from '../api'
 import { Icon, type IconName } from '../icons'
 import './panels.css'
 import './settings.css'
-
-type Section = 'general' | 'traffic' | 'profiles' | 'sites' | 'import' | 'extensions' | 'shortcuts' | 'about'
 
 const SECTIONS: { id: Section; label: string; icon?: IconName }[] = [
   { id: 'general', label: 'General', icon: 'settings' },
@@ -48,8 +46,8 @@ const THEMES: { value: SettingsT['theme']; label: string }[] = [
 
 const patch = (p: Partial<SettingsT>) => dispatch({ type: 'settings', patch: p })
 
-export function Settings({ state, close }: { state: AppState; close: () => void }) {
-  const [section, setSection] = useState<Section>('general')
+export function Settings({ state, section: initial = 'general', close }: { state: AppState; section?: Section; close: () => void }) {
+  const [section, setSection] = useState<Section>(initial)
   const current = SECTIONS.find((s) => s.id === section)!
   const onNavKey = (e: KeyboardEvent) => {
     if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return

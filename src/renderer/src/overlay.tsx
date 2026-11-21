@@ -66,7 +66,7 @@ function App() {
       return (
         <>
           <div className="scrim" onMouseDown={close} />
-          <Settings key={key} state={state} close={close} />
+          <Settings key={key} state={state} section={mode.section} close={close} />
         </>
       )
     case 'library':

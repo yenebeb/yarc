@@ -17,6 +17,14 @@ export interface Spotlight {
 /** Newest first. */
 export const SPOTLIGHTS: Spotlight[] = [
   {
+    id: 'traffic-control',
+    title: 'Links from other apps land in the right space',
+    text:
+      'Tell Traffic Control which space a site belongs to: github.com to Work, a shared doc to your side project. ' +
+      'Links you click in Slack, Mail or any other app then open as a tab right there, not wherever you happen to be.',
+    actions: [{ label: 'Set Up Rules', command: 'trafficControl' }]
+  },
+  {
     id: 'nothing-collected',
     title: 'YARC collects nothing',
     text:
