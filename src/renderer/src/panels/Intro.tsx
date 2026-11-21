@@ -40,15 +40,7 @@ function content(step: TourStep, state: AppState): StepContent {
     case 'welcome':
       return {
         title: 'Welcome to YARC',
-        text: 'Spaces, pinned tabs, a command bar and split view, all in one sidebar. A two-minute tour shows you around.',
-        body: (
-          <p className="intro-fine">
-            YARC counts how many installs are open each day, per platform, and nothing else.{' '}
-            <button className="link-btn" onClick={() => dispatch({ type: 'command', id: 'settings' })}>
-              Turn it off in Settings
-            </button>
-          </p>
-        )
+        text: 'Spaces, pinned tabs, a command bar and split view, all in one sidebar, and nothing collected about you. A two-minute tour shows you around.'
       }
     case 'import':
       return {

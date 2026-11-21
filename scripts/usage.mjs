@@ -1,67 +1,54 @@
-// GitHub keeps only running download totals, so the daily workflow (usage.yml) records them and turns the
-// differences into counts. Usage: node scripts/usage.mjs <counts.csv> <assets.json>; prints a Markdown summary.
-import { existsSync, readFileSync, writeFileSync } from 'node:fs'
-import { isoWeek, usageFiles } from '../src/main/usage.ts'
-
-const LABELS = {
-  'darwin-arm64': 'macOS, Apple silicon',
-  'darwin-x64': 'macOS, Intel',
-  'win32-x64': 'Windows, x64',
-  'win32-arm64': 'Windows, Arm',
-  'linux-x64': 'Linux, x64',
-  'linux-arm64': 'Linux, Arm'
-}
+// Installs per platform, from GitHub's public download counts: every install downloads each update once, from a
+// file named for its platform and chip. Usage: node scripts/usage.mjs [weeks] (GITHUB_TOKEN raises the rate limit).
+const API = 'https://api.github.com/repos/yenebeb/yarc/releases?per_page=100'
+const UPDATES = [
+  ['macOS, Apple silicon', /-arm64-mac\.zip$/],
+  ['macOS, Intel', /-x64-mac\.zip$/],
+  ['Windows, x64', /Setup-.*-x64\.exe$/],
+  ['Windows, Arm', /Setup-.*-arm64\.exe$/]
+]
+const DOWNLOADS = [
+  ['New Mac downloads', /\.dmg$/],
+  ['Linux downloads', /\.AppImage$/]
+]
+// Linux checks for updates through the API, so whatever fetched latest-linux.yml is a bot that fetches every file.
+const BOTS = /^latest-linux\.yml$/
 const DAY = 86_400_000
 
-const [csvPath, assetsPath] = process.argv.slice(2)
-const today = new Date().toISOString().slice(0, 10)
-const recorded = existsSync(csvPath) ? readFileSync(csvPath, 'utf8').trim().split('\n').slice(1).map(parseRow) : []
-const totals = JSON.parse(readFileSync(assetsPath, 'utf8'))
-  .filter((a) => usageFiles().includes(a.name))
-  .map((a) => ({ date: today, file: a.name, total: a.download_count }))
-const rows = [...recorded.filter((r) => r.date !== today), ...totals]
-writeFileSync(csvPath, ['date,file,total', ...rows.map((r) => `${r.date},${r.file},${r.total}`)].join('\n') + '\n')
-console.log(summary(rows))
+const weeks = Number(process.argv[2] ?? 8)
+const releases = (await allReleases()).filter((r) => !r.draft && !r.prerelease)
+const byWeek = Map.groupBy(releases, (r) => isoWeek(new Date(r.published_at)))
+const rows = [...byWeek].toSorted(([a], [b]) => b.localeCompare(a)).slice(0, weeks)
+console.log(`| Week | ${[...UPDATES, ...DOWNLOADS].map(([title]) => title).join(' | ')} |`)
+console.log(`| --- |${' ---: |'.repeat(UPDATES.length + DOWNLOADS.length)}`)
+for (const [week, inWeek] of rows) {
+  const updates = UPDATES.map(([, file]) => Math.max(0, ...inWeek.map((r) => downloads(r, file))))
+  const fresh = DOWNLOADS.map(([, file]) => inWeek.reduce((n, r) => n + downloads(r, file), 0))
+  console.log(`| ${week} | ${[...updates, ...fresh].join(' | ')} |`)
+}
+console.log(`
+Updates: the most downloads of one release that week, which is about how many installs were online while it was the newest.
+Windows also counts new installs, which download the same file. Downloads: all of that week's releases together.
+A bot's downloads (the count of latest-linux.yml) are taken off every file. Linux doesn't update itself, so its installs aren't visible.`)
 
-function parseRow(line) {
-  const [date, file, total] = line.split(',')
-  return { date, file, total: Number(total) }
+async function allReleases() {
+  const headers = process.env.GITHUB_TOKEN ? { authorization: `Bearer ${process.env.GITHUB_TOKEN}` } : {}
+  const all = []
+  for (let page = 1; ; page++) {
+    const batch = await (await fetch(`${API}&page=${page}`, { headers })).json()
+    if (!Array.isArray(batch)) throw new Error(`GitHub answered: ${batch.message}`)
+    all.push(...batch)
+    if (batch.length < 100) return all
+  }
 }
 
-/** A snapshot taken just after midnight UTC holds the counts of the day before. */
-function countsByDay(rows) {
-  const previous = new Map()
-  return rows
-    .toSorted((a, b) => a.date.localeCompare(b.date))
-    .map((r) => {
-      const added = r.total - (previous.get(r.file) ?? 0)
-      previous.set(r.file, r.total)
-      return { day: new Date(Date.parse(r.date) - DAY), file: r.file, added }
-    })
+function downloads(release, file) {
+  const bots = release.assets.find((a) => BOTS.test(a.name))?.download_count ?? 0
+  return release.assets.filter((a) => file.test(a.name)).reduce((n, a) => n + Math.max(0, a.download_count - bots), 0)
 }
 
-function summary(rows) {
-  const counts = countsByDay(rows)
-  const now = Date.parse(today)
-  const yesterday = new Date(now - DAY).toISOString().slice(0, 10)
-  const lastWeek = isoWeek(new Date(now - 7 * DAY))
-  const lastMonth = new Date(Date.UTC(new Date(now).getUTCFullYear(), new Date(now).getUTCMonth(), 0)).toISOString().slice(0, 7)
-  const sum = (platform, count, inPeriod) =>
-    counts.filter((c) => c.file === `${platform}-${count}` && inPeriod(c.day)).reduce((n, c) => n + c.added, 0)
-  const columns = [
-    ['Yesterday', 'daily', (d) => d.toISOString().slice(0, 10) === yesterday],
-    [`Last week (${lastWeek})`, 'weekly', (d) => isoWeek(d) === lastWeek],
-    [`Last month (${lastMonth})`, 'monthly', (d) => d.toISOString().slice(0, 7) === lastMonth],
-    ['New, last 7 days', 'first', (d) => d.getTime() >= now - 7 * DAY]
-  ]
-  const table = Object.entries(LABELS).map(([platform, label]) => [label, ...columns.map(([, count, inPeriod]) => sum(platform, count, inPeriod))])
-  const total = ['**Total**', ...columns.map((_, i) => table.reduce((n, row) => n + row[i + 1], 0))]
-  const since = rows.map((r) => r.date).toSorted()[0]
-  return [
-    `Installs that were open, as counted once a day by YARC itself (README: "What we collect"). Recorded since ${since}; updated ${today}.`,
-    '',
-    `| | ${columns.map(([title]) => title).join(' | ')} |`,
-    `| --- |${columns.map(() => ' ---: |').join('')}`,
-    ...[...table, total].map((row) => `| ${row.join(' | ')} |`)
-  ].join('\n')
+function isoWeek(date) {
+  const thursday = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate() + 4 - (date.getUTCDay() || 7)))
+  const year = thursday.getUTCFullYear()
+  return `${year}-W${String(Math.ceil(((thursday - Date.UTC(year, 0, 1)) / DAY + 1) / 7)).padStart(2, '0')}`
 }

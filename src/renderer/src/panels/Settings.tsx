@@ -260,14 +260,6 @@ function General({ state }: { state: AppState }) {
           onChange={(v) => patch({ autoUpdate: v })}
         />
       </Group>
-      <Group title="Privacy">
-        <ToggleRow
-          title="Count this install in YARC’s daily numbers"
-          hint="Once a day YARC tells GitHub that an install on your platform was open, so it knows which platforms to work on. No ID, nothing about you or what you browse."
-          checked={s.countUsage}
-          onChange={(v) => patch({ countUsage: v })}
-        />
-      </Group>
     </>
   )
 }

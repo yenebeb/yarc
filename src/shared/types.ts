@@ -111,15 +111,6 @@ export interface Settings {
   adblockAllowlist: string[]
   autoUpdate: boolean
   floatVideos: boolean
-  countUsage: boolean
-}
-
-/** The day, ISO week and month this install was last counted for; `first` until a fresh install's first count is sent. */
-export interface UsageCounted {
-  first?: true
-  daily?: string
-  weekly?: string
-  monthly?: string
 }
 
 export interface PersistedState {
@@ -135,7 +126,6 @@ export interface PersistedState {
   lastSeenVersion?: string
   seenSpotlights?: string[]
   waitingUpdate?: WaitingUpdate
-  usageCounted?: UsageCounted
   /** The last focused one last. */
   windows: WindowView[]
 }

@@ -3,7 +3,6 @@ import {
   BrowserWindow,
   clipboard,
   nativeTheme,
-  net,
   screen,
   shell,
   WebContentsView,
@@ -66,7 +65,6 @@ import { incognitoState, newId, SPACE_COLORS, Store } from './store'
 import { LiveTab, type OpenDisposition, type TabHost } from './tab'
 import { handleUi } from './ui-origin'
 import { Updater } from './updater'
-import { dueCounts, markCounted, usageUrl } from './usage'
 import { MainWindow, PAD, type ViewSlot } from './window'
 import { applyView, captureView, cascade, inAnyView, newView, stateForView, viewFromState } from './window-state'
 
@@ -254,32 +252,14 @@ export class Browser implements TabHost, FloatingHost {
     const lastFocused = saved[saved.length - 1]
     saved.forEach((view) => this.openWindow(view, view !== lastFocused))
     if (this.incognito) return
-    if (this.store.firstRun) this.state.usageCounted = { first: true }
     setInterval(() => {
       this.autoArchive()
       this.unloadHiddenTabs()
       this.closeIdleLittles()
-      void this.countUsage()
     }, HOUSEKEEPING_EVERY)
     this.autoArchive()
     this.updater.sync()
     this.showStartupScreen()
-  }
-
-  private async countUsage(): Promise<void> {
-    if (this.countingUsage || !app.isPackaged || process.env.YARC_TEST || !this.state.settings.countUsage) return
-    this.countingUsage = true
-    try {
-      for (const count of dueCounts(this.state.usageCounted, new Date())) {
-        const url = usageUrl(process.platform, process.arch, count)
-        const res = url ? await net.fetch(url, { signal: AbortSignal.timeout(30_000) }).catch(() => undefined) : undefined
-        if (!res?.ok) return
-        this.state.usageCounted = markCounted(this.state.usageCounted, count, new Date())
-        this.store.save()
-      }
-    } finally {
-      this.countingUsage = false
-    }
   }
 
   private showStartupScreen(): void {
@@ -2139,7 +2119,6 @@ export class Browser implements TabHost, FloatingHost {
   }
 
   private quitting = false
-  private countingUsage = false
 
   shutdown(): void {
     this.quitting = true

@@ -17,12 +17,11 @@ export interface Spotlight {
 /** Newest first. */
 export const SPOTLIGHTS: Spotlight[] = [
   {
-    id: 'usage-count',
-    title: 'YARC now counts its installs, and only that',
+    id: 'nothing-collected',
+    title: 'YARC collects nothing',
     text:
-      'Once a day, YARC tells GitHub that an install on your platform, say macOS on Apple silicon, was open. No ID, nothing about you ' +
-      'or what you browse: it only shows which platforms to spend time on. You can turn it off in Settings.',
-    actions: [{ label: 'Settings', command: 'settings' }]
+      'No telemetry, no usage counts, no account and no YARC server: the short-lived daily install count is gone again. ' +
+      'YARC’s own requests are only update checks, ad-blocking lists, search suggestions and extension updates.'
   },
   {
     id: 'canvases',

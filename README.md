@@ -2,7 +2,7 @@
 
 # YARC: an open-source alternative to the Arc browser
 
-**YARC is a free, open-source alternative to the Arc browser, which shuts down on 22 December 2026.** It will feel familiar if you used Arc: a vertical sidebar, Spaces with their own profiles, the command bar, split view, Little Window and Peek. It imports your Arc spaces, profiles, favorites, pinned tabs, folders, archive and history in one step. It runs on macOS, Windows and Linux (experimental).
+**YARC is a free, open-source alternative to the Arc browser, which shuts down on 22 December 2026.** It will feel familiar if you used Arc: a vertical sidebar, Spaces with their own profiles, the command bar, split view, Little Window and Peek. It imports your Arc spaces, profiles, favorites, pinned tabs, folders, archive and history in one step. It runs on macOS, Windows and Linux (experimental), and it collects nothing about you: no telemetry, no account, no servers of its own.
 
 **[Download YARC](https://github.com/yenebeb/yarc/releases/latest)** · [Website](https://yenebeb.nl/yarc) · [Moving from Arc](#moving-from-arc)
 
@@ -20,7 +20,6 @@ The Browser Company is shutting Arc down on **22 December 2026**. After that dat
 - [Keyboard shortcuts](#keyboard-shortcuts)
 - [FAQ](#faq)
 - [Where your data lives](#where-your-data-lives)
-- [What we collect](#what-we-collect)
 - [Building from source](#building-from-source)
 - [How it works](#how-it-works)
 - [Roadmap and known limitations](#roadmap-and-known-limitations)
@@ -28,6 +27,10 @@ The Browser Company is shutting Arc down on **22 December 2026**. After that dat
 - [License](#license)
 
 ## Features
+
+### Nothing collected
+
+YARC collects nothing about you. There's no telemetry, no usage counting, no crash reporting, no account and no YARC server, so the project never learns who you are, what you browse or even that you opened it. The only requests YARC makes on its own are update checks for itself and a daily download of the ad-blocking filter lists (both from GitHub), search suggestions from the search engine you chose, a site's icon when you use Tab to Search with it, and Chrome Web Store update checks for extensions you installed. Update checks can be turned off in Settings. The only numbers the project has are GitHub's public download counts for each release.
 
 ### The sidebar
 
@@ -287,7 +290,7 @@ Not yet. Each install keeps its own data. Syncing is on the [roadmap](#roadmap-a
 Electron is real Chromium, so sites behave as they do in Chrome, and Chrome extensions work. It also let a small project build a fully custom interface without maintaining a fork of Chromium. The trade-off is memory use roughly on par with Chrome. Arc itself was Chromium too.
 
 **Is it private?**
-YARC has no account and doesn't track you. The only thing it reports is a daily count of open installs per platform, without any ID, and you can turn that off (see [What we collect](#what-we-collect)). Its other network requests are search suggestions (sent to the search engine you chose), Chrome Web Store update checks for installed extensions, a daily download of the ad-blocking filter lists from GitHub, and update checks for YARC itself against its GitHub releases (which you can turn off in Settings).
+Yes. YARC collects nothing and has no account or servers of its own; see [Nothing collected](#nothing-collected) for the few requests it makes itself.
 
 **Who makes YARC?**
 One person, in their spare time: YARC is a hobby project. Features land when they're ready, and some may change along the way. On security, YARC relies on Chromium: every page runs in Chromium's sandbox, as it does in Chrome, and Chromium security fixes ship as soon as Electron releases them (see [Updating](#updating)). YARC's own updates are signed and checked before they install.
@@ -307,17 +310,6 @@ No. Blocking is built in (see [Built-in ad and tracker blocking](#built-in-ad-an
 | Ad-blocking filter cache | `adblock/engine.bin` | same |
 | Cookies, site storage, cache | `Partitions/profile-<id>` | same |
 | Error log | `logs\main.log` | `~/Library/Logs/YARC/main.log` |
-
-## What we collect
-
-Only a daily count of open installs, per platform. Once a day, an open install downloads one tiny file from YARC's [`usage` release](https://github.com/yenebeb/yarc/releases/tag/usage) on GitHub. The file's name is the whole message:
-
-- the platform and chip: macOS, Windows or Linux, on Apple silicon/Arm or Intel/x64;
-- which count it is: today, this week, this month, or a new install's first count.
-
-There's no ID, so two days can't be linked to the same install, and nothing about you, your settings or what you browse. The install remembers on its own disk when it was last counted, so it's counted at most once a day, a week and a month. GitHub sees your IP address, as it does for every update check. The code is [`src/main/usage.ts`](src/main/usage.ts), and a test fails if the message ever grows. Anyone can see the totals on the `usage` release, updated daily.
-
-It's on by default. The first count waits five minutes after launch, after the welcome card (or, after an update, the What's New card) has told you about it. Turn it off in **Settings > Privacy**. Builds from source never count.
 
 ## Building from source
 
