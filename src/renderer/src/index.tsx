@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { dividers, dragBorder, type Divider } from '../../shared/split'
 import { findItem } from '../../shared/tree'
+import type { SwipeHint } from '../../shared/ipc'
 import type { AppState, Rect } from '../../shared/types'
 import { activeSpace, arc, cx, dispatch, displayHost, isMac, useAppState, useSpaceTheme } from './api'
 import { Icon } from './icons'
@@ -37,8 +38,42 @@ function App() {
         </>
       ) : null}
       <ContentDecor state={state} />
+      <SwipeArrow />
       <div className="notices">
         {toast ? <div className="toast">{toast}</div> : null}
+      </div>
+    </div>
+  )
+}
+
+const SHIELD = 140
+
+/** Behind the page, in the strip it uncovers as it slides: a shield coming in from the edge, like Chrome's, darker the closer letting go is to going. */
+function SwipeArrow() {
+  const [hint, setHint] = useState<SwipeHint | null>(null)
+  useEffect(() => arc.onSwipe(setHint), [])
+  if (!hint) return null
+  const { rect, offset, step } = hint
+  const back = step === 'back'
+  const ready = hint.progress >= 1
+  const height = ready ? SHIELD + 10 : SHIELD
+  const inside = Math.min(offset, SHIELD / 2)
+  const shade = ready ? 0.75 : Math.min(0.65, Math.max(hint.progress, 0.25))
+  const edge = inside - SHIELD
+  return (
+    <div className="swipe-strip" style={{ left: rect.x, top: rect.y, width: rect.width, height: rect.height }}>
+      <div
+        className="swipe-shield"
+        style={{
+          left: back ? edge : undefined,
+          right: back ? undefined : edge,
+          top: rect.height / 2 - height / 2,
+          height,
+          background: `color-mix(in srgb, var(--text) ${Math.round(shade * 100)}%, transparent)`
+        }}
+      />
+      <div className="swipe-arrow" style={{ left: back ? 0 : undefined, right: back ? undefined : 0, width: inside, top: rect.height / 2 - 12 }}>
+        <Icon name={step} size={24} stroke={2.4} />
       </div>
     </div>
   )

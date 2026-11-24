@@ -20,7 +20,7 @@ export default defineConfig({
     build: {
       // Sandboxed preloads can only require('electron'): bundle the rest.
       externalizeDeps: { exclude: ['electron-chrome-extensions'] },
-      rollupOptions: { input: { ui: resolve('src/preload/ui.ts'), 'adblock-scriptlets': resolve('src/preload/adblock-scriptlets.ts'), 'extension-browser': resolve('src/preload/extension-browser.ts'), 'extension-dnr': resolve('src/preload/extension-dnr.ts') } }
+      rollupOptions: { input: { ui: resolve('src/preload/ui.ts'), 'adblock-scriptlets': resolve('src/preload/adblock-scriptlets.ts'), 'extension-browser': resolve('src/preload/extension-browser.ts'), 'extension-dnr': resolve('src/preload/extension-dnr.ts'), 'swipe-nav': resolve('src/preload/swipe-nav.ts') } }
     }
   },
   renderer: {

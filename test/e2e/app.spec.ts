@@ -86,6 +86,10 @@ test.beforeAll(async () => {
       res.setHeader('content-type', 'application/rss+xml')
       return res.end(`<rss><channel>${feedPosts.map((p) => `<item><title>Post ${p}</title><link>${base}/post-${p}</link></item>`).join('')}</channel></rss>`)
     }
+    if (req.url === '/report.txt') {
+      res.setHeader('content-disposition', 'attachment; filename="report.txt"')
+      return res.end('quarterly numbers')
+    }
     res.setHeader('content-type', 'text/html')
     if (req.url === '/blog') return res.end('<!doctype html><title>Blog</title><link rel="alternate" type="application/rss+xml" href="/feed.xml">')
     if (req.url === '/still-loading') return res.end('<!doctype html><title>Still loading</title><script>window.seenByPage = window.scriptlets ?? 0</script><img src="/never-loads">')
@@ -474,6 +478,167 @@ test('links from a pinned tab to another site open in Peek', async () => {
   expect(s.activeItemId).toBe(s.today[0].id)
   expect((await state()).peek).toBeUndefined()
   expect((await state()).live[home.id]?.url).toBe(`${base}/peekhome`)
+})
+
+/** A real click: Playwright's waits for a navigation the app may cancel. `tabId` 'peek' is the open Peek's page. */
+const clickInPage = (tabId: string, selector: string, opts: { button?: 'left' | 'right'; modifiers?: string[] } = {}) =>
+  app.evaluate(
+    async (_e, [id, sel, button, modifiers]) => {
+      const b = (globalThis as any).arcBrowser
+      const wc = id === 'peek' ? b.cur.peek.tab.wc : b.live.get(id).wc
+      const r = await wc.executeJavaScript(`JSON.parse(JSON.stringify(document.querySelector(${JSON.stringify(sel)}).getBoundingClientRect()))`)
+      const at = { x: Math.round(r.x + 4), y: Math.round(r.y + 4) }
+      for (const type of ['mouseDown', 'mouseUp']) wc.sendInputEvent({ type, ...at, button, clickCount: 1, modifiers })
+    },
+    [tabId, selector, opts.button ?? 'left', opts.modifiers ?? []] as const
+  )
+
+const menuLabels = async (name: string): Promise<string[]> => {
+  await expect.poll(() => app.evaluate((_e, n) => !!(globalThis as any)[n], name)).toBe(true)
+  return app.evaluate((_e, n) => (globalThis as any)[n].items.map((i: Electron.MenuItem) => i.label), name)
+}
+
+test('shift-clicking any link, or choosing Open Link in Peek, opens it in Peek', async () => {
+  await dispatch({ type: 'open', url: `${base}/shiftpeek`, where: 'tab' })
+  const tab = (await space()).today[0]
+  await pageWithUrl('/shiftpeek')
+  const tabCount = (await space()).today.length
+  const peekUrl = async () => (await state()).peek?.url
+
+  await clickInPage(tab.id, '#same', { modifiers: ['shift'] })
+  await expect.poll(peekUrl).toBe(`${base}/next-shiftpeek`)
+  expect((await space()).today.length).toBe(tabCount)
+  expect((await state()).live[tab.id]?.url).toBe(`${base}/shiftpeek`)
+
+  await pageWithUrl('/next-shiftpeek')
+  await captureNextMenu('peekLinkMenu')
+  await clickInPage('peek', '#same', { button: 'right' })
+  const inPeek = await menuLabels('peekLinkMenu')
+  expect(inPeek).toContain('Open Link in New Tab')
+  expect(inPeek).not.toContain('Open Link in Peek')
+  await dispatch({ type: 'peek', op: 'close' })
+  await expect.poll(peekUrl).toBeUndefined()
+
+  await captureNextMenu('tabLinkMenu')
+  await clickInPage(tab.id, '#blank', { button: 'right' })
+  expect(await menuLabels('tabLinkMenu')).toContain('Open Link in Peek')
+  await app.evaluate(() => (globalThis as any).tabLinkMenu.items.find((i: Electron.MenuItem) => i.label === 'Open Link in Peek').click())
+  await expect.poll(peekUrl).toBe(`${base}/child-of-shiftpeek`)
+  expect((await space()).today.length).toBe(tabCount)
+  await dispatch({ type: 'peek', op: 'close' })
+  await expect.poll(peekUrl).toBeUndefined()
+  await dispatch({ type: 'close', id: tab.id })
+})
+
+test('a three-finger swipe and the mouse back and forward buttons go back and forward', async () => {
+  await dispatch({ type: 'open', url: `${base}/swipe`, where: 'tab' })
+  const tab = (await space()).today[0]
+  await (await pageWithUrl('/swipe')).locator('#same').click()
+  const url = async () => (await state()).live[tab.id]?.url
+  await expect.poll(url).toBe(`${base}/next-swipe`)
+  const emit = (event: string, arg: string) =>
+    app.evaluate((_e, [ev, a]) => (globalThis as any).arcBrowser.window.win.emit(ev, {}, a), [event, arg] as const)
+
+  for (const [event, back, forward] of [
+    ['swipe', 'left', 'right'],
+    ['app-command', 'browser-backward', 'browser-forward']
+  ]) {
+    await emit(event, back)
+    await expect.poll(url).toBe(`${base}/swipe`)
+    await emit(event, forward)
+    await expect.poll(url).toBe(`${base}/next-swipe`)
+  }
+  await dispatch({ type: 'close', id: tab.id })
+})
+
+test('a two-finger swipe slides the page and goes back or forward when let go far enough, unless the system setting is off or the page scrolls sideways', async () => {
+  await dispatch({ type: 'open', url: `${base}/twofinger`, where: 'tab' })
+  const tab = (await space()).today[0]
+  await (await pageWithUrl('/twofinger')).locator('#same').click()
+  const url = async () => (await state()).live[tab.id]?.url
+  await expect.poll(url).toBe(`${base}/next-twofinger`)
+  const pause = (ms: number) => new Promise((r) => setTimeout(r, ms))
+  const systemSwipe = (on: boolean) =>
+    app.evaluate(({ systemPreferences }, v) => {
+      systemPreferences.isSwipeTrackingFromScrollEventsEnabled = () => v
+    }, on)
+  // Chromium's wheel deltas point the other way from the page's: a positive one scrolls left, toward the previous page.
+  const swipe = (deltaX: number, events = 8) =>
+    app.evaluate(
+      async (_e, [id, dx, n]) => {
+        const wc = (globalThis as any).arcBrowser.live.get(id).wc
+        for (let i = 0; i < n; i++) {
+          wc.sendInputEvent({ type: 'mouseWheel', x: 200, y: 200, deltaX: dx, deltaY: 0, hasPreciseScrollingDeltas: true, canScroll: true })
+          await new Promise((r) => setTimeout(r, 16))
+        }
+      },
+      [tab.id, deltaX, events] as const
+    )
+  const pageX = () => app.evaluate((_e, id) => (globalThis as any).arcBrowser.live.get(id).view.getBounds().x, tab.id)
+
+  if (process.platform === 'darwin') {
+    await systemSwipe(false)
+    await swipe(30)
+    await pause(500)
+    expect(await url()).toBe(`${base}/next-twofinger`)
+    await systemSwipe(true)
+  }
+  // A short swipe slides the page, then lets it back without going anywhere.
+  const restingX = await pageX()
+  await swipe(30, 3)
+  await expect.poll(pageX, { intervals: [16] }).toBeGreaterThan(restingX)
+  await expect.poll(pageX).toBe(restingX)
+  expect(await url()).toBe(`${base}/next-twofinger`)
+
+  await pause(500)
+  await swipe(30)
+  await expect.poll(url).toBe(`${base}/twofinger`)
+  // Past the momentum the page it landed on ignores.
+  await pause(500)
+  await swipe(-30)
+  await expect.poll(url).toBe(`${base}/next-twofinger`)
+
+  await pause(500)
+  const inPage = (js: string) => app.evaluate((_e, [id, code]) => (globalThis as any).arcBrowser.live.get(id).wc.executeJavaScript(code), [tab.id, js] as const)
+  await inPage('document.body.style.width = "5000px"; scrollTo(2000, 0)')
+  await swipe(30)
+  await expect.poll(() => inPage('scrollX')).toBeLessThan(2000)
+  await pause(500)
+  expect(await url()).toBe(`${base}/next-twofinger`)
+
+  await app.evaluate(({ systemPreferences }) => delete (systemPreferences as any).isSwipeTrackingFromScrollEventsEnabled)
+  await dispatch({ type: 'close', id: tab.id })
+})
+
+test('a finished download drags out of the Downloads panel as its file', async () => {
+  const folder = mkdtempSync(join(tmpdir(), 'yarc-e2e-downloads-'))
+  await app.evaluate(({ app }, dir) => app.setPath('downloads', dir), folder)
+  await app.evaluate((_e, u) => (globalThis as any).arcBrowser.activeTab().wc.downloadURL(u), `${base}/report.txt`)
+  await expect.poll(async () => (await state()).downloads[0]?.state).toBe('completed')
+  const file = (await state()).downloads[0].path
+  expect(file).toBe(join(folder, 'report.txt'))
+
+  await dispatch({ type: 'overlay', mode: { kind: 'library', tab: 'downloads' } })
+  const overlay = await pageWithUrl('overlay.html')
+  const row = overlay.locator('.list-row', { hasText: 'report.txt' })
+  await expect(row).toHaveAttribute('draggable', 'true')
+  // A test can't make a real OS drag, so record the one main starts.
+  await app.evaluate(() => {
+    ;(globalThis as any).arcBrowser.window.overlay.webContents.startDrag = (item: Electron.Item) => {
+      ;(globalThis as any).dragged = { file: item.file, icon: typeof item.icon !== 'string' && !item.icon.isEmpty() }
+    }
+  })
+  // Main ignores a drag until the file's icon, fetched when the download finished, is ready.
+  await expect
+    .poll(async () => {
+      await row.dispatchEvent('dragstart')
+      return app.evaluate(() => (globalThis as any).dragged)
+    })
+    .toEqual({ file, icon: true })
+
+  await app.evaluate(() => delete (globalThis as any).arcBrowser.window.overlay.webContents.startDrag)
+  await dispatch({ type: 'downloadsClear' })
+  await dispatch({ type: 'overlay', mode: { kind: 'none' } })
 })
 
 test('favorites live at the top and belong to the profile', async () => {

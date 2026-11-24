@@ -887,6 +887,27 @@ browser-action-list::part(action):hover {
   gap: 6px;
 }
 
+.swipe-strip {
+  position: fixed;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.swipe-shield {
+  position: absolute;
+  width: 140px;
+  border-radius: 50%;
+}
+
+.swipe-arrow {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  height: 24px;
+  overflow: hidden;
+  color: var(--bg);
+}
+
 .toast {
   padding: 8px 12px;
   border-radius: 9px;

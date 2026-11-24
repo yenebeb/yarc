@@ -62,7 +62,6 @@ export class LiveTab {
   crashed = false
   playing = false
   private lastClick = 0
-  private lastClickShift = false
   private lastActivation = 0
   private lastUnrequestedPopup = 0
 
@@ -206,10 +205,7 @@ export class LiveTab {
       this.host.onTabChanged(this, {})
     })
     wc.on('input-event', (_e, input) => {
-      if (input.type === 'mouseUp') {
-        this.lastClick = Date.now()
-        this.lastClickShift = input.modifiers?.includes('shift') ?? false
-      }
+      if (input.type === 'mouseUp') this.lastClick = Date.now()
       if (input.type === 'mouseDown' || input.type === 'mouseUp' || input.type === 'keyDown' || input.type === 'rawKeyDown' || input.type === 'touchEnd') this.lastActivation = Date.now()
     })
     wc.on('will-navigate', (e, url) => {
@@ -226,8 +222,9 @@ export class LiveTab {
         void openExternalLink(wc, url, this.userActivated)
         return { action: 'deny' }
       }
-      const shiftClicked = this.lastClickShift && Date.now() - this.lastClick < LINK_CLICK_MS
-      if (disposition === 'new-window' && !features && shiftClicked && this.host.peekLink?.(this, url)) return { action: 'deny' }
+      // Input events from a real mouse carry no modifiers; a featureless new window right after a click is a shift-click.
+      const shiftClicked = disposition === 'new-window' && !features && Date.now() - this.lastClick < LINK_CLICK_MS
+      if (shiftClicked && this.host.peekLink?.(this, url)) return { action: 'deny' }
       if (!this.userActivated) {
         if (Date.now() - this.lastUnrequestedPopup < UNREQUESTED_POPUP_MS) {
           this.host.onPopupBlocked?.(this, url)

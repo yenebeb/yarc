@@ -20,6 +20,7 @@ const api: ArcApi = {
   onLittle: (cb) => listen(IPC.little, cb),
   onEdit: (cb) => listen(IPC.edit, cb),
   onStill: (cb) => listen(IPC.still, cb),
+  onSwipe: (cb) => listen(IPC.swipe, cb),
   dispatch: (action) => ipcRenderer.invoke(IPC.action, action),
   search: (query) => ipcRenderer.invoke(IPC.search, query),
   suggest: (query) => ipcRenderer.invoke(IPC.suggest, query),

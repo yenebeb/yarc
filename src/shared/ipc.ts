@@ -38,7 +38,8 @@ export const IPC = {
   canvasLive: 'arc:canvas-live',
   canvasShown: 'arc:canvas-shown',
   capturePick: 'arc:capture-pick',
-  downloadDrag: 'arc:download-drag'
+  downloadDrag: 'arc:download-drag',
+  swipe: 'arc:swipe'
 } as const
 
 export interface EditRequest {
@@ -84,6 +85,14 @@ export type FloatOp =
   | { kind: 'skip'; seconds: number }
   | { kind: 'drag'; phase: 'start' | 'move' | 'end'; x: number; y: number }
 
+/** A page being swiped `offset` points away from its `rect` (window points); at `progress` 1 letting go goes. */
+export interface SwipeHint {
+  rect: Rect
+  offset: number
+  step: 'back' | 'forward'
+  progress: number
+}
+
 /** In window coordinates. */
 export interface LittleAnchor {
   x: number
@@ -101,6 +110,7 @@ export interface ArcApi {
   onLittle(cb: (s: LittleState) => void): () => void
   onEdit(cb: (e: EditRequest) => void): () => void
   onStill(cb: (s: PageStill) => void): () => void
+  onSwipe(cb: (hint: SwipeHint | null) => void): () => void
   dispatch(action: Action): Promise<void>
   search(query: string): Promise<SearchResult[]>
   suggest(query: string): Promise<string[]>

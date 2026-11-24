@@ -6,6 +6,7 @@ import { History } from './history'
 import { PermissionQueue, type MediaType } from './permission-queue'
 import { SessionCookies, type Cipher } from './session-cookies'
 import { SiteDecisions } from './site-permissions'
+import { swipeToNavigate } from './swipe-nav'
 import { CHROME_UA_HOSTS, userAgentFor } from './useragent'
 import { PERMISSION_KEYS, permissionOrigin } from '../shared/permissions'
 import type { ID } from '../shared/types'
@@ -119,6 +120,7 @@ export class Profiles {
     if (!this.incognito) this.keepSessionCookies(id)
     ses.setUserAgent(app.userAgentFallback)
     listenBeforeSendHeaders(ses)
+    swipeToNavigate(ses)
     ses.setSpellCheckerLanguages(app.getPreferredSystemLanguages().slice(0, 3).filter((l) => ses.availableSpellCheckerLanguages.includes(l)))
     this.permissions(ses, id)
     rt = { id, session: ses, history: new History(this.incognito ? undefined : this.dir(id)) }
