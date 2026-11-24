@@ -1,0 +1,30 @@
+diff --git a/dist/cjs/index.js b/dist/cjs/index.js
+index a91ca8fd07194abb081e9bb35fad0060fefddf91..aae3efde6fdf1dc85893b83757fc0742cad5c369 100644
+--- a/dist/cjs/index.js
++++ b/dist/cjs/index.js
+@@ -1907,6 +1907,10 @@ var NativeMessagingHost = class {
+     this.process = (0, import_node_child_process.spawn)(config.path, [extensionUrl], {
+       shell: false
+     });
++    this.process.stdin.on("error", (err) => {
++      d7("stdin error: %s", err);
++      this.destroy();
++    });
+     this.process.stdout.on("data", this.receive);
+     this.process.stderr.on("data", (data) => {
+       d7("stderr: %s", data.toString());
+diff --git a/dist/esm/index.mjs b/dist/esm/index.mjs
+index 43929222572e4d6875cc192aca0750da79d8ff14..2b2a83bf712c45fe663dc92a542462f4ea0ca6ca 100644
+--- a/dist/esm/index.mjs
++++ b/dist/esm/index.mjs
+@@ -1870,6 +1870,10 @@ var NativeMessagingHost = class {
+     this.process = spawn2(config.path, [extensionUrl], {
+       shell: false
+     });
++    this.process.stdin.on("error", (err) => {
++      d7("stdin error: %s", err);
++      this.destroy();
++    });
+     this.process.stdout.on("data", this.receive);
+     this.process.stderr.on("data", (data) => {
+       d7("stderr: %s", data.toString());

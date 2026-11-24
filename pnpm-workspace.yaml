@@ -10,3 +10,7 @@ overrides:
   # The 3.x/5.x copies (glob 7, @electron/asar 3, dir-compare, filelist) use the default
   # export that 11 dropped, so they stay until electron-builder moves off them.
   "minimatch@>=9 <11.0.1": 11.0.3
+
+patchedDependencies:
+  # A native messaging host that exits at once (e.g. on extension install) made stdin.write throw an uncaught EPIPE.
+  electron-chrome-extensions@4.10.0: patches/electron-chrome-extensions@4.10.0.patch
