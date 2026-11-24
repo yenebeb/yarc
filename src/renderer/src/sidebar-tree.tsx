@@ -296,7 +296,7 @@ function CanvasRow({ node, ctx, index, folderId, onDrop }: { node: PinnedCanvas;
   const active = ctx.space.activeItemId === node.id
   return (
     <div
-      className={`row canvas${active ? ' active' : ''}${cls}`}
+      className={cx('row canvas', active && 'active', cls)}
       draggable={!editing}
       onDragStart={(event) => startDrag(event, node.id)}
       onDragOver={onDragOver}

@@ -98,6 +98,40 @@ test('dragging a sidebar tab onto the page or onto another tab makes a split, an
   await dispatch({ type: 'unsplit' })
 })
 
+test('a canvas row is highlighted while selected, and shows where a tab dragged over it will land', async () => {
+  await dispatch({ type: 'open', url: `${base}/canvas-drag`, where: 'tab' })
+  const tabId = (await space()).activeItemId!
+  const canvasId: string = await app.evaluate(() => {
+    const browser = (globalThis as any).arcBrowser
+    const id = browser.canvases.create(browser.space, 'Drop target').id
+    browser.changed()
+    return id
+  })
+  const ui = await pageWithUrl('index.html')
+  const canvasRow = ui.locator('.row.canvas', { hasText: 'Drop target' })
+  await expect(ui.locator('.row .title', { hasText: 'Page canvas-drag' })).toBeVisible()
+  await expect(canvasRow).toHaveClass('row canvas')
+
+  await dispatch({ type: 'activate', id: canvasId })
+  await expect(canvasRow).toContainClass('active')
+
+  await dragRow(ui, 'Page canvas-drag', 'dragstart')
+  await dragRow(ui, 'Drop target', 'dragover', 0.5, 0.2)
+  await expect(canvasRow).toContainClass('drop-before')
+  await dragRow(ui, 'Drop target', 'dragover', 0.5, 0.8)
+  await expect(canvasRow).toContainClass('drop-after')
+  await dragRow(ui, 'Page canvas-drag', 'dragend')
+  await expect(canvasRow).not.toContainClass('drop-after')
+
+  await dispatch({ type: 'activate', id: tabId })
+  await app.evaluate((_electron, id) => {
+    const browser = (globalThis as any).arcBrowser
+    browser.canvases.delete(id)
+    browser.changed()
+  }, canvasId)
+  await dispatch({ type: 'close', id: tabId })
+})
+
 test('a split is one sidebar row, and each pane has its own bar that closes just that tab', async () => {
   for (const name of ['bar-a', 'bar-b']) await dispatch({ type: 'open', url: `${base}/${name}`, where: 'tab' })
   const current = await space()
