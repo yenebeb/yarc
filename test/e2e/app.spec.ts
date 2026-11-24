@@ -735,7 +735,7 @@ test('spaces with their own profile do not share storage', async () => {
 test('Little Window opens a mini window and can move the page into the main window', async () => {
   await dispatch({ type: 'littleArc', url: `${base}/little` })
   await pageWithUrl('little.html')
-  await pageWithUrl('/little')
+  await pageWithUrl(`${base}/little`)
   const count = (await space()).today.length
   await app.evaluate(() => {
     const b = (globalThis as any).arcBrowser
