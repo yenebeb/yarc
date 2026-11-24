@@ -606,6 +606,8 @@ test('a two-finger swipe slides the page and goes back or forward when let go fa
     expect(await url()).toBe(`${base}/next-twofinger`)
     await systemSwipe(true)
   }
+  // Wheel events right after a page loads look like a swipe's leftover momentum, which the page ignores.
+  await pause(500)
   // A short swipe slides the page, then lets it back without going anywhere.
   await swipe(30, 3, 20)
   await expect.poll(pageX).toBe(restingX)
