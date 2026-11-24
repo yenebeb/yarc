@@ -2,7 +2,8 @@
 // the changes of the PRs merged since the tag before it. A PR's changes are the lines of the
 // "What's New" section in its description (scripts/whats-new.mjs; "none" for none), or its title
 // for PRs from before the section existed. Dependabot PRs and PRs labeled `release:skip` are left
-// out. Every tag gets an entry, also one without changes, so the update card counts every update.
+// out. A change from someone outside the project (not the repo owner, not a bot) ends in
+// "(thanks @login)". Every tag gets an entry, also one without changes, so the update card counts every update.
 // The release workflow runs it before the build (electron.vite.config.ts bakes it into the app) and
 // uploads it with the release (src/main/updater.ts reads the newest one); without the file, the app
 // has an empty changelog.
@@ -20,6 +21,10 @@ const run = (cmd, args) => execFileSync(cmd, args, { encoding: 'utf8', maxBuffer
 const lines = (text) => text.split('\n').filter(Boolean)
 
 const prs = JSON.parse(run('gh', ['pr', 'list', '--state', 'merged', '--base', 'main', '--limit', '5000', '--json', 'number,title,body,labels,author,mergeCommit']))
+const owner = run('gh', ['repo', 'view', '--json', 'owner', '--jq', '.owner.login'])
+const thanked = (author) => author && !author.is_bot && author.login !== owner && !/\[bot\]$|^app\/|claude/i.test(author.login)
+const credit = (pr, change) => (thanked(pr.author) ? `${change} (thanks @${pr.author.login})` : change)
+
 const byCommit = new Map()
 for (const pr of prs) {
   if (!pr.mergeCommit?.oid) continue
@@ -37,7 +42,7 @@ for (const tag of tags) {
   changelog[tag.slice(1)] = lines(run('git', ['log', '--format=%H', range]))
     .map((sha) => byCommit.get(sha))
     .filter(Boolean)
-    .flatMap((pr) => whatsNewLines(pr.body) ?? [pr.title.trim()])
+    .flatMap((pr) => (whatsNewLines(pr.body) ?? [pr.title.trim()]).map((change) => credit(pr, change)))
   previous = tag
 }
 
