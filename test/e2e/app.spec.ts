@@ -563,7 +563,7 @@ test('a two-finger swipe slides the page and goes back or forward when let go fa
       systemPreferences.isSwipeTrackingFromScrollEventsEnabled = () => v
     }, on)
   // Chromium's wheel deltas point the other way from the page's: a positive one scrolls left, toward the previous page.
-  const swipe = (deltaX: number, events = 8) =>
+  const wheel = (deltaX: number, events = 8) =>
     app.evaluate(
       async (_e, [id, dx, n]) => {
         const wc = (globalThis as any).arcBrowser.live.get(id).wc
@@ -574,34 +574,56 @@ test('a two-finger swipe slides the page and goes back or forward when let go fa
       },
       [tab.id, deltaX, events] as const
     )
+  // sendInputEvent ends the scroll gesture after every wheel event: keep the fingers down by hiding those ends until the test lifts them.
+  const fingers = (down: boolean) =>
+    app.evaluate(
+      (_e, [id, hold]) => {
+        const wc = (globalThis as any).arcBrowser.live.get(id).wc
+        if (!hold) {
+          delete wc.emit
+          wc.emit('input-event', { preventDefault() {} }, { type: 'gestureScrollEnd' })
+          return
+        }
+        const emit = wc.emit
+        wc.emit = (name: string, ...args: any[]) => (name === 'input-event' && args[1]?.type === 'gestureScrollEnd') || emit.call(wc, name, ...args)
+      },
+      [tab.id, down] as const
+    )
   const pageX = () => app.evaluate((_e, id) => (globalThis as any).arcBrowser.live.get(id).view.getBounds().x, tab.id)
+  const restingX = await pageX()
+  /** Swipes with the fingers held until the page has slid `slid` points, then lifts them. */
+  const swipe = async (deltaX: number, events: number, slid: number) => {
+    await fingers(true)
+    await wheel(deltaX, events)
+    await expect.poll(async () => Math.abs((await pageX()) - restingX)).toBeGreaterThanOrEqual(slid)
+    await fingers(false)
+  }
 
   if (process.platform === 'darwin') {
     await systemSwipe(false)
-    await swipe(30)
+    await wheel(30)
     await pause(500)
     expect(await url()).toBe(`${base}/next-twofinger`)
     await systemSwipe(true)
   }
   // A short swipe slides the page, then lets it back without going anywhere.
-  const restingX = await pageX()
-  await swipe(30, 3)
-  await expect.poll(pageX, { intervals: [16] }).toBeGreaterThan(restingX)
+  await swipe(30, 3, 20)
   await expect.poll(pageX).toBe(restingX)
   expect(await url()).toBe(`${base}/next-twofinger`)
 
+  // Letting go past the 70-point commit point goes.
   await pause(500)
-  await swipe(30)
+  await swipe(30, 8, 70)
   await expect.poll(url).toBe(`${base}/twofinger`)
   // Past the momentum the page it landed on ignores.
   await pause(500)
-  await swipe(-30)
+  await swipe(-30, 8, 70)
   await expect.poll(url).toBe(`${base}/next-twofinger`)
 
   await pause(500)
   const inPage = (js: string) => app.evaluate((_e, [id, code]) => (globalThis as any).arcBrowser.live.get(id).wc.executeJavaScript(code), [tab.id, js] as const)
   await inPage('document.body.style.width = "5000px"; scrollTo(2000, 0)')
-  await swipe(30)
+  await wheel(30)
   await expect.poll(() => inPage('scrollX')).toBeLessThan(2000)
   await pause(500)
   expect(await url()).toBe(`${base}/next-twofinger`)
