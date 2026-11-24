@@ -1,6 +1,7 @@
 import { useEffect, useId, useState, type CSSProperties, type KeyboardEvent, type PointerEvent } from 'react'
 import { hexToHsv, hsvToHex, SPACE_COLORS, type Hsv } from '../../../shared/colors'
 import { cx } from '../api'
+import './color-picker.css'
 
 const HEX = /^#[0-9a-f]{6}$/i
 const clamp = (x: number) => Math.min(1, Math.max(0, x))

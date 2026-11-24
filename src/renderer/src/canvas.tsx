@@ -1,9 +1,7 @@
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { createRoot } from 'react-dom/client'
 import {
   arrangeInGrid,
-  arrowEnds,
-  arrowHead,
   boundsOf,
   COLORS,
   IMAGE_TYPES,
@@ -18,7 +16,6 @@ import {
   type Box,
   type CanvasImage,
   type CanvasLoad,
-  type CanvasScene,
   type CardItem,
   type Color,
   type DrawItem,
@@ -26,45 +23,24 @@ import {
   type Handle,
   type ImageItem,
   type InboxItem,
-  type LiveCard,
   type TextItem,
   type TextSize
 } from '../../shared/canvas'
 import { arc, cx, isMac } from './api'
+import { useBoardHistory, useDarkAppearance, useLiveCards, useSceneSave, useStateRef } from './canvas-hooks'
+import { DRAW_STROKE, hasImageFile, ItemView, LINE_HEIGHT, paint, TEXT } from './canvas-item'
+import { Menu, type MenuEntry } from './canvas-menu'
+import { loadImage, renderPng } from './canvas-png'
+import { toScreen, toWorld, type Point, type View } from './canvas-view'
 import { Icon, type IconName } from './icons'
 import './canvas.css'
 
-const SAVE_DELAY = 400
-const UNDO_STEPS = 200
 const MIN_ZOOM = 0.1
 const MAX_ZOOM = 4
 const SNAP_SCREEN_PX = 6
-const CARD_FRAME = 6
-const LIVE_MIN = { width: 80, height: 60 }
-const STROKE = 2.5
-const DRAW_STROKE = 3
-const LINE_HEIGHT = 1.25
-const TEXT: Record<TextSize, { size: number; weight: number; label: string }> = {
-  title: { size: 36, weight: 700, label: 'Title' },
-  heading: { size: 24, weight: 600, label: 'Heading' },
-  body: { size: 16, weight: 400, label: 'Body' }
-}
-const PALETTE: Record<Color, { light: string; dark: string }> = {
-  ink: { light: '#1d1b22', dark: '#ecebf0' },
-  grey: { light: '#8a8794', dark: '#9e9ba8' },
-  red: { light: '#e5484d', dark: '#ff6369' },
-  orange: { light: '#f76b15', dark: '#ff8b3e' },
-  yellow: { light: '#e2a336', dark: '#ffca16' },
-  green: { light: '#30a46c', dark: '#3dd68c' },
-  blue: { light: '#0090ff', dark: '#70b8ff' },
-  purple: { light: '#8e4ec6', dark: '#bf7af0' }
-}
-/** Carries the images too, so items paste into another canvas. */
 const CLIP_TYPE = 'application/x-yarc-canvas'
 
 type Tool = 'select' | 'hand' | 'text' | 'rect' | 'ellipse' | 'arrow' | 'draw'
-type View = { x: number; y: number; zoom: number }
-type Point = { x: number; y: number }
 type Style = { color: Color; fill: boolean; textSize: TextSize }
 type Gesture =
   | { kind: 'pan'; start: Point; view: View }
@@ -85,27 +61,14 @@ const TOOLS: { tool: Tool; icon: IconName; label: string; key: string }[] = [
 ]
 
 const newId = () => crypto.randomUUID()
-const titleOf = (items: BoardItem[]) => items.find((i): i is TextItem => i.kind === 'text' && !!i.title)
-const paint = (color: Color, dark: boolean) => PALETTE[color][dark ? 'dark' : 'light']
-const toWorld = (p: Point, v: View): Point => ({ x: (p.x - v.x) / v.zoom, y: (p.y - v.y) / v.zoom })
-const clampZoom = (z: number) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, z))
+const titleOf = (items: BoardItem[]) => items.find((item): item is TextItem => item.kind === 'text' && !!item.title)
+const clampZoom = (zoom: number) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoom))
 
-const hasColor = (i: BoardItem): i is Extract<BoardItem, { color: Color }> => 'color' in i
-const keepsShape = (i: BoardItem) => i.kind === 'capture' || i.kind === 'image'
-const isTyping = (t: EventTarget | null) => t instanceof HTMLElement && (t.isContentEditable || t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')
-const textFont = (size: TextSize, family: string) => `${TEXT[size].weight} ${TEXT[size].size}px ${family}`
-
-const appearanceIsDark = () => document.documentElement.dataset.appearance === 'dark'
-
-function useDarkAppearance(): boolean {
-  const [dark, setDark] = useState(appearanceIsDark)
-  useEffect(() => {
-    const watch = new MutationObserver(() => setDark(appearanceIsDark()))
-    watch.observe(document.documentElement, { attributes: true, attributeFilter: ['data-appearance'] })
-    return () => watch.disconnect()
-  }, [])
-  return dark
-}
+const hasColor = (item: BoardItem): item is Extract<BoardItem, { color: Color }> => 'color' in item
+const keepsShape = (item: BoardItem) => item.kind === 'capture' || item.kind === 'image'
+const isTyping = (target: EventTarget | null) => target instanceof HTMLElement && (target.isContentEditable || target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')
+const copyOf = (item: BoardItem, offset: number): BoardItem =>
+  item.kind === 'text' ? { ...item, id: newId(), x: item.x + offset, y: item.y + offset, title: false } : { ...item, id: newId(), x: item.x + offset, y: item.y + offset }
 
 function readDataURL(file: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -116,263 +79,20 @@ function readDataURL(file: Blob): Promise<string> {
   })
 }
 
-function loadImage(src: string): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
-    const img = new Image()
-    img.onload = () => resolve(img)
-    img.onerror = () => reject(new Error('image'))
-    img.src = src
-  })
-}
-
 async function hashOf(file: Blob): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', await file.arrayBuffer())
-  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('')
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('')
 }
 
 /** A one-off copy event: needs no clipboard permission. */
 function copyText(text: string): void {
-  const onCopy = (e: ClipboardEvent) => {
-    e.preventDefault()
-    e.stopImmediatePropagation()
-    e.clipboardData?.setData('text/plain', text)
+  const onCopy = (event: ClipboardEvent) => {
+    event.preventDefault()
+    event.stopImmediatePropagation()
+    event.clipboardData?.setData('text/plain', text)
   }
   document.addEventListener('copy', onCopy, { capture: true, once: true })
   document.execCommand('copy')
-}
-
-async function renderPng(items: BoardItem[], files: Map<string, CanvasImage>): Promise<Uint8Array | undefined> {
-  const bounds = boundsOf(items.map((i) => (i.kind === 'capture' ? { x: i.x - CARD_FRAME, y: i.y - CARD_FRAME, width: i.width + 2 * CARD_FRAME, height: i.height + 2 * CARD_FRAME } : i)))
-  if (!bounds) return undefined
-  const pad = 32
-  const scale = 2
-  const canvas = document.createElement('canvas')
-  canvas.width = Math.ceil((bounds.width + 2 * pad) * scale)
-  canvas.height = Math.ceil((bounds.height + 2 * pad) * scale)
-  const ctx = canvas.getContext('2d')
-  if (!ctx) return undefined
-  ctx.fillStyle = '#ffffff'
-  ctx.fillRect(0, 0, canvas.width, canvas.height)
-  ctx.scale(scale, scale)
-  ctx.translate(pad - bounds.x, pad - bounds.y)
-  const family = getComputedStyle(document.body).fontFamily
-  const images = new Map<string, HTMLImageElement | undefined>()
-  for (const item of items) {
-    if ((item.kind === 'capture' || item.kind === 'image') && !images.has(item.fileId)) {
-      const file = files.get(item.fileId)
-      images.set(item.fileId, file ? await loadImage(file.dataURL).catch(() => undefined) : undefined)
-    }
-  }
-  for (const item of items) {
-    ctx.save()
-    if (item.kind === 'capture' || item.kind === 'image') {
-      if (item.kind === 'capture') {
-        ctx.save()
-        ctx.shadowColor = 'rgb(0 0 0 / 0.14)'
-        ctx.shadowBlur = 18
-        ctx.shadowOffsetY = 4
-        ctx.fillStyle = '#ffffff'
-        ctx.beginPath()
-        ctx.roundRect(item.x - CARD_FRAME, item.y - CARD_FRAME, item.width + 2 * CARD_FRAME, item.height + 2 * CARD_FRAME, 12)
-        ctx.fill()
-        ctx.restore()
-      }
-      const img = images.get(item.fileId)
-      ctx.beginPath()
-      ctx.roundRect(item.x, item.y, item.width, item.height, item.kind === 'capture' ? 7 : 6)
-      ctx.clip()
-      if (img) ctx.drawImage(img, item.x, item.y, item.width, item.height)
-    } else if (item.kind === 'text') {
-      const { size } = TEXT[item.size]
-      ctx.font = textFont(item.size, family)
-      ctx.fillStyle = paint(item.color, false)
-      ctx.textBaseline = 'middle'
-      item.text.split('\n').forEach((line, n) => ctx.fillText(line, item.x, item.y + (n + 0.5) * size * LINE_HEIGHT))
-    } else if (item.kind === 'rect' || item.kind === 'ellipse') {
-      const color = paint(item.color, false)
-      ctx.beginPath()
-      if (item.kind === 'rect') ctx.roundRect(item.x, item.y, item.width, item.height, 4)
-      else ctx.ellipse(item.x + item.width / 2, item.y + item.height / 2, item.width / 2, item.height / 2, 0, 0, Math.PI * 2)
-      if (item.fill) {
-        ctx.fillStyle = `${color}2e`
-        ctx.fill()
-      }
-      ctx.lineWidth = STROKE
-      ctx.strokeStyle = color
-      ctx.stroke()
-    } else if (item.kind === 'arrow') {
-      const { x1, y1, x2, y2 } = arrowEnds(item)
-      ctx.translate(item.x, item.y)
-      ctx.lineWidth = STROKE
-      ctx.lineCap = 'round'
-      ctx.lineJoin = 'round'
-      ctx.strokeStyle = paint(item.color, false)
-      ctx.stroke(new Path2D(`M ${x1} ${y1} L ${x2} ${y2} ${arrowHead(x1, y1, x2, y2)}`))
-    } else if (item.kind === 'draw') {
-      const sx = item.width / item.drawnWidth || 1
-      const sy = item.height / item.drawnHeight || 1
-      ctx.translate(item.x, item.y)
-      ctx.scale(sx, sy)
-      ctx.lineWidth = DRAW_STROKE / ((sx + sy) / 2)
-      ctx.lineCap = 'round'
-      ctx.lineJoin = 'round'
-      ctx.strokeStyle = paint(item.color, false)
-      ctx.stroke(new Path2D(smoothPath(item.points)))
-    }
-    ctx.restore()
-  }
-  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'))
-  return blob ? new Uint8Array(await blob.arrayBuffer()) : undefined
-}
-
-function ItemView({
-  item,
-  selected,
-  editing,
-  dark,
-  files,
-  nodeRef,
-  onEdited,
-  onPlay
-}: {
-  item: BoardItem
-  selected: boolean
-  editing: boolean
-  dark: boolean
-  files: Map<string, CanvasImage>
-  nodeRef: (node: HTMLElement | null) => void
-  onEdited: (text: string) => void
-  onPlay: () => void
-}) {
-  const place: CSSProperties = { left: item.x, top: item.y, width: item.width, height: item.height }
-  const cls = cx('item', item.kind, selected && 'selected')
-  if (item.kind === 'capture') {
-    const source = item.source
-    return (
-      <div className={cx(cls, 'card', item.live && 'live')} data-id={item.id} style={place}>
-        <div className="frame" />
-        <img src={files.get(item.fileId)?.dataURL} alt={source?.title ?? ''} draggable={false} />
-        {source ? (
-          <div className="footer">
-            {source.favicon ? <img className="favicon" src={source.favicon} alt="" draggable={false} /> : <Icon name="globe" size={15} />}
-            <span className="title">{source.title || source.url}</span>
-            {item.capture ? (
-              <button title={item.live ? 'Show the picture' : 'Show the live page'} onPointerDown={(e) => e.stopPropagation()} onClick={onPlay}>
-                <Icon name={item.live ? 'pause' : 'play'} size={14} />
-              </button>
-            ) : null}
-            <button title="Open the page" onPointerDown={(e) => e.stopPropagation()} onClick={() => void arc.canvasOpenUrl(source.url)}>
-              <Icon name="external" size={14} />
-            </button>
-          </div>
-        ) : null}
-      </div>
-    )
-  }
-  if (item.kind === 'image') {
-    return (
-      <div className={cls} data-id={item.id} style={place}>
-        <img src={files.get(item.fileId)?.dataURL} alt="" draggable={false} />
-      </div>
-    )
-  }
-  if (item.kind === 'text') {
-    const t = TEXT[item.size]
-    return (
-      <div
-        ref={nodeRef}
-        className={cx(cls, editing && 'editing')}
-        data-id={item.id}
-        style={{ left: item.x, top: item.y, color: paint(item.color, dark), fontSize: t.size, fontWeight: t.weight, lineHeight: LINE_HEIGHT }}
-        contentEditable={editing ? 'plaintext-only' : undefined}
-        suppressContentEditableWarning
-        spellCheck={editing}
-        onBlur={editing ? (e) => onEdited(e.currentTarget.innerText.replace(/\n$/, '')) : undefined}
-        onKeyDown={
-          editing
-            ? (e) => {
-                if (e.key === 'Escape' || (e.key === 'Enter' && (e.metaKey || e.ctrlKey))) {
-                  e.preventDefault()
-                  e.currentTarget.blur()
-                }
-              }
-            : undefined
-        }
-      >
-        {item.text}
-      </div>
-    )
-  }
-  if (item.kind === 'rect' || item.kind === 'ellipse') {
-    const color = paint(item.color, dark)
-    return <div className={cls} data-id={item.id} style={{ ...place, borderColor: color, background: item.fill ? `${color}2e` : 'transparent' }} />
-  }
-  if (item.kind === 'arrow') {
-    const { x1, y1, x2, y2 } = arrowEnds(item)
-    const d = `M ${x1} ${y1} L ${x2} ${y2} ${arrowHead(x1, y1, x2, y2)}`
-    return (
-      <svg className={cls} data-id={item.id} style={{ left: item.x, top: item.y }} width={Math.max(1, item.width)} height={Math.max(1, item.height)}>
-        <path className="hit" d={d} />
-        <path d={d} stroke={paint(item.color, dark)} strokeWidth={STROKE} />
-      </svg>
-    )
-  }
-  if (item.kind !== 'draw') return null
-  const sx = item.width / item.drawnWidth || 1
-  const sy = item.height / item.drawnHeight || 1
-  const d = smoothPath(item.points)
-  return (
-    <svg
-      className={cls}
-      data-id={item.id}
-      style={{ left: item.x, top: item.y }}
-      width={Math.max(1, item.width)}
-      height={Math.max(1, item.height)}
-      viewBox={`0 0 ${Math.max(1, item.drawnWidth)} ${Math.max(1, item.drawnHeight)}`}
-      preserveAspectRatio="none"
-    >
-      <path className="hit" d={d} strokeWidth={14 / ((sx + sy) / 2)} />
-      <path d={d} stroke={paint(item.color, dark)} strokeWidth={DRAW_STROKE / ((sx + sy) / 2)} />
-    </svg>
-  )
-}
-
-interface MenuEntry {
-  label: string
-  keys?: string
-  checked?: boolean
-  run: () => void
-}
-
-function Menu({ at, entries, onClose }: { at: Point; entries: (MenuEntry | '-')[]; onClose: () => void }) {
-  const ref = useRef<HTMLDivElement>(null)
-  const [place, setPlace] = useState(at)
-  useLayoutEffect(() => {
-    const r = ref.current?.getBoundingClientRect()
-    if (!r) return
-    setPlace({ x: Math.max(8, Math.min(at.x, innerWidth - r.width - 8)), y: Math.max(8, Math.min(at.y, innerHeight - r.height - 8)) })
-  }, [at])
-  return (
-    <div ref={ref} className="menu" style={{ left: place.x, top: place.y }} onPointerDown={(e) => e.stopPropagation()} onContextMenu={(e) => e.preventDefault()}>
-      {entries.map((e, i) =>
-        e === '-' ? (
-          <div key={i} className="menu-line" />
-        ) : (
-          <button
-            key={i}
-            onClick={() => {
-              onClose()
-              e.run()
-            }}
-          >
-            <span className="check">{e.checked ? '✓' : ''}</span>
-            <span className="label">{e.label}</span>
-            {e.keys ? <span className="keys">{e.keys}</span> : null}
-          </button>
-        )
-      )}
-    </div>
-  )
 }
 
 function Board({ loaded }: { loaded: CanvasLoad }) {
@@ -380,11 +100,16 @@ function Board({ loaded }: { loaded: CanvasLoad }) {
   const boardRef = useRef<HTMLDivElement>(null)
   const fileInput = useRef<HTMLInputElement>(null)
 
-  const [items, setItemsState] = useState<BoardItem[]>(
-    () => loaded.scene?.items ?? [{ id: newId(), kind: 'text', x: 0, y: 0, width: 0, height: 0, text: loaded.name, size: 'title', color: 'ink', title: true }]
-  )
-  const [view, setViewState] = useState<View>(() => loaded.scene?.view ?? { x: 96, y: 96, zoom: 1 })
-  const [selected, setSelectedState] = useState<string[]>([])
+  const {
+    items,
+    itemsRef,
+    setItems,
+    record,
+    change,
+    undo: undoItems
+  } = useBoardHistory(() => loaded.scene?.items ?? [{ id: newId(), kind: 'text', x: 0, y: 0, width: 0, height: 0, text: loaded.name, size: 'title', color: 'ink', title: true }])
+  const [view, viewRef, setView] = useStateRef<View>(() => loaded.scene?.view ?? { x: 96, y: 96, zoom: 1 })
+  const [selected, selectedRef, setSelected] = useStateRef<string[]>([])
   const [snapping, setSnapping] = useState(loaded.scene?.snapping ?? true)
   const [tool, setTool] = useState<Tool>('select')
   const [style, setStyle] = useState<Style>({ color: 'ink', fill: false, textSize: 'body' })
@@ -394,38 +119,13 @@ function Board({ loaded }: { loaded: CanvasLoad }) {
   const [draft, setDraft] = useState<number[]>()
   const [menu, setMenu] = useState<{ at: Point; board: boolean }>()
   const [panning, setPanning] = useState(false)
-  const [shown, setShown] = useState(true)
-
-  // The latest state, for event handlers registered once.
-  const itemsRef = useRef(items)
-  const viewRef = useRef(view)
-  const selectedRef = useRef(selected)
   const editingRef = useRef(editing)
   const snappingRef = useRef(snapping)
-  itemsRef.current = items
-  viewRef.current = view
-  selectedRef.current = selected
   editingRef.current = editing
   snappingRef.current = snapping
-  const setItems = (next: BoardItem[]) => {
-    itemsRef.current = next
-    setItemsState(next)
-  }
-  const setView = (next: View) => {
-    viewRef.current = next
-    setViewState(next)
-  }
-  const setSelected = (next: string[]) => {
-    selectedRef.current = next
-    setSelectedState(next)
-  }
 
   const files = useRef(new Map<string, CanvasImage>(Object.entries(loaded.files)))
-  /** Images main has on disk; the others go with the next save. */
-  const stored = useRef(new Set(Object.keys(loaded.files)))
-  const past = useRef<BoardItem[][]>([])
-  const future = useRef<BoardItem[][]>([])
-  const gesture = useRef<Gesture>(undefined)
+  const gestureRef = useRef<Gesture>(undefined)
   const editBefore = useRef<BoardItem[]>(undefined)
   const lastDown = useRef<{ at: number; id: string | undefined }>({ at: 0, id: undefined })
   const spaceDown = useRef(false)
@@ -434,52 +134,12 @@ function Board({ loaded }: { loaded: CanvasLoad }) {
   const pasteCount = useRef(0)
   const nodes = useRef(new Map<string, HTMLElement>())
 
-
-  const record = (before: BoardItem[]) => {
-    past.current.push(before)
-    if (past.current.length > UNDO_STEPS) past.current.shift()
-    future.current = []
-  }
-  const change = (next: BoardItem[]) => {
-    record(itemsRef.current)
-    setItems(next)
-  }
   const undo = (redo = false) => {
-    const from = redo ? future.current : past.current
-    const to = redo ? past.current : future.current
-    const state = from.pop()
-    if (!state) return
-    to.push(itemsRef.current)
-    setItems(state)
-    setSelected(selectedRef.current.filter((id) => state.some((i) => i.id === id)))
+    const restored = undoItems(redo)
+    if (restored) setSelected(selectedRef.current.filter((id) => restored.some((item) => item.id === id)))
   }
 
-
-  const lastSaved = useRef('')
-  const save = () => {
-    const scene: CanvasScene = { items: itemsRef.current, view: viewRef.current, snapping: snappingRef.current }
-    const json = JSON.stringify(scene)
-    const newFiles: Record<string, CanvasImage> = {}
-    for (const item of scene.items) {
-      if ((item.kind === 'capture' || item.kind === 'image') && !stored.current.has(item.fileId)) {
-        const file = files.current.get(item.fileId)
-        if (file) newFiles[item.fileId] = file
-      }
-    }
-    if (json === lastSaved.current && !Object.keys(newFiles).length) return
-    arc.canvasSave(scene, newFiles)
-    for (const id of Object.keys(newFiles)) stored.current.add(id)
-    lastSaved.current = json
-  }
-  useEffect(() => {
-    const timer = setTimeout(save, SAVE_DELAY)
-    return () => clearTimeout(timer)
-  })
-  useEffect(() => {
-    const flush = () => save()
-    addEventListener('pagehide', flush)
-    return () => removeEventListener('pagehide', flush)
-  }, [])
+  useSceneSave(() => ({ items: itemsRef.current, view: viewRef.current, snapping: snappingRef.current }), files.current, Object.keys(loaded.files))
 
   useLayoutEffect(() => {
     let changed = false
@@ -502,31 +162,29 @@ function Board({ loaded }: { loaded: CanvasLoad }) {
     setView({ ...viewRef.current, x: Math.round(width / 2 - (title.width / 2) * viewRef.current.zoom), y: Math.round(height / 2 - (title.height / 2) * viewRef.current.zoom) })
   })
 
-
-  const local = (e: { clientX: number; clientY: number }): Point => {
-    const r = boardRef.current?.getBoundingClientRect()
-    return { x: e.clientX - (r?.left ?? 0), y: e.clientY - (r?.top ?? 0) }
+  const pointOnBoard = (event: { clientX: number; clientY: number }): Point => {
+    const rect = boardRef.current?.getBoundingClientRect()
+    return { x: event.clientX - (rect?.left ?? 0), y: event.clientY - (rect?.top ?? 0) }
   }
   const viewSize = () => ({ width: boardRef.current?.clientWidth ?? innerWidth, height: boardRef.current?.clientHeight ?? innerHeight })
   const middle = (): Point => ({ x: viewSize().width / 2, y: viewSize().height / 2 })
   const center = (): Point => toWorld(middle(), viewRef.current)
-  const zoomAt = (p: Point, zoom: number) => {
-    const v = viewRef.current
-    const z = clampZoom(zoom)
-    const w = toWorld(p, v)
-    setView({ zoom: z, x: p.x - w.x * z, y: p.y - w.y * z })
+  const zoomAt = (anchor: Point, requestedZoom: number) => {
+    const zoom = clampZoom(requestedZoom)
+    const anchorInWorld = toWorld(anchor, viewRef.current)
+    setView({ zoom, x: anchor.x - anchorInWorld.x * zoom, y: anchor.y - anchorInWorld.y * zoom })
   }
   const zoomBy = (factor: number) => zoomAt(middle(), viewRef.current.zoom * factor)
   const reveal = (box: Box | undefined, onlyIfHidden = false) => {
     if (!box) return
-    const v = viewRef.current
+    const currentView = viewRef.current
     const { width, height } = viewSize()
-    const shown = { x: box.x * v.zoom + v.x, y: box.y * v.zoom + v.y, width: box.width * v.zoom, height: box.height * v.zoom }
-    if (onlyIfHidden && shown.x >= 0 && shown.y >= 0 && shown.x + shown.width <= width && shown.y + shown.height <= height) return
-    const zoom = clampZoom(Math.min(onlyIfHidden ? v.zoom : 1, (width - 160) / Math.max(1, box.width), (height - 200) / Math.max(1, box.height)))
+    const boxOnScreen = toScreen(box, currentView)
+    if (onlyIfHidden && boxOnScreen.x >= 0 && boxOnScreen.y >= 0 && boxOnScreen.x + boxOnScreen.width <= width && boxOnScreen.y + boxOnScreen.height <= height) return
+    const zoom = clampZoom(Math.min(onlyIfHidden ? currentView.zoom : 1, (width - 160) / Math.max(1, box.width), (height - 200) / Math.max(1, box.height)))
     setView({ zoom, x: width / 2 - (box.x + box.width / 2) * zoom, y: height / 2 - (box.y + box.height / 2) * zoom })
   }
-  const selectedItems = () => itemsRef.current.filter((i) => selectedRef.current.includes(i.id))
+  const selectedItems = () => itemsRef.current.filter((item) => selectedRef.current.includes(item.id))
 
   const addImageFiles = async (list: File[], at: Point) => {
     const added: ImageItem[] = []
@@ -534,8 +192,8 @@ function Board({ loaded }: { loaded: CanvasLoad }) {
       if (!IMAGE_TYPES[file.type]) continue
       const dataURL = await readDataURL(file)
       const fileId = await hashOf(file)
-      const img = await loadImage(dataURL).catch(() => undefined)
-      const size = placedSize(img?.naturalWidth ?? 320, img?.naturalHeight ?? 240)
+      const decoded = await loadImage(dataURL).catch(() => undefined)
+      const size = placedSize(decoded?.naturalWidth ?? 320, decoded?.naturalHeight ?? 240)
       const spot = placeNext(added[added.length - 1], size, at)
       files.current.set(fileId, { mimeType: file.type, dataURL })
       added.push({ id: newId(), kind: 'image', fileId, ...spot, ...size })
@@ -543,101 +201,100 @@ function Board({ loaded }: { loaded: CanvasLoad }) {
     const bounds = boundsOf(added)
     if (!bounds) return
     const shift = at.x - (bounds.x + bounds.width / 2)
-    const placed = added.map((i) => ({ ...i, x: i.x + shift }))
+    const placed = added.map((item) => ({ ...item, x: item.x + shift }))
     change([...itemsRef.current, ...placed])
-    setSelected(placed.map((i) => i.id))
+    setSelected(placed.map((item) => item.id))
   }
 
-  const copySelection = (e: ClipboardEvent, cut: boolean) => {
+  const copySelection = (event: ClipboardEvent, cut: boolean) => {
     const chosen = selectedItems()
-    if (!chosen.length || !e.clipboardData) return
-    e.preventDefault()
+    if (!chosen.length || !event.clipboardData) return
+    event.preventDefault()
     const used: Record<string, CanvasImage> = {}
-    for (const i of chosen) {
-      const file = i.kind === 'capture' || i.kind === 'image' ? files.current.get(i.fileId) : undefined
-      if (file && (i.kind === 'capture' || i.kind === 'image')) used[i.fileId] = file
+    for (const item of chosen.filter(hasImageFile)) {
+      const file = files.current.get(item.fileId)
+      if (file) used[item.fileId] = file
     }
-    e.clipboardData.setData(CLIP_TYPE, JSON.stringify({ items: chosen, files: used }))
+    event.clipboardData.setData(CLIP_TYPE, JSON.stringify({ items: chosen, files: used }))
     const text = chosen
-      .map((i) => (i.kind === 'text' ? i.text : i.kind === 'capture' ? (i.source?.url ?? '') : ''))
+      .map((item) => (item.kind === 'text' ? item.text : item.kind === 'capture' ? (item.source?.url ?? '') : ''))
       .filter(Boolean)
       .join('\n\n')
-    if (text) e.clipboardData.setData('text/plain', text)
+    if (text) event.clipboardData.setData('text/plain', text)
     pasteCount.current = 0
     if (cut) {
-      change(itemsRef.current.filter((i) => !selectedRef.current.includes(i.id)))
+      change(itemsRef.current.filter((item) => !selectedRef.current.includes(item.id)))
       setSelected([])
     }
   }
 
-  const paste = (e: ClipboardEvent) => {
-    const data = e.clipboardData
+  const paste = (event: ClipboardEvent) => {
+    const data = event.clipboardData
     if (!data) return
-    e.preventDefault()
+    event.preventDefault()
     const ours = data.getData(CLIP_TYPE)
     if (ours) {
       try {
         const clip = JSON.parse(ours) as { items: BoardItem[]; files: Record<string, CanvasImage> }
         for (const [id, file] of Object.entries(clip.files ?? {})) if (!files.current.has(id)) files.current.set(id, file)
         pasteCount.current += 1
-        const offset = 24 * pasteCount.current
-        const copies = clip.items.map((i): BoardItem => (i.kind === 'text' ? { ...i, id: newId(), x: i.x + offset, y: i.y + offset, title: false } : { ...i, id: newId(), x: i.x + offset, y: i.y + offset }))
+        const copies = clip.items.map((item) => copyOf(item, 24 * pasteCount.current))
         change([...itemsRef.current, ...copies])
-        setSelected(copies.map((i) => i.id))
+        setSelected(copies.map((item) => item.id))
       } catch {}
       return
     }
-    const images = [...data.files].filter((f) => IMAGE_TYPES[f.type])
+    const images = [...data.files].filter((file) => IMAGE_TYPES[file.type])
     if (images.length) return void addImageFiles(images, center())
     const text = data.getData('text/plain').trim()
     if (!text) return
     const at = center()
-    const item: TextItem = { id: newId(), kind: 'text', x: at.x, y: at.y, width: 0, height: 0, text, size: 'body', color: style.color }
-    change([...itemsRef.current, item])
-    setSelected([item.id])
+    const textItem: TextItem = { id: newId(), kind: 'text', x: at.x, y: at.y, width: 0, height: 0, text, size: 'body', color: style.color }
+    change([...itemsRef.current, textItem])
+    setSelected([textItem.id])
   }
 
   const duplicate = () => {
-    const copies = selectedItems().map((i): BoardItem => (i.kind === 'text' ? { ...i, id: newId(), x: i.x + 16, y: i.y + 16, title: false } : { ...i, id: newId(), x: i.x + 16, y: i.y + 16 }))
+    const copies = selectedItems().map((item) => copyOf(item, 16))
     if (!copies.length) return
     change([...itemsRef.current, ...copies])
-    setSelected(copies.map((i) => i.id))
+    setSelected(copies.map((item) => item.id))
   }
   const remove = () => {
     if (!selectedRef.current.length) return
-    change(itemsRef.current.filter((i) => !selectedRef.current.includes(i.id)))
+    change(itemsRef.current.filter((item) => !selectedRef.current.includes(item.id)))
     setSelected([])
   }
   const reorder = (toFront: boolean) => {
     const chosen = selectedItems()
     if (!chosen.length) return
-    const rest = itemsRef.current.filter((i) => !selectedRef.current.includes(i.id))
+    const rest = itemsRef.current.filter((item) => !selectedRef.current.includes(item.id))
     change(toFront ? [...rest, ...chosen] : [...chosen, ...rest])
   }
   const arrange = () => {
     const moves = arrangeInGrid(selectedItems())
     if (moves.size < 2) return
-    change(itemsRef.current.map((i) => ({ ...i, ...moves.get(i.id) })))
+    change(itemsRef.current.map((item) => ({ ...item, ...moves.get(item.id) })))
   }
   const makeTitle = (id: string) =>
-    change(itemsRef.current.map((i) => (i.kind !== 'text' ? i : i.id === id ? { ...i, title: true, size: 'title' } : i.title ? { ...i, title: false } : i)))
+    change(itemsRef.current.map((item) => (item.kind !== 'text' ? item : item.id === id ? { ...item, title: true, size: 'title' } : item.title ? { ...item, title: false } : item)))
   const nudge = (dx: number, dy: number) => {
     if (!selectedRef.current.length) return
-    change(itemsRef.current.map((i) => (selectedRef.current.includes(i.id) ? { ...i, x: i.x + dx, y: i.y + dy } : i)))
+    change(itemsRef.current.map((item) => (selectedRef.current.includes(item.id) ? { ...item, x: item.x + dx, y: item.y + dy } : item)))
   }
   const restyle = (next: Partial<Style>) => {
     setStyle({ ...style, ...next })
     const ids = new Set(selectedRef.current)
     if (!ids.size) return
     let changed = false
-    const updated = itemsRef.current.map((i): BoardItem => {
-      if (!ids.has(i.id)) return i
-      let out = i
-      if (next.color && hasColor(out) && out.color !== next.color) out = { ...out, color: next.color }
-      if (next.fill !== undefined && (out.kind === 'rect' || out.kind === 'ellipse') && out.fill !== next.fill) out = { ...out, fill: next.fill }
-      if (next.textSize && out.kind === 'text' && out.size !== next.textSize) out = { ...out, size: next.textSize }
-      if (out !== i) changed = true
-      return out
+    const updated = itemsRef.current.map((item): BoardItem => {
+      if (!ids.has(item.id)) return item
+      let restyled = item
+      if (next.color && hasColor(restyled) && restyled.color !== next.color) restyled = { ...restyled, color: next.color }
+      if (next.fill !== undefined && (restyled.kind === 'rect' || restyled.kind === 'ellipse') && restyled.fill !== next.fill) restyled = { ...restyled, fill: next.fill }
+      if (next.textSize && restyled.kind === 'text' && restyled.size !== next.textSize) restyled = { ...restyled, size: next.textSize }
+      if (restyled !== item) changed = true
+      return restyled
     })
     if (changed) change(updated)
   }
@@ -663,16 +320,16 @@ function Board({ loaded }: { loaded: CanvasLoad }) {
     const before = editBefore.current ?? itemsRef.current
     editBefore.current = undefined
     setEditing(undefined)
-    const wasThere = before.find((i) => i.id === id)
+    const wasThere = before.find((item) => item.id === id)
     if (!text.trim()) {
-      setItems(itemsRef.current.filter((i) => i.id !== id))
+      setItems(itemsRef.current.filter((item) => item.id !== id))
       setSelected([])
       if (wasThere) record(before)
       return
     }
     if (wasThere?.kind === 'text' && wasThere.text === text) return
     record(before)
-    setItems(itemsRef.current.map((i) => (i.id === id && i.kind === 'text' ? { ...i, text } : i)))
+    setItems(itemsRef.current.map((item) => (item.id === id && item.kind === 'text' ? { ...item, text } : item)))
   }
   useEffect(() => {
     if (!editing) return
@@ -682,31 +339,30 @@ function Board({ loaded }: { loaded: CanvasLoad }) {
     const range = document.createRange()
     range.selectNodeContents(node)
     range.collapse(false)
-    const sel = getSelection()
-    sel?.removeAllRanges()
-    sel?.addRange(range)
+    const selection = getSelection()
+    selection?.removeAllRanges()
+    selection?.addRange(range)
   }, [editing])
-
 
   const takeInbox = async () => {
     const queued: InboxItem[] = await arc.canvasTakeInbox()
     if (!queued.length) return
     const added: CardItem[] = []
-    for (const q of queued) {
+    for (const entry of queued) {
       const natural =
-        q.width > 0 && q.height > 0
-          ? q
-          : await loadImage(q.dataURL).then(
-              (img) => ({ width: img.naturalWidth, height: img.naturalHeight }),
+        entry.width > 0 && entry.height > 0
+          ? entry
+          : await loadImage(entry.dataURL).then(
+              (image) => ({ width: image.naturalWidth, height: image.naturalHeight }),
               () => ({ width: 320, height: 240 })
             )
       const size = placedSize(natural.width, natural.height)
-      const previous = [...itemsRef.current, ...added].find((i) => i.id === lastPlaced.current)
+      const previous = [...itemsRef.current, ...added].find((item) => item.id === lastPlaced.current)
       const title = titleOf(itemsRef.current)
-      const onlyTitle = !previous && title && itemsRef.current.every((i) => i === title)
+      const onlyTitle = !previous && title && itemsRef.current.every((item) => item === title)
       const spot = onlyTitle ? { x: Math.round(title.x + (title.width - size.width) / 2), y: Math.round(title.y + title.height + 32) } : placeNext(previous, size, center())
-      files.current.set(q.fileId, { mimeType: q.mimeType, dataURL: q.dataURL })
-      const card: CardItem = { id: newId(), kind: 'capture', fileId: q.fileId, ...spot, ...size, source: q.data.source, capture: q.data.capture, imageUrl: q.data.imageUrl }
+      files.current.set(entry.fileId, { mimeType: entry.mimeType, dataURL: entry.dataURL })
+      const card: CardItem = { id: newId(), kind: 'capture', fileId: entry.fileId, ...spot, ...size, source: entry.data.source, capture: entry.data.capture, imageUrl: entry.data.imageUrl }
       added.push(card)
       lastPlaced.current = card.id
     }
@@ -721,155 +377,158 @@ function Board({ loaded }: { loaded: CanvasLoad }) {
   useEffect(
     () =>
       arc.onCanvasRenamed(({ from, to }) => {
-        setItems(itemsRef.current.map((i) => (i.kind === 'text' && i.title && i.text === from ? { ...i, text: to } : i)))
+        setItems(itemsRef.current.map((item) => (item.kind === 'text' && item.title && item.text === from ? { ...item, text: to } : item)))
       }),
     []
   )
 
-
-  const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
+  const onPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     setMenu(undefined)
     // A click while editing text ends the edit: the browser's default moves focus away.
     if (editingRef.current) return
     // Otherwise no default: it would take focus from a text this click starts editing.
-    e.preventDefault()
-    const p = local(e)
-    const v = viewRef.current
-    const w = toWorld(p, v)
-    const target = e.target as Element
-    if (e.button === 1 || (e.button === 0 && (tool === 'hand' || spaceDown.current))) {
-      gesture.current = { kind: 'pan', start: p, view: v }
+    event.preventDefault()
+    const screenPoint = pointOnBoard(event)
+    const currentView = viewRef.current
+    const worldPoint = toWorld(screenPoint, currentView)
+    const target = event.target as Element
+    if (event.button === 1 || (event.button === 0 && (tool === 'hand' || spaceDown.current))) {
+      gestureRef.current = { kind: 'pan', start: screenPoint, view: currentView }
       setPanning(true)
-      e.currentTarget.setPointerCapture(e.pointerId)
+      event.currentTarget.setPointerCapture(event.pointerId)
       return
     }
-    if (e.button !== 0) return
-    e.currentTarget.setPointerCapture(e.pointerId)
-    if (tool === 'text') return startText(w)
+    if (event.button !== 0) return
+    event.currentTarget.setPointerCapture(event.pointerId)
+    if (tool === 'text') return startText(worldPoint)
     if (tool === 'rect' || tool === 'ellipse' || tool === 'arrow') {
       const id = newId()
-      const base = { id, x: w.x, y: w.y, width: 0, height: 0, color: style.color }
+      const base = { id, x: worldPoint.x, y: worldPoint.y, width: 0, height: 0, color: style.color }
       const item: BoardItem = tool === 'arrow' ? { ...base, kind: 'arrow', flipX: false, flipY: false } : { ...base, kind: tool, fill: style.fill }
-      gesture.current = { kind: 'create', start: w, before: itemsRef.current, id }
+      gestureRef.current = { kind: 'create', start: worldPoint, before: itemsRef.current, id }
       setItems([...itemsRef.current, item])
       setSelected([id])
       return
     }
     if (tool === 'draw') {
-      gesture.current = { kind: 'draw', points: [w.x, w.y] }
-      setDraft([w.x, w.y])
+      gestureRef.current = { kind: 'draw', points: [worldPoint.x, worldPoint.y] }
+      setDraft([worldPoint.x, worldPoint.y])
       return
     }
     const handle = target.closest('[data-handle]')?.getAttribute('data-handle') as Handle | null
     if (handle && selectedRef.current.length === 1) {
-      gesture.current = { kind: 'resize', start: w, before: itemsRef.current, id: selectedRef.current[0], handle }
+      gestureRef.current = { kind: 'resize', start: worldPoint, before: itemsRef.current, id: selectedRef.current[0], handle }
       return
     }
     const hit = target.closest('[data-id]')?.getAttribute('data-id') ?? undefined
     const now = Date.now()
-    const double = now - lastDown.current.at < 350 && lastDown.current.id === hit
+    const doubleClick = now - lastDown.current.at < 350 && lastDown.current.id === hit
     lastDown.current = { at: now, id: hit }
-    if (double) {
-      const item = itemsRef.current.find((i) => i.id === hit)
-      if (item?.kind === 'text') return editText(item.id)
-      if (!hit) return startText(w)
+    if (doubleClick) {
+      const clicked = itemsRef.current.find((item) => item.id === hit)
+      if (clicked?.kind === 'text') return editText(clicked.id)
+      if (!hit) return startText(worldPoint)
     }
     if (hit) {
       let next = selectedRef.current
-      if (e.shiftKey) next = next.includes(hit) ? next.filter((id) => id !== hit) : [...next, hit]
+      if (event.shiftKey) next = next.includes(hit) ? next.filter((id) => id !== hit) : [...next, hit]
       else if (!next.includes(hit)) next = [hit]
       setSelected(next)
-      if (next.includes(hit)) gesture.current = { kind: 'move', start: w, before: itemsRef.current, ids: new Set(next), clicked: hit, moved: false }
+      if (next.includes(hit)) gestureRef.current = { kind: 'move', start: worldPoint, before: itemsRef.current, ids: new Set(next), clicked: hit, moved: false }
       return
     }
-    const keep = e.shiftKey ? selectedRef.current : []
-    if (!e.shiftKey) setSelected([])
-    gesture.current = { kind: 'marquee', start: p, keep }
+    const keep = event.shiftKey ? selectedRef.current : []
+    if (!event.shiftKey) setSelected([])
+    gestureRef.current = { kind: 'marquee', start: screenPoint, keep }
   }
 
-  const onPointerMove = (e: ReactPointerEvent<HTMLDivElement>) => {
-    const g = gesture.current
-    if (!g) return
-    const p = local(e)
-    const v = viewRef.current
-    const w = toWorld(p, v)
-    if (g.kind === 'pan') return setView({ ...g.view, x: g.view.x + p.x - g.start.x, y: g.view.y + p.y - g.start.y })
-    if (g.kind === 'move') {
-      let dx = w.x - g.start.x
-      let dy = w.y - g.start.y
-      if (!g.moved && Math.hypot(dx, dy) * v.zoom < 3) return
-      g.moved = true
-      const bounds = boundsOf(g.before.filter((i) => g.ids.has(i.id)))
-      if (snappingRef.current && !e.altKey && bounds) {
-        const others = g.before.filter((i) => !g.ids.has(i.id))
-        const snap = snapMove({ ...bounds, x: bounds.x + dx, y: bounds.y + dy }, others, SNAP_SCREEN_PX / v.zoom)
+  const onPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const gesture = gestureRef.current
+    if (!gesture) return
+    const screenPoint = pointOnBoard(event)
+    const currentView = viewRef.current
+    const worldPoint = toWorld(screenPoint, currentView)
+    if (gesture.kind === 'pan') return setView({ ...gesture.view, x: gesture.view.x + screenPoint.x - gesture.start.x, y: gesture.view.y + screenPoint.y - gesture.start.y })
+    if (gesture.kind === 'move') {
+      let dx = worldPoint.x - gesture.start.x
+      let dy = worldPoint.y - gesture.start.y
+      if (!gesture.moved && Math.hypot(dx, dy) * currentView.zoom < 3) return
+      gesture.moved = true
+      const bounds = boundsOf(gesture.before.filter((item) => gesture.ids.has(item.id)))
+      if (snappingRef.current && !event.altKey && bounds) {
+        const others = gesture.before.filter((item) => !gesture.ids.has(item.id))
+        const snap = snapMove({ ...bounds, x: bounds.x + dx, y: bounds.y + dy }, others, SNAP_SCREEN_PX / currentView.zoom)
         dx += snap.dx
         dy += snap.dy
         setGuides(snap.guides)
       }
-      return setItems(g.before.map((i) => (g.ids.has(i.id) ? { ...i, x: i.x + dx, y: i.y + dy } : i)))
+      return setItems(gesture.before.map((item) => (gesture.ids.has(item.id) ? { ...item, x: item.x + dx, y: item.y + dy } : item)))
     }
-    if (g.kind === 'resize') {
-      const item = g.before.find((i) => i.id === g.id)
-      if (!item) return
-      const r = resized(item, g.handle, w.x - g.start.x, w.y - g.start.y, keepsShape(item) !== e.shiftKey)
-      return setItems(g.before.map((i) => (i.id === g.id ? withBox(i, r) : i)))
+    if (gesture.kind === 'resize') {
+      const resizing = gesture.before.find((item) => item.id === gesture.id)
+      if (!resizing) return
+      const newBox = resized(resizing, gesture.handle, worldPoint.x - gesture.start.x, worldPoint.y - gesture.start.y, keepsShape(resizing) !== event.shiftKey)
+      return setItems(gesture.before.map((item) => (item.id === gesture.id ? withBox(item, newBox) : item)))
     }
-    if (g.kind === 'marquee') {
-      const box = { x: Math.min(g.start.x, p.x), y: Math.min(g.start.y, p.y), width: Math.abs(p.x - g.start.x), height: Math.abs(p.y - g.start.y) }
+    if (gesture.kind === 'marquee') {
+      const box = { x: Math.min(gesture.start.x, screenPoint.x), y: Math.min(gesture.start.y, screenPoint.y), width: Math.abs(screenPoint.x - gesture.start.x), height: Math.abs(screenPoint.y - gesture.start.y) }
       setMarquee(box)
-      const world = { x: (box.x - v.x) / v.zoom, y: (box.y - v.y) / v.zoom, width: box.width / v.zoom, height: box.height / v.zoom }
-      const inside = itemsRef.current.filter((i) => intersects(world, i)).map((i) => i.id)
-      return setSelected([...new Set([...g.keep, ...inside])])
+      const worldBox = { x: (box.x - currentView.x) / currentView.zoom, y: (box.y - currentView.y) / currentView.zoom, width: box.width / currentView.zoom, height: box.height / currentView.zoom }
+      const inside = itemsRef.current.filter((item) => intersects(worldBox, item)).map((item) => item.id)
+      return setSelected([...new Set([...gesture.keep, ...inside])])
     }
-    if (g.kind === 'create') {
-      const box = { x: Math.min(g.start.x, w.x), y: Math.min(g.start.y, w.y), width: Math.abs(w.x - g.start.x), height: Math.abs(w.y - g.start.y) }
-      if (e.shiftKey && tool !== 'arrow') box.width = box.height = Math.max(box.width, box.height)
-      return setItems(itemsRef.current.map((i) => (i.id !== g.id ? i : i.kind === 'arrow' ? { ...i, ...box, flipX: w.x < g.start.x, flipY: w.y < g.start.y } : { ...i, ...box })))
+    if (gesture.kind === 'create') {
+      const box = { x: Math.min(gesture.start.x, worldPoint.x), y: Math.min(gesture.start.y, worldPoint.y), width: Math.abs(worldPoint.x - gesture.start.x), height: Math.abs(worldPoint.y - gesture.start.y) }
+      if (event.shiftKey && tool !== 'arrow') box.width = box.height = Math.max(box.width, box.height)
+      return setItems(
+        itemsRef.current.map((item) =>
+          item.id !== gesture.id ? item : item.kind === 'arrow' ? { ...item, ...box, flipX: worldPoint.x < gesture.start.x, flipY: worldPoint.y < gesture.start.y } : { ...item, ...box }
+        )
+      )
     }
-    const last = g.points.length - 2
-    if (Math.hypot(w.x - g.points[last], w.y - g.points[last + 1]) * v.zoom < 1.5) return
-    g.points.push(w.x, w.y)
-    setDraft([...g.points])
+    const last = gesture.points.length - 2
+    if (Math.hypot(worldPoint.x - gesture.points[last], worldPoint.y - gesture.points[last + 1]) * currentView.zoom < 1.5) return
+    gesture.points.push(worldPoint.x, worldPoint.y)
+    setDraft([...gesture.points])
   }
 
   const onPointerUp = () => {
-    const g = gesture.current
-    gesture.current = undefined
-    if (!g) return
-    if (g.kind === 'pan') return setPanning(spaceDown.current)
-    if (g.kind === 'move') {
+    const gesture = gestureRef.current
+    gestureRef.current = undefined
+    if (!gesture) return
+    if (gesture.kind === 'pan') return setPanning(spaceDown.current)
+    if (gesture.kind === 'move') {
       setGuides([])
-      if (g.moved) return record(g.before)
-      if (selectedRef.current.length > 1 && selectedRef.current.includes(g.clicked)) setSelected([g.clicked])
+      if (gesture.moved) return record(gesture.before)
+      if (selectedRef.current.length > 1 && selectedRef.current.includes(gesture.clicked)) setSelected([gesture.clicked])
       return
     }
-    if (g.kind === 'resize') {
-      if (itemsRef.current !== g.before) record(g.before)
+    if (gesture.kind === 'resize') {
+      if (itemsRef.current !== gesture.before) record(gesture.before)
       return
     }
-    if (g.kind === 'marquee') return setMarquee(undefined)
-    if (g.kind === 'create') {
-      const item = itemsRef.current.find((i) => i.id === g.id)
-      if (item && item.width + item.height < 6) {
-        const size = item.kind === 'arrow' ? { width: 120, height: 0 } : { width: 160, height: 100 }
-        const x = item.kind === 'arrow' ? g.start.x : g.start.x - size.width / 2
-        const y = item.kind === 'arrow' ? g.start.y : g.start.y - size.height / 2
-        setItems(itemsRef.current.map((i) => (i.id === g.id ? { ...i, x, y, ...size } : i)))
+    if (gesture.kind === 'marquee') return setMarquee(undefined)
+    if (gesture.kind === 'create') {
+      const created = itemsRef.current.find((item) => item.id === gesture.id)
+      if (created && created.width + created.height < 6) {
+        const size = created.kind === 'arrow' ? { width: 120, height: 0 } : { width: 160, height: 100 }
+        const left = created.kind === 'arrow' ? gesture.start.x : gesture.start.x - size.width / 2
+        const top = created.kind === 'arrow' ? gesture.start.y : gesture.start.y - size.height / 2
+        setItems(itemsRef.current.map((item) => (item.id === gesture.id ? { ...item, x: left, y: top, ...size } : item)))
       }
-      record(g.before)
+      record(gesture.before)
       setTool('select')
       return
     }
     setDraft(undefined)
-    const xs = g.points.filter((_, i) => i % 2 === 0)
-    const ys = g.points.filter((_, i) => i % 2 === 1)
-    const x = Math.min(...xs)
-    const y = Math.min(...ys)
-    const width = Math.max(...xs) - x
-    const height = Math.max(...ys) - y
-    const points = g.points.map((n, i) => Math.round((n - (i % 2 === 0 ? x : y)) * 10) / 10)
-    const item: DrawItem = { id: newId(), kind: 'draw', x, y, width, height, color: style.color, points, drawnWidth: Math.max(1, width), drawnHeight: Math.max(1, height) }
+    const xs = gesture.points.filter((_, index) => index % 2 === 0)
+    const ys = gesture.points.filter((_, index) => index % 2 === 1)
+    const left = Math.min(...xs)
+    const top = Math.min(...ys)
+    const width = Math.max(...xs) - left
+    const height = Math.max(...ys) - top
+    const points = gesture.points.map((coordinate, index) => Math.round((coordinate - (index % 2 === 0 ? left : top)) * 10) / 10)
+    const item: DrawItem = { id: newId(), kind: 'draw', x: left, y: top, width, height, color: style.color, points, drawnWidth: Math.max(1, width), drawnHeight: Math.max(1, height) }
     change([...itemsRef.current, item])
   }
 
@@ -877,74 +536,73 @@ function Board({ loaded }: { loaded: CanvasLoad }) {
   useEffect(() => {
     const board = boardRef.current
     if (!board) return
-    const onWheel = (e: WheelEvent) => {
-      e.preventDefault()
-      const v = viewRef.current
-      if (e.ctrlKey || e.metaKey) return zoomAt(local(e), v.zoom * Math.exp(-e.deltaY * (e.deltaMode === 1 ? 0.05 : 0.01)))
-      const sideways = e.shiftKey && !e.deltaX
-      setView({ ...v, x: v.x - (sideways ? e.deltaY : e.deltaX), y: v.y - (sideways ? 0 : e.deltaY) })
+    const onWheel = (event: WheelEvent) => {
+      event.preventDefault()
+      const currentView = viewRef.current
+      if (event.ctrlKey || event.metaKey) return zoomAt(pointOnBoard(event), currentView.zoom * Math.exp(-event.deltaY * (event.deltaMode === 1 ? 0.05 : 0.01)))
+      const sideways = event.shiftKey && !event.deltaX
+      setView({ ...currentView, x: currentView.x - (sideways ? event.deltaY : event.deltaX), y: currentView.y - (sideways ? 0 : event.deltaY) })
     }
     board.addEventListener('wheel', onWheel, { passive: false })
     return () => board.removeEventListener('wheel', onWheel)
   }, [])
 
-
-  const onKey = (e: KeyboardEvent) => {
-    if (editingRef.current || isTyping(e.target)) return
-    const mod = isMac ? e.metaKey : e.ctrlKey
-    const key = e.key.toLowerCase()
+  const onKey = (event: KeyboardEvent) => {
+    if (editingRef.current || isTyping(event.target)) return
+    const commandHeld = isMac ? event.metaKey : event.ctrlKey
+    const key = event.key.toLowerCase()
     const run = (action: () => void) => {
-      e.preventDefault()
+      event.preventDefault()
       action()
     }
-    if (e.key === ' ') {
+    if (event.key === ' ') {
       spaceDown.current = true
       return run(() => setPanning(true))
     }
-    if (mod) {
-      if (key === 'z') return run(() => undo(e.shiftKey))
+    if (commandHeld) {
+      if (key === 'z') return run(() => undo(event.shiftKey))
       if (key === 'y') return run(() => undo(true))
-      if (key === 'a') return run(() => setSelected(itemsRef.current.map((i) => i.id)))
+      if (key === 'a') return run(() => setSelected(itemsRef.current.map((item) => item.id)))
       if (key === 'd') return run(duplicate)
       if (key === '=' || key === '+') return run(() => zoomBy(1.25))
       if (key === '-') return run(() => zoomBy(0.8))
       if (key === '0') return run(() => zoomAt(middle(), 1))
-      if (e.shiftKey && e.code === 'BracketRight') return run(() => reorder(true))
-      if (e.shiftKey && e.code === 'BracketLeft') return run(() => reorder(false))
+      if (event.shiftKey && event.code === 'BracketRight') return run(() => reorder(true))
+      if (event.shiftKey && event.code === 'BracketLeft') return run(() => reorder(false))
       return
     }
-    if (e.altKey) return
-    if (e.key === 'Delete' || e.key === 'Backspace') return run(remove)
-    if (e.key === 'Escape') {
+    if (event.altKey) return
+    if (event.key === 'Delete' || event.key === 'Backspace') return run(remove)
+    if (event.key === 'Escape') {
       return run(() => {
         setMenu(undefined)
         if (selectedRef.current.length) setSelected([])
         else setTool('select')
       })
     }
-    const step = e.shiftKey ? 10 : 1
-    if (e.key === 'ArrowLeft') return run(() => nudge(-step, 0))
-    if (e.key === 'ArrowRight') return run(() => nudge(step, 0))
-    if (e.key === 'ArrowUp') return run(() => nudge(0, -step))
-    if (e.key === 'ArrowDown') return run(() => nudge(0, step))
-    if (e.shiftKey && e.code === 'Digit1') return run(() => reveal(boundsOf(itemsRef.current)))
+    const step = event.shiftKey ? 10 : 1
+    if (event.key === 'ArrowLeft') return run(() => nudge(-step, 0))
+    if (event.key === 'ArrowRight') return run(() => nudge(step, 0))
+    if (event.key === 'ArrowUp') return run(() => nudge(0, -step))
+    if (event.key === 'ArrowDown') return run(() => nudge(0, step))
+    if (event.shiftKey && event.code === 'Digit1') return run(() => reveal(boundsOf(itemsRef.current)))
     if (key === 'i') return run(() => fileInput.current?.click())
-    const t = TOOLS.find((x) => x.key.toLowerCase() === key)
-    if (t) return run(() => setTool(t.tool))
+    const toolForKey = TOOLS.find((entry) => entry.key.toLowerCase() === key)
+    if (toolForKey) return run(() => setTool(toolForKey.tool))
   }
   const handlers = useRef({ onKey, copySelection, paste })
   handlers.current = { onKey, copySelection, paste }
   useEffect(() => {
-    const free = (e: Event) => !editingRef.current && !isTyping(e.target)
-    const down = (e: KeyboardEvent) => handlers.current.onKey(e)
-    const up = (e: KeyboardEvent) => {
-      if (e.key !== ' ') return
+    const meantForBoard = (event: Event) => !editingRef.current && !isTyping(event.target)
+    const down = (event: KeyboardEvent) => handlers.current.onKey(event)
+    const up = (event: KeyboardEvent) => {
+      if (event.key !== ' ') return
       spaceDown.current = false
-      if (gesture.current?.kind !== 'pan') setPanning(false)
+      if (gestureRef.current?.kind !== 'pan') setPanning(false)
     }
-    const onCopy = (e: ClipboardEvent) => free(e) && handlers.current.copySelection(e, false)
-    const onCut = (e: ClipboardEvent) => free(e) && handlers.current.copySelection(e, true)
-    const onPaste = (e: ClipboardEvent) => free(e) && handlers.current.paste(e)
+    const onCopy = (event: ClipboardEvent) => meantForBoard(event) && handlers.current.copySelection(event, false)
+    const onCut = (event: ClipboardEvent) => meantForBoard(event) && handlers.current.copySelection(event, true)
+    const onPaste = (event: ClipboardEvent) => meantForBoard(event) && handlers.current.paste(event)
     addEventListener('keydown', down)
     addEventListener('keyup', up)
     document.addEventListener('copy', onCopy)
@@ -959,14 +617,13 @@ function Board({ loaded }: { loaded: CanvasLoad }) {
     }
   }, [])
 
-
-  const shortcut = (k: string) => (isMac ? `⌘${k}` : `Ctrl+${k}`)
+  const shortcut = (key: string) => (isMac ? `⌘${key}` : `Ctrl+${key}`)
   const menuEntries = (board: boolean): (MenuEntry | '-')[] => {
     const chosen = board ? [] : selectedItems()
     const one = chosen.length === 1 ? chosen[0] : undefined
-    const out: (MenuEntry | '-')[] = []
+    const entries: (MenuEntry | '-')[] = []
     if (chosen.length) {
-      out.push(
+      entries.push(
         { label: 'Cut', keys: shortcut('X'), run: () => document.execCommand('cut') },
         { label: 'Copy', keys: shortcut('C'), run: () => document.execCommand('copy') },
         { label: 'Duplicate', keys: shortcut('D'), run: duplicate },
@@ -975,63 +632,41 @@ function Board({ loaded }: { loaded: CanvasLoad }) {
         { label: 'Bring to Front', keys: shortcut('⇧]'), run: () => reorder(true) },
         { label: 'Send to Back', keys: shortcut('⇧['), run: () => reorder(false) }
       )
-      if (one?.kind === 'text' && !one.title) out.push({ label: 'Make Title', run: () => makeTitle(one.id) })
+      if (one?.kind === 'text' && !one.title) entries.push({ label: 'Make Title', run: () => makeTitle(one.id) })
       if (one?.kind === 'capture' && one.source) {
         const url = one.source.url
-        out.push('-', { label: 'Open Page', run: () => void arc.canvasOpenUrl(url) }, { label: 'Copy Page Address', run: () => copyText(url) })
+        entries.push('-', { label: 'Open Page', run: () => void arc.canvasOpenUrl(url) }, { label: 'Copy Page Address', run: () => copyText(url) })
       }
-      if (chosen.length > 1) out.push('-', { label: 'Arrange in Grid', run: arrange })
-      out.push('-')
+      if (chosen.length > 1) entries.push('-', { label: 'Arrange in Grid', run: arrange })
+      entries.push('-')
     } else {
-      out.push(
-        { label: 'Select All', keys: shortcut('A'), run: () => setSelected(itemsRef.current.map((i) => i.id)) },
+      entries.push(
+        { label: 'Select All', keys: shortcut('A'), run: () => setSelected(itemsRef.current.map((item) => item.id)) },
         { label: 'Zoom to Fit', keys: '⇧1', run: () => reveal(boundsOf(itemsRef.current)) },
         '-'
       )
     }
-    out.push({ label: 'Snap to Objects', checked: snapping, run: () => setSnapping(!snapping) })
-    if (!chosen.length) out.push('-', { label: 'Export as PNG…', run: () => void exportPng('file') }, { label: 'Copy as PNG', run: () => void exportPng('clipboard') })
-    return out
+    entries.push({ label: 'Snap to Objects', checked: snapping, run: () => setSnapping(!snapping) })
+    if (!chosen.length) entries.push('-', { label: 'Export as PNG…', run: () => void exportPng('file') }, { label: 'Copy as PNG', run: () => void exportPng('clipboard') })
+    return entries
   }
 
-
-  const onScreen = (b: Box): Box => ({ x: b.x * view.zoom + view.x, y: b.y * view.zoom + view.y, width: b.width * view.zoom, height: b.height * view.zoom })
-
-  useEffect(() => arc.onCanvasShown(setShown), [])
-  const togglePlay = (id: string) => setItems(itemsRef.current.map((i) => (i.id === id && i.kind === 'capture' ? { ...i, live: !i.live || undefined } : i)))
-  const lastLive = useRef('')
-  useEffect(() => {
-    const board = boardRef.current?.getBoundingClientRect()
-    if (!board) return
-    const visible = { x: 0, y: 0, width: board.width, height: board.height }
-    const clip = { x: board.left, y: board.top, width: board.width, height: board.height }
-    const cards: LiveCard[] = !shown
-      ? []
-      : items.flatMap((i) => {
-          if (i.kind !== 'capture' || !i.live || !i.capture || !i.source) return []
-          const box = onScreen(i)
-          const hidden = !!menu || box.width < LIVE_MIN.width || box.height < LIVE_MIN.height || !intersects(box, visible)
-          return [{ id: i.id, url: i.source.url, capture: i.capture, box: { ...box, x: box.x + board.left, y: box.y + board.top }, clip, zoom: view.zoom, pixelRatio: devicePixelRatio, hidden }]
-        })
-    const json = JSON.stringify(cards)
-    if (json === lastLive.current) return
-    lastLive.current = json
-    arc.canvasLive(cards)
-  })
-  const single = selected.length === 1 ? items.find((i) => i.id === selected[0]) : undefined
+  useLiveCards(boardRef, items, view, !!menu)
+  const togglePlay = (id: string) => setItems(itemsRef.current.map((item) => (item.id === id && item.kind === 'capture' ? { ...item, live: !item.live || undefined } : item)))
+  const single = selected.length === 1 ? items.find((item) => item.id === selected[0]) : undefined
   const handles: Handle[] = !single || single.kind === 'text' || editing ? [] : keepsShape(single) ? ['nw', 'ne', 'sw', 'se'] : ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']
-  const chosenItems = items.filter((i) => selected.includes(i.id))
+  const chosenItems = items.filter((item) => selected.includes(item.id))
   const styled = chosenItems.filter(hasColor)
   const showColors = tool === 'text' || tool === 'rect' || tool === 'ellipse' || tool === 'arrow' || tool === 'draw' || styled.length > 0
-  const showFill = tool === 'rect' || tool === 'ellipse' || chosenItems.some((i) => i.kind === 'rect' || i.kind === 'ellipse')
-  const showSizes = tool === 'text' || chosenItems.some((i) => i.kind === 'text')
+  const showFill = tool === 'rect' || tool === 'ellipse' || chosenItems.some((item) => item.kind === 'rect' || item.kind === 'ellipse')
+  const showSizes = tool === 'text' || chosenItems.some((item) => item.kind === 'text')
   const currentColor = styled[0]?.color ?? style.color
-  const firstShape = chosenItems.find((i) => i.kind === 'rect' || i.kind === 'ellipse')
+  const firstShape = chosenItems.find((item) => item.kind === 'rect' || item.kind === 'ellipse')
   const currentFill = firstShape && (firstShape.kind === 'rect' || firstShape.kind === 'ellipse') ? firstShape.fill : style.fill
-  const currentSize = chosenItems.find((i): i is TextItem => i.kind === 'text')?.size ?? style.textSize
+  const currentSize = chosenItems.find((item): item is TextItem => item.kind === 'text')?.size ?? style.textSize
 
   const title = titleOf(items)
-  const empty = items.every((i) => i === title) && !editing
+  const empty = items.every((item) => item === title) && !editing
   const hintAt = title ? { left: (title.x + title.width / 2) * view.zoom + view.x, top: (title.y + title.height) * view.zoom + view.y + 14 } : undefined
 
   return (
@@ -1043,18 +678,18 @@ function Board({ loaded }: { loaded: CanvasLoad }) {
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
-        onContextMenu={(e) => {
-          e.preventDefault()
-          const hit = (e.target as Element).closest('[data-id]')?.getAttribute('data-id')
+        onContextMenu={(event) => {
+          event.preventDefault()
+          const hit = (event.target as Element).closest('[data-id]')?.getAttribute('data-id')
           if (hit && !selectedRef.current.includes(hit)) setSelected([hit])
           if (!hit) setSelected([])
-          setMenu({ at: { x: e.clientX, y: e.clientY }, board: false })
+          setMenu({ at: { x: event.clientX, y: event.clientY }, board: false })
         }}
-        onDragOver={(e) => e.preventDefault()}
-        onDrop={(e) => {
-          e.preventDefault()
-          const list = [...e.dataTransfer.files]
-          if (list.length) void addImageFiles(list, toWorld(local(e), viewRef.current))
+        onDragOver={(event) => event.preventDefault()}
+        onDrop={(event) => {
+          event.preventDefault()
+          const list = [...event.dataTransfer.files]
+          if (list.length) void addImageFiles(list, toWorld(pointOnBoard(event), viewRef.current))
         }}
       >
         <div className="world" style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.zoom})` }}>
@@ -1079,22 +714,22 @@ function Board({ loaded }: { loaded: CanvasLoad }) {
         </div>
         <div className="overlay">
           {chosenItems.map((item) => {
-            const b = onScreen(item)
-            return <div key={item.id} className="selection" style={{ left: b.x - 3, top: b.y - 3, width: b.width + 6, height: b.height + 6 }} />
+            const box = toScreen(item, view)
+            return <div key={item.id} className="selection" style={{ left: box.x - 3, top: box.y - 3, width: box.width + 6, height: box.height + 6 }} />
           })}
           {single
-            ? handles.map((h) => {
-                const b = onScreen(single)
-                const x = h.includes('w') ? b.x - 3 : h.includes('e') ? b.x + b.width + 3 : b.x + b.width / 2
-                const y = h.includes('n') ? b.y - 3 : h.includes('s') ? b.y + b.height + 3 : b.y + b.height / 2
-                return <div key={h} className={`handle handle-${h}`} data-handle={h} style={{ left: x, top: y }} />
+            ? handles.map((handle) => {
+                const box = toScreen(single, view)
+                const left = handle.includes('w') ? box.x - 3 : handle.includes('e') ? box.x + box.width + 3 : box.x + box.width / 2
+                const top = handle.includes('n') ? box.y - 3 : handle.includes('s') ? box.y + box.height + 3 : box.y + box.height / 2
+                return <div key={handle} className={`handle handle-${handle}`} data-handle={handle} style={{ left, top }} />
               })
             : null}
-          {guides.map((g, i) => {
-            const at = g.axis === 'x' ? g.at * view.zoom + view.x : g.at * view.zoom + view.y
-            const from = g.axis === 'x' ? g.from * view.zoom + view.y : g.from * view.zoom + view.x
-            const to = g.axis === 'x' ? g.to * view.zoom + view.y : g.to * view.zoom + view.x
-            return <div key={i} className="guide" style={g.axis === 'x' ? { left: at, top: from, height: to - from } : { top: at, left: from, width: to - from }} />
+          {guides.map((guide, index) => {
+            const at = guide.axis === 'x' ? guide.at * view.zoom + view.x : guide.at * view.zoom + view.y
+            const from = guide.axis === 'x' ? guide.from * view.zoom + view.y : guide.from * view.zoom + view.x
+            const to = guide.axis === 'x' ? guide.to * view.zoom + view.y : guide.to * view.zoom + view.x
+            return <div key={index} className="guide" style={guide.axis === 'x' ? { left: at, top: from, height: to - from } : { top: at, left: from, width: to - from }} />
           })}
           {marquee ? <div className="marquee" style={{ left: marquee.x, top: marquee.y, width: marquee.width, height: marquee.height }} /> : null}
         </div>
@@ -1107,10 +742,10 @@ function Board({ loaded }: { loaded: CanvasLoad }) {
         ) : null}
       </div>
 
-      <div className="toolbar" onPointerDown={(e) => e.stopPropagation()}>
-        {TOOLS.map((t) => (
-          <button key={t.tool} className={cx(tool === t.tool && 'on')} title={`${t.label} (${t.key})`} onClick={() => setTool(t.tool)}>
-            <Icon name={t.icon} size={18} />
+      <div className="toolbar" onPointerDown={(event) => event.stopPropagation()}>
+        {TOOLS.map((entry) => (
+          <button key={entry.tool} className={cx(tool === entry.tool && 'on')} title={`${entry.label} (${entry.key})`} onClick={() => setTool(entry.tool)}>
+            <Icon name={entry.icon} size={18} />
           </button>
         ))}
         <button title="Image from a file (I)" onClick={() => fileInput.current?.click()}>
@@ -1119,9 +754,9 @@ function Board({ loaded }: { loaded: CanvasLoad }) {
         {showColors ? (
           <>
             <span className="toolbar-line" />
-            {COLORS.map((c) => (
-              <button key={c} className={cx('swatch', currentColor === c && 'on')} title={c} onClick={() => restyle({ color: c })}>
-                <span style={{ background: paint(c, dark) }} />
+            {COLORS.map((color) => (
+              <button key={color} className={cx('swatch', currentColor === color && 'on')} title={color} onClick={() => restyle({ color })}>
+                <span style={{ background: paint(color, dark) }} />
               </button>
             ))}
           </>
@@ -1137,16 +772,16 @@ function Board({ loaded }: { loaded: CanvasLoad }) {
         {showSizes ? (
           <>
             <span className="toolbar-line" />
-            {(['title', 'heading', 'body'] as const).map((s) => (
-              <button key={s} className={cx('size', currentSize === s && 'on')} title={TEXT[s].label} onClick={() => restyle({ textSize: s })}>
-                {s === 'title' ? 'L' : s === 'heading' ? 'M' : 'S'}
+            {(['title', 'heading', 'body'] as const).map((size) => (
+              <button key={size} className={cx('size', currentSize === size && 'on')} title={TEXT[size].label} onClick={() => restyle({ textSize: size })}>
+                {size === 'title' ? 'L' : size === 'heading' ? 'M' : 'S'}
               </button>
             ))}
           </>
         ) : null}
       </div>
 
-      <div className="zoombar" onPointerDown={(e) => e.stopPropagation()}>
+      <div className="zoombar" onPointerDown={(event) => event.stopPropagation()}>
         <button title={`Zoom out (${shortcut('-')})`} onClick={() => zoomBy(0.8)}>
           <Icon name="minus" size={16} />
         </button>
@@ -1161,10 +796,10 @@ function Board({ loaded }: { loaded: CanvasLoad }) {
       <button
         className="board-menu-button"
         title="More"
-        onPointerDown={(e) => e.stopPropagation()}
-        onClick={(e) => {
-          const r = e.currentTarget.getBoundingClientRect()
-          setMenu({ at: { x: r.right - 220, y: r.bottom + 6 }, board: true })
+        onPointerDown={(event) => event.stopPropagation()}
+        onClick={(event) => {
+          const rect = event.currentTarget.getBoundingClientRect()
+          setMenu({ at: { x: rect.right - 220, y: rect.bottom + 6 }, board: true })
         }}
       >
         <Icon name="more" size={18} />
@@ -1178,9 +813,9 @@ function Board({ loaded }: { loaded: CanvasLoad }) {
         accept={Object.keys(IMAGE_TYPES).join(',')}
         multiple
         hidden
-        onChange={(e) => {
-          const list = [...(e.target.files ?? [])]
-          e.target.value = ''
+        onChange={(event) => {
+          const list = [...(event.target.files ?? [])]
+          event.target.value = ''
           if (list.length) void addImageFiles(list, center())
         }}
       />

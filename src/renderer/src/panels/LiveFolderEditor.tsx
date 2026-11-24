@@ -5,6 +5,7 @@ import type { AppState, LiveSource } from '../../../shared/types'
 import { activeSpace, cx, dispatch } from '../api'
 import { Icon } from '../icons'
 import './panels.css'
+import './editors.css'
 
 const KINDS: { id: LiveSource['kind']; name: string; detail: string }[] = [
   { id: 'github', name: 'GitHub pull requests', detail: 'From a search on github.com' },

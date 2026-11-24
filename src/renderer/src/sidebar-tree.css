@@ -1,0 +1,345 @@
+.scroll {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  margin: 0 -4px;
+  padding: 0 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.scroll::-webkit-scrollbar {
+  width: 0;
+}
+
+.favorites {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
+  gap: 8px;
+  margin: 4px 0 8px;
+}
+
+.favorite {
+  height: 48px;
+  border-radius: 10px;
+  background: var(--tile);
+  display: grid;
+  place-items: center;
+  position: relative;
+}
+
+.favorite:hover {
+  background: color-mix(in oklab, var(--tile) 50%, var(--active));
+}
+
+.favorite.active {
+  background: var(--active);
+  box-shadow: var(--active-shadow);
+}
+
+.favorite img,
+.favorite .letter {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+}
+
+.favorite.live::after {
+  content: '';
+  position: absolute;
+  bottom: 5px;
+  width: 4px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--text-3);
+}
+
+.favorite.active::after {
+  display: none;
+}
+
+.favorites-drop {
+  height: 46px;
+  border-radius: 10px;
+  border: 1.5px dashed var(--line);
+  display: grid;
+  place-items: center;
+  color: var(--text-3);
+  font-size: 12px;
+  margin: 4px 0 6px;
+}
+
+.row {
+  height: 40px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 4px 0 10px;
+  font-size: 14px;
+  position: relative;
+  flex: none;
+}
+
+.row:hover {
+  background: var(--hover);
+}
+
+.row.active {
+  background: var(--active);
+  box-shadow: var(--active-shadow);
+}
+
+.row.in-split:not(.active) {
+  background: color-mix(in oklab, var(--hover) 60%, transparent);
+}
+
+.row .title {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  mask-image: linear-gradient(90deg, #000 85%, transparent);
+}
+
+.row .slash {
+  color: var(--text-3);
+  margin-right: 2px;
+}
+
+.row .close {
+  opacity: 0;
+  width: 24px;
+  height: 24px;
+}
+
+.row:hover .close,
+.row.active .close {
+  opacity: 1;
+}
+
+.row:not(:hover):not(.active) .close {
+  display: none;
+}
+
+.row input.rename {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 2px solid var(--accent);
+  border-radius: 5px;
+  background: var(--panel);
+  padding: 3px 5px;
+}
+
+.favicon-wrap {
+  position: relative;
+  width: 16px;
+  height: 16px;
+  flex: none;
+}
+
+.favicon-wrap .reset {
+  position: absolute;
+  inset: -4px;
+  border-radius: 5px;
+  display: none;
+  place-items: center;
+  background: var(--panel);
+  color: var(--text);
+}
+
+.row:hover .favicon-wrap.away .reset {
+  display: grid;
+}
+
+.audio {
+  color: var(--text-2);
+}
+
+.spinner {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid var(--line);
+  border-top-color: var(--accent);
+  animation: spin 0.7s linear infinite;
+  flex: none;
+  margin: 1px;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.folder > .icon {
+  color: var(--space-strong);
+  fill: color-mix(in srgb, var(--space-strong) 18%, transparent);
+}
+
+.folder .title {
+  font-weight: 600;
+}
+
+.children {
+  padding-left: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.live-note {
+  padding: 5px 10px;
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--text-3);
+  cursor: default;
+}
+
+.live-note.error {
+  color: var(--text-2);
+}
+
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 26px;
+  margin: 4px 2px;
+  color: var(--text-3);
+  font-size: 11.5px;
+  flex: none;
+}
+
+.divider hr {
+  flex: 1;
+  border: 0;
+  border-top: 1px solid var(--line);
+}
+
+.divider button {
+  opacity: 0;
+  padding: 2px 6px;
+  border-radius: 6px;
+  color: var(--text-2);
+}
+
+.divider:hover button {
+  opacity: 1;
+}
+
+.divider button:hover {
+  background: var(--hover);
+}
+
+.newtab {
+  color: var(--text-2);
+}
+
+.newtab.active {
+  color: var(--text);
+}
+
+.drop-before::before,
+.drop-after::after {
+  content: '';
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--accent);
+}
+
+.drop-before::before {
+  top: -2px;
+}
+
+.drop-after::after {
+  bottom: -2px;
+}
+
+.drop-into {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.empty-hint {
+  color: var(--text-3);
+  font-size: 12px;
+  padding: 6px 10px;
+}
+
+.row.drop-split {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.row.drop-split > :not(.split-preview) {
+  visibility: hidden;
+}
+
+.split-preview {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  border-radius: 10px;
+  background: color-mix(in oklab, var(--panel) 70%, transparent);
+  box-shadow: var(--active-shadow);
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.split-preview .half {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  align-self: stretch;
+}
+
+.split-preview .half.incoming {
+  background: color-mix(in oklab, var(--accent) 18%, transparent);
+}
+
+.row.split-row {
+  padding: 0;
+  gap: 0;
+}
+
+.half-wrap {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  align-self: stretch;
+}
+
+.split-row .half {
+  flex: 1;
+  min-width: 0;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px 0 10px;
+}
+
+.split-row.active .half:not(.focused) {
+  color: var(--text-2);
+}
+
+.split-divider {
+  flex: none;
+  width: 1px;
+  align-self: stretch;
+  margin: 10px 0;
+  background: var(--line);
+}

@@ -1,3 +1,73 @@
+.panel.command {
+  top: 30vh;
+  width: min(766px, calc(100vw - 64px));
+  border-radius: 12px;
+  background: color-mix(in oklab, var(--space) 10%, var(--panel));
+}
+
+.results {
+  max-height: min(460px, 60vh);
+  overflow-y: auto;
+  padding: 6px;
+}
+
+.result {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 42px;
+  padding: 0 12px;
+  border-radius: 9px;
+}
+
+.result.sel {
+  background: color-mix(in oklab, var(--space) 22%, transparent);
+}
+
+.result .text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.result .t {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 70%;
+}
+
+.result .s {
+  color: var(--text-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 12px;
+}
+
+.result .hint {
+  font-size: 11px;
+  color: var(--text-3);
+  flex: none;
+}
+
+.result .ico {
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  color: var(--text-2);
+  flex: none;
+}
+
+.result .ico img {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+}
+
 .command .field {
   display: flex;
   align-items: center;

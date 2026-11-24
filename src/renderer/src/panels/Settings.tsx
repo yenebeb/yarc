@@ -1,12 +1,13 @@
-import { useEffect, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react'
+import { useState, type CSSProperties, type KeyboardEvent } from 'react'
 import logo from '../../../../build/icon.svg'
-import { accelLabel, assign, BINDINGS, bindingLabel, canRemap, commandTitle, pressed, RESERVED, usedBy, whyNot, type CommandId, type Shortcuts as ShortcutsT } from '../../../shared/keymap'
 import { cleanMatch } from '../../../shared/link-routes'
 import { permissionLabel, siteName, type SitePermissionRow } from '../../../shared/permissions'
 import { SIDEBAR_WIDTH, type AppState, type Profile, type SearchEngine, type Settings as SettingsT, type SettingsSection as Section } from '../../../shared/types'
 import { SEARCH_ENGINES } from '../../../shared/url'
-import { activeSpace, cx, dispatch, isMac } from '../api'
+import { activeSpace, dispatch } from '../api'
 import { Icon, type IconName } from '../icons'
+import { Group, HoursSelect, patch, Row, Select, ToggleRow, type HoursOption } from './settings-controls'
+import { ShortcutSettings } from './ShortcutSettings'
 import './panels.css'
 import './settings.css'
 
@@ -20,8 +21,6 @@ const SECTIONS: { id: Section; label: string; icon?: IconName }[] = [
   { id: 'shortcuts', label: 'Keyboard Shortcuts', icon: 'command' },
   { id: 'about', label: 'About' }
 ]
-
-type HoursOption = { hours: number; label: string }
 
 const ARCHIVE_OPTIONS: HoursOption[] = [
   { hours: 0, label: 'Never' },
@@ -44,16 +43,14 @@ const THEMES: { value: SettingsT['theme']; label: string }[] = [
   { value: 'dark', label: 'Dark' }
 ]
 
-const patch = (p: Partial<SettingsT>) => dispatch({ type: 'settings', patch: p })
-
 export function Settings({ state, section: initial = 'general', close }: { state: AppState; section?: Section; close: () => void }) {
   const [section, setSection] = useState<Section>(initial)
-  const current = SECTIONS.find((s) => s.id === section)!
-  const onNavKey = (e: KeyboardEvent) => {
-    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return
-    e.preventDefault()
-    const i = SECTIONS.findIndex((s) => s.id === section)
-    const next = SECTIONS[(i + (e.key === 'ArrowDown' ? 1 : SECTIONS.length - 1)) % SECTIONS.length]
+  const current = SECTIONS.find((entry) => entry.id === section)!
+  const onNavKey = (event: KeyboardEvent) => {
+    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return
+    event.preventDefault()
+    const currentIndex = SECTIONS.findIndex((entry) => entry.id === section)
+    const next = SECTIONS[(currentIndex + (event.key === 'ArrowDown' ? 1 : SECTIONS.length - 1)) % SECTIONS.length]
     setSection(next.id)
     document.getElementById(`set-tab-${next.id}`)?.focus()
   }
@@ -61,18 +58,18 @@ export function Settings({ state, section: initial = 'general', close }: { state
     <div className="panel sheet settings">
       <nav className="set-nav" role="tablist" aria-orientation="vertical" aria-label="Settings" onKeyDown={onNavKey}>
         <div className="set-nav-title">Settings</div>
-        {SECTIONS.map((s) => (
+        {SECTIONS.map((entry) => (
           <button
-            key={s.id}
-            id={`set-tab-${s.id}`}
+            key={entry.id}
+            id={`set-tab-${entry.id}`}
             role="tab"
-            aria-selected={section === s.id}
-            tabIndex={section === s.id ? 0 : -1}
+            aria-selected={section === entry.id}
+            tabIndex={section === entry.id ? 0 : -1}
             className="set-nav-item"
-            onClick={() => setSection(s.id)}
+            onClick={() => setSection(entry.id)}
           >
-            <span className="set-nav-icon">{s.icon ? <Icon name={s.icon} size={15} stroke={2} /> : <img src={logo} alt="" />}</span>
-            {s.label}
+            <span className="set-nav-icon">{entry.icon ? <Icon name={entry.icon} size={15} stroke={2} /> : <img src={logo} alt="" />}</span>
+            {entry.label}
           </button>
         ))}
       </nav>
@@ -90,7 +87,7 @@ export function Settings({ state, section: initial = 'general', close }: { state
           {section === 'sites' && <SitePermissions state={state} />}
           {section === 'import' && <Import />}
           {section === 'extensions' && <Extensions state={state} />}
-          {section === 'shortcuts' && <Shortcuts shortcuts={state.settings.shortcuts} />}
+          {section === 'shortcuts' && <ShortcutSettings shortcuts={state.settings.shortcuts} />}
           {section === 'about' && <About />}
         </div>
       </section>
@@ -98,80 +95,21 @@ export function Settings({ state, section: initial = 'general', close }: { state
   )
 }
 
-function Group({ title, children }: { title?: string; children: ReactNode }) {
-  return (
-    <div className="set-group">
-      {title && <h3>{title}</h3>}
-      <div className="set-card">{children}</div>
-    </div>
-  )
-}
-
-function Row({ title, hint, children }: { title: string; hint?: ReactNode; children: ReactNode }) {
-  return (
-    <div className="set-row">
-      <div className="set-row-text">
-        <span className="set-row-title">{title}</span>
-        {hint && <small>{hint}</small>}
-      </div>
-      <div className="set-control">{children}</div>
-    </div>
-  )
-}
-
-function ToggleRow({ title, hint, checked, onChange }: { title: string; hint?: ReactNode; checked: boolean; onChange: (v: boolean) => void }) {
-  return (
-    <label className="set-row click">
-      <div className="set-row-text">
-        <span className="set-row-title">{title}</span>
-        {hint && <small>{hint}</small>}
-      </div>
-      <div className="set-control">
-        <input type="checkbox" role="switch" aria-label={title} className="switch" checked={checked} onChange={(e) => onChange(e.target.checked)} />
-      </div>
-    </label>
-  )
-}
-
-function Select({ label, value, onChange, children }: { label: string; value: string | number; onChange: (v: string) => void; children: ReactNode }) {
-  return (
-    <span className="set-select">
-      <select aria-label={label} value={value} onChange={(e) => onChange(e.target.value)}>
-        {children}
-      </select>
-      <Icon name="chevron" size={13} stroke={2.2} />
-    </span>
-  )
-}
-
-function HoursSelect({ label, value, options, onChange }: { label: string; value: number; options: HoursOption[]; onChange: (hours: number) => void }) {
-  return (
-    <Select label={label} value={value} onChange={(v) => onChange(Number(v))}>
-      {!options.some((o) => o.hours === value) && <option value={value}>After {value} hours</option>}
-      {options.map((o) => (
-        <option key={o.hours} value={o.hours}>
-          {o.label}
-        </option>
-      ))}
-    </Select>
-  )
-}
-
 function General({ state }: { state: AppState }) {
-  const s = state.settings
+  const settings = state.settings
   // Local value so the slider stays smooth while main catches up.
-  const [width, setWidth] = useState(s.sidebarWidth)
+  const [width, setWidth] = useState(settings.sidebarWidth)
   const space = activeSpace(state)
-  const spaceProfile = state.profiles.find((p) => p.id === space.profileId)
+  const spaceProfile = state.profiles.find((profile) => profile.id === space.profileId)
   const pct = ((width - SIDEBAR_WIDTH.min) / (SIDEBAR_WIDTH.max - SIDEBAR_WIDTH.min)) * 100
   return (
     <>
       <Group title="Browsing">
         <Row title="Search engine" hint="Used for searches typed in the command bar.">
-          <Select label="Search engine" value={s.searchEngine} onChange={(v) => patch({ searchEngine: v as SearchEngine })}>
-            {(Object.keys(SEARCH_ENGINES) as SearchEngine[]).map((k) => (
-              <option key={k} value={k}>
-                {SEARCH_ENGINES[k].name}
+          <Select label="Search engine" value={settings.searchEngine} onChange={(engine) => patch({ searchEngine: engine as SearchEngine })}>
+            {(Object.keys(SEARCH_ENGINES) as SearchEngine[]).map((engine) => (
+              <option key={engine} value={engine}>
+                {SEARCH_ENGINES[engine].name}
               </option>
             ))}
           </Select>
@@ -179,19 +117,19 @@ function General({ state }: { state: AppState }) {
         <ToggleRow
           title="Block ads and trackers"
           hint="Built in, using uBlock Origin / EasyList-compatible lists. Turn it off per site from the shield in the URL bar."
-          checked={s.adblock}
-          onChange={(v) => patch({ adblock: v })}
+          checked={settings.adblock}
+          onChange={(on) => patch({ adblock: on })}
         />
         <Row title="Archive unpinned tabs" hint="Tabs in Today that you haven't used for a while move to the Archive.">
-          <HoursSelect label="Archive unpinned tabs" value={s.archiveAfterHours} options={ARCHIVE_OPTIONS} onChange={(hours) => patch({ archiveAfterHours: hours })} />
+          <HoursSelect label="Archive unpinned tabs" value={settings.archiveAfterHours} options={ARCHIVE_OPTIONS} onChange={(hours) => patch({ archiveAfterHours: hours })} />
         </Row>
       </Group>
       <Group title="Appearance">
         <Row title="Theme">
           <div className="set-seg" role="radiogroup" aria-label="Theme">
-            {THEMES.map((t) => (
-              <button key={t.value} role="radio" aria-checked={s.theme === t.value} className={s.theme === t.value ? 'on' : ''} onClick={() => patch({ theme: t.value })}>
-                {t.label}
+            {THEMES.map((theme) => (
+              <button key={theme.value} role="radio" aria-checked={settings.theme === theme.value} className={settings.theme === theme.value ? 'on' : ''} onClick={() => patch({ theme: theme.value })}>
+                {theme.label}
               </button>
             ))}
           </div>
@@ -206,32 +144,32 @@ function General({ state }: { state: AppState }) {
             max={SIDEBAR_WIDTH.max}
             step={2}
             value={width}
-            onChange={(e) => {
-              const v = Number(e.target.value)
-              setWidth(v)
-              patch({ sidebarWidth: v })
+            onChange={(event) => {
+              const sidebarWidth = Number(event.target.value)
+              setWidth(sidebarWidth)
+              patch({ sidebarWidth })
             }}
           />
           <span className="set-value">{width}px</span>
         </Row>
-        <ToggleRow title="Sidebar on the right" hint="Put the sidebar on the other side of the window." checked={s.sidebarRight} onChange={(v) => patch({ sidebarRight: v })} />
+        <ToggleRow title="Sidebar on the right" hint="Put the sidebar on the other side of the window." checked={settings.sidebarRight} onChange={(on) => patch({ sidebarRight: on })} />
       </Group>
       <Group title="Little Window and Peek">
         <ToggleRow
           title="Open links from other apps in a Little Window"
           hint="When off, they open as a new tab in the current space."
-          checked={s.littleArcForExternalLinks}
-          onChange={(v) => patch({ littleArcForExternalLinks: v })}
+          checked={settings.littleArcForExternalLinks}
+          onChange={(on) => patch({ littleArcForExternalLinks: on })}
         />
         <Row title="Close Little Windows" hint="A Little Window you leave in the background closes after this long. Its page goes to the Archive.">
-          <HoursSelect label="Close Little Windows" value={s.littleCloseAfterHours} options={LITTLE_CLOSE_OPTIONS} onChange={(hours) => patch({ littleCloseAfterHours: hours })} />
+          <HoursSelect label="Close Little Windows" value={settings.littleCloseAfterHours} options={LITTLE_CLOSE_OPTIONS} onChange={(hours) => patch({ littleCloseAfterHours: hours })} />
         </Row>
         <Row title="Little Window profile" hint="Which logins and history Little Windows use.">
-          <Select label="Little Window profile" value={s.littleArcProfileId} onChange={(v) => patch({ littleArcProfileId: v })}>
+          <Select label="Little Window profile" value={settings.littleArcProfileId} onChange={(profileId) => patch({ littleArcProfileId: profileId })}>
             <option value="">Current space's profile{spaceProfile ? ` (now: ${spaceProfile.name})` : ''}</option>
-            {state.profiles.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
+            {state.profiles.map((profile) => (
+              <option key={profile.id} value={profile.id}>
+                {profile.name}
               </option>
             ))}
           </Select>
@@ -239,14 +177,14 @@ function General({ state }: { state: AppState }) {
         <ToggleRow
           title="Open other sites from pinned tabs in Peek"
           hint="Links from pinned tabs and favorites to another site open in a Peek preview."
-          checked={s.peekPinnedLinks}
-          onChange={(v) => patch({ peekPinnedLinks: v })}
+          checked={settings.peekPinnedLinks}
+          onChange={(on) => patch({ peekPinnedLinks: on })}
         />
         <ToggleRow
           title="Float playing videos when you leave their tab"
           hint="The video keeps playing in a small window in front of your other apps. Move it, resize it, double-click it to go back to the tab."
-          checked={s.floatVideos}
-          onChange={(v) => patch({ floatVideos: v })}
+          checked={settings.floatVideos}
+          onChange={(on) => patch({ floatVideos: on })}
         />
       </Group>
       <Group title="Updates">
@@ -257,8 +195,8 @@ function General({ state }: { state: AppState }) {
               ? 'New versions download in the background and install when you restart YARC.'
               : 'You’re told when a new version is out, and install it yourself.'
           }
-          checked={s.autoUpdate}
-          onChange={(v) => patch({ autoUpdate: v })}
+          checked={settings.autoUpdate}
+          onChange={(on) => patch({ autoUpdate: on })}
         />
       </Group>
     </>
@@ -272,15 +210,15 @@ function TrafficControl({ state }: { state: AppState }) {
   const site = cleanMatch(match)
   const add = () => {
     if (!site) return
-    patch({ linkRoutes: [...routes.filter((r) => r.match !== site), { match: site, spaceId }] })
+    patch({ linkRoutes: [...routes.filter((route) => route.match !== site), { match: site, spaceId }] })
     setMatch('')
   }
   const spaceSelect = (label: string, value: string, onChange: (id: string) => void) => (
     <Select label={label} value={value} onChange={onChange}>
-      {state.spaces.map((s) => (
-        <option key={s.id} value={s.id}>
-          {s.emoji ? `${s.emoji} ` : ''}
-          {s.name}
+      {state.spaces.map((space) => (
+        <option key={space.id} value={space.id}>
+          {space.emoji ? `${space.emoji} ` : ''}
+          {space.name}
         </option>
       ))}
     </Select>
@@ -293,10 +231,10 @@ function TrafficControl({ state }: { state: AppState }) {
       </p>
       <Group>
         {routes.length === 0 && <div className="set-empty">No rules yet.</div>}
-        {routes.map((r, i) => (
-          <Row key={r.match} title={r.match}>
-            {spaceSelect(`Space for ${r.match}`, r.spaceId, (id) => patch({ linkRoutes: routes.map((x, j) => (j === i ? { ...x, spaceId: id } : x)) }))}
-            <button className="icon-btn" title={`Remove the rule for ${r.match}`} onClick={() => patch({ linkRoutes: routes.filter((_, j) => j !== i) })}>
+        {routes.map((route, index) => (
+          <Row key={route.match} title={route.match}>
+            {spaceSelect(`Space for ${route.match}`, route.spaceId, (id) => patch({ linkRoutes: routes.map((other, otherIndex) => (otherIndex === index ? { ...other, spaceId: id } : other)) }))}
+            <button className="icon-btn" title={`Remove the rule for ${route.match}`} onClick={() => patch({ linkRoutes: routes.filter((_route, otherIndex) => otherIndex !== index) })}>
               <Icon name="x" />
             </button>
           </Row>
@@ -310,9 +248,9 @@ function TrafficControl({ state }: { state: AppState }) {
             placeholder="figma.com"
             spellCheck={false}
             value={match}
-            onChange={(e) => setMatch(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') add()
+            onChange={(event) => setMatch(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') add()
             }}
           />
           <div className="set-control">
@@ -335,8 +273,8 @@ function Profiles({ state }: { state: AppState }) {
         space's profile from its Edit sheet.
       </p>
       <Group>
-        {state.profiles.map((p) => (
-          <ProfileRow key={p.id} profile={p} state={state} />
+        {state.profiles.map((profile) => (
+          <ProfileRow key={profile.id} profile={profile} state={state} />
         ))}
       </Group>
     </>
@@ -345,7 +283,7 @@ function Profiles({ state }: { state: AppState }) {
 
 function ProfileRow({ profile, state }: { profile: Profile; state: AppState }) {
   const [draft, setDraft] = useState(profile.name)
-  const spaces = state.spaces.filter((s) => s.profileId === profile.id)
+  const spaces = state.spaces.filter((space) => space.profileId === profile.id)
   const commit = () => {
     const name = draft.trim()
     if (!name) return setDraft(profile.name)
@@ -361,18 +299,18 @@ function ProfileRow({ profile, state }: { profile: Profile; state: AppState }) {
         aria-label="Profile name"
         title="Rename"
         value={draft}
-        onChange={(e) => setDraft(e.target.value)}
+        onChange={(event) => setDraft(event.target.value)}
         onBlur={commit}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') e.currentTarget.blur()
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') event.currentTarget.blur()
         }}
       />
       <div className="used-by">
         {spaces.length === 0 && <span className="muted">Not used by any space</span>}
-        {spaces.map((s) => (
-          <span key={s.id} className="chip">
-            {s.emoji ? <span>{s.emoji}</span> : <span className="swatch" style={{ background: s.color, width: 8, height: 8 }} />}
-            {s.name}
+        {spaces.map((space) => (
+          <span key={space.id} className="chip">
+            {space.emoji ? <span>{space.emoji}</span> : <span className="swatch" style={{ background: space.color, width: 8, height: 8 }} />}
+            {space.name}
           </span>
         ))}
       </div>
@@ -381,8 +319,8 @@ function ProfileRow({ profile, state }: { profile: Profile; state: AppState }) {
 }
 
 function SitePermissions({ state }: { state: AppState }) {
-  const groups = state.profiles.map((p) => ({ profile: p, rows: state.sitePermissions?.[p.id] ?? [] }))
-  const any = groups.some((g) => g.rows.length)
+  const groups = state.profiles.map((profile) => ({ profile, rows: state.sitePermissions?.[profile.id] ?? [] }))
+  const any = groups.some((group) => group.rows.length)
   return (
     <>
       <p className="set-note">
@@ -413,7 +351,7 @@ function SitePermissionLine({ profileId, row }: { profileId: string; row: SitePe
   const label = `${permissionLabel(row.key)} for ${siteName(row.origin)}`
   return (
     <Row title={siteName(row.origin)} hint={row.setting === 'quiet' ? `${permissionLabel(row.key)} · not asking until ${until}` : permissionLabel(row.key)}>
-      <Select label={label} value={row.setting} onChange={(v) => send(v as 'allow' | 'block')}>
+      <Select label={label} value={row.setting} onChange={(setting) => send(setting as 'allow' | 'block')}>
         {row.setting === 'quiet' && <option value="quiet">Blocked for now</option>}
         <option value="allow">Allow</option>
         <option value="block">Block</option>
@@ -462,7 +400,7 @@ function Import() {
 
 function Extensions({ state }: { state: AppState }) {
   const space = activeSpace(state)
-  const profile = state.profiles.find((p) => p.id === space.profileId)
+  const profile = state.profiles.find((profile) => profile.id === space.profileId)
   const list = state.extensions[space.profileId] ?? []
   return (
     <>
@@ -480,140 +418,11 @@ function Extensions({ state }: { state: AppState }) {
       </p>
       <Group title="Installed">
         {list.length === 0 && <div className="set-empty">No extensions installed in this profile yet.</div>}
-        {list.map((x) => (
-          <div key={x.id} className="set-row set-ext">
-            {x.icon ? <img className="set-ext-icon" src={x.icon} alt="" /> : <span className="set-ext-icon"><Icon name="puzzle" /></span>}
-            <span className="set-row-title">{x.name}</span>
-            <span className="set-ext-id">{x.id}</span>
-          </div>
-        ))}
-      </Group>
-    </>
-  )
-}
-
-/** "Ctrl+Shift+T" or "⌘⇧T". */
-function keyCaps(label: string): string[] {
-  if (!isMac) return label.split(/\+(?=.)/)
-  const mods = /^[⌘⌃⌥⇧]*/.exec(label)![0]
-  return [...Array.from(mods), label.slice(mods.length)].filter(Boolean)
-}
-
-const Keys = ({ label }: { label: string }) => (
-  <span className="set-keys">
-    {keyCaps(label).map((k, i) => (
-      <kbd key={i}>{k}</kbd>
-    ))}
-  </span>
-)
-
-type Problem = { text: string; replace?: string }
-
-function Shortcuts({ shortcuts }: { shortcuts: ShortcutsT }) {
-  const [recording, setRecording] = useState<CommandId>()
-  const [held, setHeld] = useState({ accel: '', done: false })
-  const [problem, setProblem] = useState<Problem>()
-  const record = (id?: CommandId) => {
-    setRecording(id)
-    setHeld({ accel: '', done: false })
-    setProblem(undefined)
-    dispatch({ type: 'recordShortcut', on: id !== undefined })
-  }
-  const save = (next: ShortcutsT) => {
-    patch({ shortcuts: next })
-    record(undefined)
-  }
-  useEffect(() => () => dispatch({ type: 'recordShortcut', on: false }), [])
-  useEffect(() => {
-    if (!recording) return
-    const onKey = (e: globalThis.KeyboardEvent) => {
-      e.preventDefault()
-      e.stopPropagation()
-      const keys = pressed({ code: e.code, control: e.ctrlKey, meta: e.metaKey, alt: e.altKey, shift: e.shiftKey })
-      if (e.type === 'keyup') return setHeld((h) => (h.done ? h : keys))
-      if (e.key === 'Escape') return record(undefined)
-      setHeld(keys)
-      if (!keys.done) return
-      const other = usedBy(keys.accel, recording, isMac, shortcuts)
-      const why = whyNot(keys.accel, isMac)
-      if (why) setProblem({ text: why })
-      else if (other && !canRemap(other)) setProblem({ text: `${commandTitle(other)} uses it, and that can't be changed.` })
-      else if (other) setProblem({ text: `${commandTitle(other)} already uses it.`, replace: keys.accel })
-      else save(assign(shortcuts, recording, keys.accel, isMac))
-    }
-    window.addEventListener('keydown', onKey, true)
-    window.addEventListener('keyup', onKey, true)
-    return () => {
-      window.removeEventListener('keydown', onKey, true)
-      window.removeEventListener('keyup', onKey, true)
-    }
-  }, [recording, shortcuts])
-
-  const reset = (id: CommandId) => patch({ shortcuts: Object.fromEntries(Object.entries(shortcuts).filter(([k]) => k !== id)) })
-  const fixed: { title: string; keys: string }[] = []
-  const bound: CommandId[] = []
-  const unbound: CommandId[] = []
-  for (const b of BINDINGS) {
-    const keys = bindingLabel(b.id, isMac, shortcuts)
-    const m = /^(space|tab)(\d)$/.exec(b.id)
-    if (canRemap(b.id)) (keys || shortcuts[b.id] ? bound : unbound).push(b.id)
-    else if (m?.[2] === '1') fixed.push({ title: m[1] === 'space' ? 'Switch to Space 1–9' : 'Go to Tab 1–9', keys: `${keys}–9` })
-    else if (keys && !m) fixed.push({ title: b.title, keys })
-  }
-  for (const [accel, title] of Object.entries(RESERVED[isMac ? 'mac' : 'other'])) fixed.push({ title, keys: accelLabel(accel, isMac) })
-
-  const row = (id: CommandId) => (
-    <div key={id} className={cx('set-row set-shortcut', recording === id && 'recording')}>
-      <span className="set-row-title">{commandTitle(id)}</span>
-      {shortcuts[id] && (
-        <button className="icon-btn set-shortcut-reset" title="Reset to default" onClick={() => reset(id)}>
-          <Icon name="reset" />
-        </button>
-      )}
-      <button className="set-shortcut-keys" title="Change shortcut" onClick={() => record(recording === id ? undefined : id)}>
-        {recording === id ? (
-          held.accel ? <Keys label={accelLabel(held.accel, isMac)} /> : <span className="set-shortcut-hint">Press keys…</span>
-        ) : bindingLabel(id, isMac, shortcuts) ? (
-          <Keys label={bindingLabel(id, isMac, shortcuts)} />
-        ) : (
-          <span className="set-shortcut-hint">None</span>
-        )}
-      </button>
-      {recording === id && problem && (
-        <div className="set-shortcut-problem">
-          {problem.text}
-          {problem.replace && (
-            <>
-              <button className="btn" onClick={() => save(assign(shortcuts, id, problem.replace!, isMac))}>
-                Replace
-              </button>
-              <button className="btn" onClick={() => record(undefined)}>
-                Cancel
-              </button>
-            </>
-          )}
-        </div>
-      )}
-    </div>
-  )
-  return (
-    <>
-      <p className="set-note">
-        Click a shortcut, then press the keys you want. Esc cancels.
-        {Object.keys(shortcuts).length > 0 && (
-          <button className="btn set-shortcut-reset-all" onClick={() => save({})}>
-            Reset All
-          </button>
-        )}
-      </p>
-      <Group>{bound.map(row)}</Group>
-      <Group title="Without a shortcut">{unbound.map(row)}</Group>
-      <Group title="Fixed">
-        {fixed.map((r) => (
-          <div key={r.title} className="set-row set-shortcut fixed" title="Can't be changed">
-            <span className="set-row-title">{r.title}</span>
-            <Icon name="lock" size={13} />
-            <Keys label={r.keys} />
+        {list.map((extension) => (
+          <div key={extension.id} className="set-row set-ext">
+            {extension.icon ? <img className="set-ext-icon" src={extension.icon} alt="" /> : <span className="set-ext-icon"><Icon name="puzzle" /></span>}
+            <span className="set-row-title">{extension.name}</span>
+            <span className="set-ext-id">{extension.id}</span>
           </div>
         ))}
       </Group>

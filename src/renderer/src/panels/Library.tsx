@@ -5,6 +5,7 @@ import { activeSpace, arc, cx, dispatch, displayHost } from '../api'
 import { Favicon, Icon } from '../icons'
 import { countPinned, formatBytes, groupByDay, timeLabel } from './util'
 import './panels.css'
+import './library.css'
 
 type Tab = 'archive' | 'history' | 'downloads' | 'spaces'
 

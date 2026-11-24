@@ -5,6 +5,7 @@ import { Icon } from '../icons'
 import { CustomColor } from './ColorPicker'
 import { firstGrapheme, SPACE_COLORS } from './util'
 import './panels.css'
+import './editors.css'
 
 const EMOJI = [
   '🏠', '💼', '🎨', '🎮', '🎵', '📚', '🧪', '💻', '🛠️', '🚀',

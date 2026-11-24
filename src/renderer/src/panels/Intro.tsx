@@ -8,6 +8,7 @@ import type { AppState, ImportChoice, ReleaseNotes, UpdateStatus } from '../../.
 import { activeSpace, cx, dispatch, isMac, shortcutLabel } from '../api'
 import { Icon } from '../icons'
 import './panels.css'
+import './intro.css'
 import { SpotlightPicture } from './spotlight-pictures'
 
 const key = (id: CommandId) => <kbd className="kbd">{shortcutLabel(id)}</kbd>
