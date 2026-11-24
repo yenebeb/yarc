@@ -26,7 +26,6 @@ Open-source Arc-browser replacement (Electron 45 / Chromium 156, React 19, TypeS
 
 - Fewest lines that stay readable. No comments except a one-line *why* no name can carry (an Electron/Chromium/OS workaround, a security or ordering reason); otherwise extract a function or rename.
 - Keep the main process cheap: high-frequency sources (blocked requests, download progress) use `emitSlowly()`, not `emitSoon()`; data only a panel shows (archive, site permissions) reaches the overlay only while that panel is open (`withPanelData`); UI webContents are created on first use, and a child view's webContents is closed with its window (Electron doesn't).
-- Several files are CRLF: edit them in place (Edit tool, `perl -pi`), never rewrite them through a text-mode script.
 - Unit tests run under `node --experimental-strip-types`: no parameter properties, enums or namespaces in anything they import.
 - e2e tests reach `Browser` untyped (`globalThis.arcBrowser`), so after renaming a member grep `test/`. Wait for the page's DOM to show a change before measuring it; main's state alone races.
 
