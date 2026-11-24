@@ -69,13 +69,17 @@ jobs:
         run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
       - if: runner.os == 'Linux'
         run: xvfb-run --auto-servernum --server-args="-screen 0 1600x1000x24" pnpm test:e2e
+        env:
+          YARC_CRASH_DUMPS: ${{ runner.temp }}/crash-dumps
       - if: runner.os != 'Linux'
         run: pnpm test:e2e
-      # The app crashes on macOS CI now and then and never locally: macOS's report says where.
-      - if: failure() && runner.os == 'macOS'
+        env:
+          YARC_CRASH_DUMPS: ${{ runner.temp }}/crash-dumps
+      # The app crashes on macOS CI now and then and never locally: the dump says where.
+      - if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: macos-crash-reports
-          path: ~/Library/Logs/DiagnosticReports/Electron*
+          name: crash-dumps-${{ matrix.os }}
+          path: ${{ runner.temp }}/crash-dumps
           if-no-files-found: ignore
           retention-days: 14

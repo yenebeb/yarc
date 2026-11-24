@@ -1,4 +1,4 @@
-import { app, BrowserWindow } from 'electron'
+import { app, BrowserWindow, crashReporter } from 'electron'
 import { writeSync } from 'node:fs'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -29,6 +29,11 @@ if (process.env.YARC_TEST)
     writeSync(2, `Uncaught exception: ${err.stack ?? err}\n`)
     app.exit(1)
   })
+// CI's e2e job only: macOS on the runners leaves no crash report, so the app writes its own (kept on disk, never uploaded).
+if (process.env.YARC_CRASH_DUMPS) {
+  app.setPath('crashDumps', process.env.YARC_CRASH_DUMPS)
+  crashReporter.start({ uploadToServer: false })
+}
 
 app.userAgentFallback = browserUserAgent(app.userAgentFallback)
 registerUiScheme()
