@@ -28,6 +28,8 @@ export interface TabHost {
   showContextMenu(tab: LiveTab, params: ContextMenuParams): void
   /** A link the user clicked is about to replace the page; return true to open it elsewhere instead. */
   interceptLink?(tab: LiveTab, url: string): boolean
+  /** A link the user shift-clicked; return true if it opened in Peek instead of a new window. */
+  peekLink?(tab: LiveTab, url: string): boolean
   onPopupBlocked?(tab: LiveTab, url: string): void
 }
 
@@ -60,6 +62,7 @@ export class LiveTab {
   crashed = false
   playing = false
   private lastClick = 0
+  private lastClickShift = false
   private lastActivation = 0
   private lastUnrequestedPopup = 0
 
@@ -203,7 +206,10 @@ export class LiveTab {
       this.host.onTabChanged(this, {})
     })
     wc.on('input-event', (_e, input) => {
-      if (input.type === 'mouseUp') this.lastClick = Date.now()
+      if (input.type === 'mouseUp') {
+        this.lastClick = Date.now()
+        this.lastClickShift = input.modifiers?.includes('shift') ?? false
+      }
       if (input.type === 'mouseDown' || input.type === 'mouseUp' || input.type === 'keyDown' || input.type === 'rawKeyDown' || input.type === 'touchEnd') this.lastActivation = Date.now()
     })
     wc.on('will-navigate', (e, url) => {
@@ -220,6 +226,8 @@ export class LiveTab {
         void openExternalLink(wc, url, this.userActivated)
         return { action: 'deny' }
       }
+      const shiftClicked = this.lastClickShift && Date.now() - this.lastClick < LINK_CLICK_MS
+      if (disposition === 'new-window' && !features && shiftClicked && this.host.peekLink?.(this, url)) return { action: 'deny' }
       if (!this.userActivated) {
         if (Date.now() - this.lastUnrequestedPopup < UNREQUESTED_POPUP_MS) {
           this.host.onPopupBlocked?.(this, url)

@@ -19,8 +19,9 @@ export function buildContextMenu(browser: Browser, tab: LiveTab, p: ContextMenuP
   if (p.linkURL) {
     // Loaded from main, which Chromium doesn't stop from opening local URLs a web page could never navigate to itself.
     if (WEB_LINK.test(p.linkURL) || (/^file:/i.test(p.linkURL) && /^file:/i.test(p.pageURL))) {
+      items.push({ label: 'Open Link in New Tab', click: () => browser.open(p.linkURL, 'background') })
+      if (WEB_LINK.test(p.linkURL) && tab.host === browser) items.push({ label: 'Open Link in Peek', click: () => browser.peekLink(tab, p.linkURL) })
       items.push(
-        { label: 'Open Link in New Tab', click: () => browser.open(p.linkURL, 'background') },
         { label: 'Open Link in Split View', click: () => browser.open(p.linkURL, 'split') },
         { label: 'Open Link in a Little Window', click: () => browser.openLittle(p.linkURL) },
         { label: 'Open Link in Incognito Window', click: () => browser.openIncognito(p.linkURL) }

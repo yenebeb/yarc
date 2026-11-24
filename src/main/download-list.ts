@@ -1,4 +1,4 @@
-import { app, dialog, shell, type BaseWindow, type Session, type WebContents } from 'electron'
+import { app, dialog, shell, type BaseWindow, type NativeImage, type Session, type WebContents } from 'electron'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import type { DownloadItemInfo, ID } from '../shared/types'
@@ -16,6 +16,7 @@ export interface DownloadHost {
 export class DownloadList {
   items: DownloadItemInfo[] = []
   private burst = new DownloadBurst()
+  private icons = new Map<ID, NativeImage>()
 
   constructor(private host: DownloadHost) {}
 
@@ -50,8 +51,11 @@ export class DownloadList {
       item.once('done', (_ev, state) => {
         info.state = state
         info.received = item.getReceivedBytes()
-        if (state === 'completed') markFromInternet(info.path, info.url)
-        if (state === 'completed') this.host.toast(`Downloaded ${info.filename}`)
+        if (state === 'completed') {
+          markFromInternet(info.path, info.url)
+          this.host.toast(`Downloaded ${info.filename}`)
+          void app.getFileIcon(info.path).then((icon) => this.icons.set(info.id, icon), () => undefined)
+        }
         this.host.changed()
       })
       this.host.changed()
@@ -80,8 +84,17 @@ export class DownloadList {
     void shell.openPath(d.path)
   }
 
+  /** Synchronous, so the drag starts while the button is still down; the icon was fetched when the download finished. */
+  drag(id: ID, page: WebContents): void {
+    const d = this.items.find((x) => x.id === id)
+    const icon = this.icons.get(id)
+    if (d?.state !== 'completed' || !icon || !existsSync(d.path)) return
+    page.startDrag({ file: d.path, icon })
+  }
+
   clearFinished(): void {
     this.items = this.items.filter((d) => d.state === 'progressing')
+    this.icons = new Map([...this.icons].filter(([id]) => this.items.some((d) => d.id === id)))
     this.host.changed()
   }
 }

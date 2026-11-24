@@ -229,6 +229,11 @@ function Downloads({ state }: { state: AppState }) {
             key={d.id}
             className={cx('list-row', done && 'click')}
             title={d.path || d.url}
+            draggable={done}
+            onDragStart={(e) => {
+              e.preventDefault()
+              arc.dragDownload(d.id)
+            }}
             onClick={() => done && dispatch({ type: 'downloadOpen', id: d.id })}
           >
             <Icon name="download" />

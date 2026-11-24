@@ -41,7 +41,8 @@ const api: ArcApi = {
   canvasExport: (png, to) => ipcRenderer.invoke(IPC.canvasExport, png, to),
   canvasLive: (cards) => ipcRenderer.send(IPC.canvasLive, cards),
   onCanvasShown: (cb) => listen(IPC.canvasShown, cb),
-  capturePick: (x, y, depth) => ipcRenderer.invoke(IPC.capturePick, x, y, depth)
+  capturePick: (x, y, depth) => ipcRenderer.invoke(IPC.capturePick, x, y, depth),
+  dragDownload: (id) => ipcRenderer.send(IPC.downloadDrag, id)
 }
 
 // Never for a web page that ends up in a UI view somehow (main refuses its IPC too: ui-origin.ts).

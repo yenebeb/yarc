@@ -12,7 +12,6 @@ import {
   type Event,
   type Input,
   type Point,
-  type IpcMainInvokeEvent,
   type Rectangle,
   type Result,
   type View,
@@ -74,7 +73,7 @@ import { search, suggest } from './search'
 import { SharePicker } from './share-picker'
 import { incognitoState, MAX_ARCHIVE, newId, SPACE_COLORS, Store } from './store'
 import { LiveTab, type OpenDisposition, type TabHost } from './tab'
-import { handleUi } from './ui-origin'
+import { handleUi, onUi } from './ui-origin'
 import { Updater } from './updater'
 import { MainWindow, PAD, TRAFFIC_LIGHTS, TRAFFIC_LIGHTS_WIDTH, type ViewSlot } from './window'
 import { applyView, captureView, cascade, inAnyView, newView, stateForView, viewFromState } from './window-state'
@@ -370,6 +369,15 @@ export class Browser implements TabHost, FloatingHost {
       })
     )
     win.on('move', () => this.saveBounds(w))
+    const stepHistory = (step: 'back' | 'forward') => this.inWin(w, () => void this.dispatch({ type: step }))
+    win.on('swipe', (_e, direction) => {
+      if (direction === 'left') stepHistory('back')
+      if (direction === 'right') stepHistory('forward')
+    })
+    win.on('app-command', (_e, command) => {
+      if (command === 'browser-backward') stepHistory('back')
+      if (command === 'browser-forward') stepHistory('forward')
+    })
     for (const ev of ['maximize', 'unmaximize', 'enter-full-screen', 'leave-full-screen'] as const) {
       win.on(ev as 'maximize', () =>
         this.inWin(w, () => {
@@ -1166,6 +1174,12 @@ export class Browser implements TabHost, FloatingHost {
     if (!this.state.settings.peekPinnedLinks || !/^https?:/i.test(url)) return false
     const found = findItem(this.state, tab.itemId)
     if (!found || found.loc.kind === 'today' || sameSite(tab.wc.getURL(), url)) return false
+    this.openPeek(tab.profileId, url)
+    return true
+  }
+
+  peekLink(tab: LiveTab, url: string): boolean {
+    if (!/^https?:/i.test(url) || tab.host !== this) return false
     this.openPeek(tab.profileId, url)
     return true
   }
@@ -2180,7 +2194,7 @@ export class Browser implements TabHost, FloatingHost {
   }
 
   private registerIpc(): void {
-    const of = (e: IpcMainInvokeEvent): Browser => {
+    const of = (e: { sender: WebContents }): Browser => {
       for (const b of Browser.all) {
         const w = b.winFor(e.sender)
         if (w) {
@@ -2205,6 +2219,7 @@ export class Browser implements TabHost, FloatingHost {
       return b.profiles.get(b.space.profileId).history.deleteUrl(String(url))
     })
     handleUi(IPC.focus, (e) => e.sender.focus())
+    onUi(IPC.downloadDrag, (e, id: string) => of(e).downloads.drag(String(id), e.sender))
     handleUi(IPC.capturePick, (e, x: number, y: number, depth: number) => {
       const b = of(e)
       const tab = b.activeTab()

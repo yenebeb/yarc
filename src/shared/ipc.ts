@@ -37,7 +37,8 @@ export const IPC = {
   canvasExport: 'arc:canvas-export',
   canvasLive: 'arc:canvas-live',
   canvasShown: 'arc:canvas-shown',
-  capturePick: 'arc:capture-pick'
+  capturePick: 'arc:capture-pick',
+  downloadDrag: 'arc:download-drag'
 } as const
 
 export interface EditRequest {
@@ -128,4 +129,6 @@ export interface ArcApi {
   onCanvasShown(cb: (shown: boolean) => void): () => void
   /** In overlay page coordinates; `depth` steps out to the element's ancestors. */
   capturePick(x: number, y: number, depth: number): Promise<Rect | undefined>
+  /** From a row's cancelled dragstart: only main can start a drag of a file on disk. */
+  dragDownload(id: string): void
 }

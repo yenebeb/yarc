@@ -47,7 +47,7 @@ Drag a tab onto the page. Up to four tabs, side by side or stacked.
 
 ![A link from a favorite opening in Peek](docs/screenshots/peek.gif)
 
-Links from pinned tabs and favorites to other sites open in a card over the page. `Esc` closes it, `⌘O` keeps it as a tab.
+Links from pinned tabs and favorites to other sites open in a card over the page. Shift-click any link, or right-click it and choose *Open Link in Peek*, to peek it too. `Esc` closes it, `⌘O` keeps it as a tab.
 
 ### Canvases, an alternative to Arc's Easels
 
