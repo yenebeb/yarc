@@ -321,24 +321,25 @@ function ResizeHandle({ width, right }: { width: number; right: boolean }) {
 function TopBar({ state }: { state: AppState }) {
   const space = activeSpace(state)
   const live = state.peek ?? (space.activeItemId ? state.live[space.activeItemId] : undefined)
-  return (
-    <div className="topbar">
-      <button className="icon-btn" title={`Toggle sidebar (${isMac ? '⌘S' : 'Ctrl+S'})`} onClick={() => dispatch({ type: 'toggleSidebar' })}>
-        <Icon name="sidebar" />
-      </button>
-      {isMac ? null : (
-        <button
-          className="icon-btn"
-          title="Menu"
-          onClick={(e) => {
-            const r = e.currentTarget.getBoundingClientRect()
-            dispatch({ type: 'appMenu', x: r.left, y: r.bottom + 4 })
-          }}
-        >
-          <Icon name="menu" />
-        </button>
-      )}
-      <div className="spacer" />
+  const toggle = (
+    <button className="icon-btn sidebar-toggle" title={`Toggle sidebar (${isMac ? '⌘S' : 'Ctrl+S'})`} onClick={() => dispatch({ type: 'toggleSidebar' })}>
+      <Icon name="sidebar" />
+    </button>
+  )
+  const menu = isMac ? null : (
+    <button
+      className="icon-btn"
+      title="Menu"
+      onClick={(e) => {
+        const r = e.currentTarget.getBoundingClientRect()
+        dispatch({ type: 'appMenu', x: r.left, y: r.bottom + 4 })
+      }}
+    >
+      <Icon name="menu" />
+    </button>
+  )
+  const nav = (
+    <>
       <button className="icon-btn" disabled={!live?.canGoBack} onClick={() => dispatch({ type: 'back' })} title="Back">
         <Icon name="back" />
       </button>
@@ -353,6 +354,25 @@ function TopBar({ state }: { state: AppState }) {
       >
         <Icon name={live?.loading ? 'x' : 'reload'} />
       </button>
+    </>
+  )
+  return (
+    <div className="topbar">
+      {state.settings.sidebarRight ? (
+        <>
+          {nav}
+          <div className="spacer" />
+          {menu}
+          {toggle}
+        </>
+      ) : (
+        <>
+          {toggle}
+          {menu}
+          <div className="spacer" />
+          {nav}
+        </>
+      )}
     </div>
   )
 }

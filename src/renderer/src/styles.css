@@ -185,6 +185,11 @@ input {
   flex: 1;
 }
 
+.sidebar-toggle .icon {
+  width: 18px;
+  height: 18px;
+}
+
 .mac .topbar {
   padding-left: 70px;
 }
