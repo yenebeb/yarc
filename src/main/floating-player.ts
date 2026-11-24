@@ -82,23 +82,30 @@ export class FloatingPlayer {
     clearInterval(this.keepLifted)
     this.keepLifted = undefined
     const win = this.window
-    const controls = this.controls
-    if (win) {
+    if (win?.isVisible()) {
       this.remember()
-      // Both views out and the controls' page closed before the window goes: on macOS CI the app crashed when they went after it.
-      for (const view of [tab?.view, controls]) if (view) win.contentView.removeChildView(view)
-      if (controls && !controls.webContents.isDestroyed()) controls.webContents.close()
-      win.destroy()
+      win.hide()
     }
-    this.win = undefined
-    this.controls = undefined
-    this.ready = false
+    if (win && tab) win.contentView.removeChildView(tab.view)
     if (tab && !tab.destroyed) {
       void lowerVideo(tab.wc)
       if (this.cssKey) void tab.wc.removeInsertedCSS(this.cssKey).catch(() => {})
     }
     this.cssKey = undefined
     return tab
+  }
+
+  /** Once no window is left. Until then the panel is hidden and reused: on macOS a GPU frame reaching a destroyed panel crashes Chromium. */
+  dispose(): void {
+    this.release()
+    const win = this.window
+    const controls = this.controls
+    if (win && controls) win.contentView.removeChildView(controls)
+    if (controls && !controls.webContents.isDestroyed()) controls.webContents.close()
+    win?.destroy()
+    this.win = undefined
+    this.controls = undefined
+    this.ready = false
   }
 
   update(): void {
@@ -113,8 +120,20 @@ export class FloatingPlayer {
     const ratio = videoRatio(size.width, size.height)
     const area = screen.getDisplayMatching(this.lastBounds ?? anchor.win).workArea
     const bounds = floatingBounds({ win: anchor.win, area, ratio, sidebarRight: anchor.sidebarRight, last: this.lastBounds })
+    const win = this.window ?? this.create()
+    win.setAspectRatio(ratio)
+    win.setMinimumSize(FLOAT_MIN_WIDTH, Math.round(FLOAT_MIN_WIDTH / ratio))
+    win.setBounds(bounds)
+    const tab = this.tab!
+    tab.view.setBorderRadius(0)
+    win.contentView.addChildView(tab.view, 0)
+    this.layout()
+    this.update()
+    win.showInactive()
+  }
+
+  private create(): BaseWindow {
     const options: BaseWindowConstructorOptions = {
-      ...bounds,
       show: false,
       frame: false,
       resizable: true,
@@ -134,12 +153,6 @@ export class FloatingPlayer {
     this.win = win
     win.setAlwaysOnTop(true, 'floating')
     win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true })
-    win.setAspectRatio(ratio)
-    win.setMinimumSize(FLOAT_MIN_WIDTH, Math.round(FLOAT_MIN_WIDTH / ratio))
-
-    const tab = this.tab!
-    tab.view.setBorderRadius(0)
-    win.contentView.addChildView(tab.view)
 
     const controls = new WebContentsView({ webPreferences: uiWebPreferences() })
     controls.setBackgroundColor('#00000000')
@@ -150,11 +163,10 @@ export class FloatingPlayer {
     win.contentView.addChildView(controls)
     loadRenderer(controls.webContents, 'float')
 
-    this.layout()
     win.on('resize', () => this.layout())
     win.on('resized', () => this.remember())
     win.on('moved', () => this.remember())
-    win.showInactive()
+    return win
   }
 
   private layout(): void {

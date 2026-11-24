@@ -454,7 +454,7 @@ export class Browser implements TabHost, FloatingHost {
       this.store.save()
       return this.emitSoon()
     }
-    this.floating.release()
+    this.floating.dispose()
     this.media = mediaState.emptyMedia()
     this.onScreen.clear()
     for (const t of this.live.values()) t.destroy()

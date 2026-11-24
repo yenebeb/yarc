@@ -1415,7 +1415,7 @@ const untilFloating = async (id: string) => {
 }
 const floatingPlayer = () =>
   app.evaluate(({ BaseWindow }) => {
-    const w = BaseWindow.getAllWindows().find((x) => x.getTitle() === 'Floating Player')
+    const w = BaseWindow.getAllWindows().find((x) => x.getTitle() === 'Floating Player' && x.isVisible())
     return w ? { onTop: w.isAlwaysOnTop(), resizable: w.isResizable() } : null
   })
 
