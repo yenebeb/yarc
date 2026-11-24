@@ -1008,14 +1008,15 @@ test('a downloaded update opens the relaunch card only after a week, then at mos
 
 test('the peeking sidebar stays out while the pointer is near it and slides back once it moves over the page', async () => {
   await dispatch({ type: 'open', url: `${base}/peek-away`, where: 'tab' })
-  // Chromium sends mouse moves at the real cursor when views change: keep the window out from under it.
+  // Chromium sends mouse moves at the real cursor when views change: keep the window above or below it (a corner of 1024×768 can still be under it).
   const bounds = await app.evaluate(({ screen }) => {
     const win = (globalThis as any).arcBrowser.window.win
     const before = win.getBounds()
     const c = screen.getCursorScreenPoint()
     const a = screen.getDisplayNearestPoint(c).workArea
-    const [width, height] = [800, 520]
-    win.setBounds({ x: c.x - a.x > a.width / 2 ? a.x : a.x + a.width - width, y: c.y - a.y > a.height / 2 ? a.y : a.y + a.height - height, width, height })
+    const [above, below] = [c.y - a.y, a.y + a.height - c.y - 1]
+    const height = Math.min(520, Math.max(above, below))
+    win.setBounds({ x: a.x, y: above > below ? c.y - height : c.y + 1, width: 800, height })
     return before
   })
   await dispatch({ type: 'toggleSidebar' })
@@ -1164,6 +1165,12 @@ test('menu bar commands reopen the closed main window (macOS)', async () => {
 })
 
 const isPlaying = (id: string) => app.evaluate((_e, tabId) => (globalThis as any).arcBrowser.live.get(tabId).playing as boolean, id)
+/** Playing and painted: a hidden tab paints no canvas, so a stream left before its first frame never gets one, and a video without a frame doesn't float. */
+const untilShowing = async (id: string) => {
+  await expect.poll(() => isPlaying(id), { timeout: 10_000 }).toBe(true)
+  const painted = '(v => v.readyState >= 2 && v.videoWidth > 0)(document.getElementById("v"))'
+  await expect.poll(() => app.evaluate((_e, [tabId, code]) => (globalThis as any).arcBrowser.live.get(tabId).wc.executeJavaScript(code), [id, painted] as const)).toBe(true)
+}
 const floatingPlayer = () =>
   app.evaluate(({ BaseWindow }) => {
     const w = BaseWindow.getAllWindows().find((x) => x.getTitle() === 'Floating Player')
@@ -1173,7 +1180,7 @@ const floatingPlayer = () =>
 test('a playing video floats when you leave its tab, and goes back into the page when you return', async () => {
   await dispatch({ type: 'open', url: `${base}/video-page` })
   const video = (await space()).activeItemId!
-  await expect.poll(() => isPlaying(video), { timeout: 10_000 }).toBe(true)
+  await untilShowing(video)
 
   await dispatch({ type: 'open', url: `${base}/after-video` })
   await expect.poll(async () => (await state()).media.floating, { timeout: 10_000 }).toBe(video)
@@ -1189,7 +1196,7 @@ test('a playing video floats when you leave its tab, and goes back into the page
 test("the floating player's – keeps the video playing as a sidebar card, whose button floats it again", async () => {
   await dispatch({ type: 'open', url: `${base}/video-page` })
   const video = (await space()).activeItemId!
-  await expect.poll(() => isPlaying(video), { timeout: 10_000 }).toBe(true)
+  await untilShowing(video)
   await dispatch({ type: 'open', url: `${base}/after-video-card` })
   await expect.poll(async () => (await state()).media.floating, { timeout: 10_000 }).toBe(video)
 

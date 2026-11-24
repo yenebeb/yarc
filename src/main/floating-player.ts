@@ -82,9 +82,12 @@ export class FloatingPlayer {
     clearInterval(this.keepLifted)
     this.keepLifted = undefined
     const win = this.window
+    const controls = this.controls
     if (win) {
       this.remember()
-      if (tab) win.contentView.removeChildView(tab.view)
+      // Both views out and the controls' page closed before the window goes: on macOS CI the app crashed when they went after it.
+      for (const view of [tab?.view, controls]) if (view) win.contentView.removeChildView(view)
+      if (controls && !controls.webContents.isDestroyed()) controls.webContents.close()
       win.destroy()
     }
     this.win = undefined
@@ -146,9 +149,6 @@ export class FloatingPlayer {
     controls.webContents.once('destroyed', () => players.delete(id))
     win.contentView.addChildView(controls)
     loadRenderer(controls.webContents, 'float')
-    win.on('closed', () => {
-      if (!controls.webContents.isDestroyed()) controls.webContents.close()
-    })
 
     this.layout()
     win.on('resize', () => this.layout())
