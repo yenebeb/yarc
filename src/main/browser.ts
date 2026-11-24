@@ -717,12 +717,12 @@ export class Browser implements TabHost, FloatingHost {
     this.window.setTrafficLights(this.state.settings.sidebarVisible || this.window.overlayMode.kind === 'sidebar', this.trafficLightsAt())
   }
 
-  /** A right sidebar's top bar keeps them at the window's top-right corner, mirroring the left layout. */
-  private trafficLightsAt(): Point | undefined {
-    if (!this.state.settings.sidebarRight) return undefined
-    const revealed = !this.state.settings.sidebarVisible && this.window.overlayMode.kind === 'sidebar'
+  /** In the sidebar's top bar at the window's outer corner, and as much lower as the revealed sidebar is inset. */
+  private trafficLightsAt(): Point {
+    const s = this.state.settings
+    const revealed = !s.sidebarVisible && this.window.overlayMode.kind === 'sidebar'
     return {
-      x: this.window.size().width - TRAFFIC_LIGHTS.x - TRAFFIC_LIGHTS_WIDTH,
+      x: s.sidebarRight ? this.window.size().width - TRAFFIC_LIGHTS.x - TRAFFIC_LIGHTS_WIDTH : TRAFFIC_LIGHTS.x,
       y: TRAFFIC_LIGHTS.y + (revealed ? FLOATING_SIDEBAR_INSET : 0)
     }
   }
@@ -1956,6 +1956,7 @@ export class Browser implements TabHost, FloatingHost {
     this.adblock.sync(this.state.settings)
     if (patch.theme) nativeTheme.themeSource = patch.theme
     if (patch.autoUpdate !== undefined) this.updater.sync()
+    if (patch.sidebarRight !== undefined) for (const other of this.wins) if (other !== this.cur) this.inWin(other, () => this.layout())
     this.relayout()
   }
 

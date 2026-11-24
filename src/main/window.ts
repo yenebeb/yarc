@@ -1,4 +1,5 @@
 import { BrowserWindow, WebContentsView, nativeTheme, screen, type BrowserWindowConstructorOptions, type Point, type Rectangle, type View, type WebContents } from 'electron'
+import { release } from 'node:os'
 import { join } from 'node:path'
 import { IPC } from '../shared/ipc'
 import { isFloating } from '../shared/tour'
@@ -10,8 +11,8 @@ export const PAD = 8
 
 const mac = process.platform === 'darwin'
 export const TRAFFIC_LIGHTS = { x: 13, y: 16 }
-/** Electron doesn't report the button group's width; measured on macOS. */
-export const TRAFFIC_LIGHTS_WIDTH = 54
+/** Electron doesn't report the button group's width. From macOS 26 (Darwin 25), apps built with its SDK space the buttons 23pt apart instead of 20. */
+export const TRAFFIC_LIGHTS_WIDTH = Number(release().split('.')[0]) >= 25 ? 60 : 54
 export const CAPTION_H = mac ? 0 : 32
 /** The UI's --text (styles.css). */
 export const captionSymbols = (dark: boolean): string => (dark ? '#f1eff6' : '#1d1b22')
@@ -124,7 +125,7 @@ export class MainWindow {
   }
 
   /** Electron shows them again at macOS's default spot, out of line with the sidebar's top bar. */
-  setTrafficLights(visible: boolean, at: Point = TRAFFIC_LIGHTS): void {
+  setTrafficLights(visible: boolean, at: Point): void {
     if (!mac) return
     this.win.setWindowButtonVisibility(visible)
     if (visible) this.win.setWindowButtonPosition(at)

@@ -6,7 +6,7 @@ import { createHash, generateKeyPairSync } from 'node:crypto'
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { createServer, type Server } from 'node:http'
 import type { AddressInfo } from 'node:net'
-import { tmpdir } from 'node:os'
+import { release, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { Action } from '../../src/shared/actions'
 import type { AppState, PinnedFolder } from '../../src/shared/types'
@@ -178,18 +178,41 @@ test('pages start below the native caption buttons on Windows and Linux', async 
   }
 })
 
-test('the traffic lights mirror to the top-right corner with a right sidebar on macOS, docked and revealed', async () => {
+/** macOS 26 (Darwin 25) spaces the window buttons 23pt apart instead of 20. */
+const trafficLightsWidth = Number(release().split('.')[0]) >= 25 ? 60 : 54
+
+test('the traffic lights sit in the sidebar at the window outer corner on macOS, docked and revealed, left and right', async () => {
   if (process.platform !== 'darwin') return
   const lights = () => app.evaluate(() => (globalThis as any).arcBrowser.window.win.getWindowButtonPosition())
-  const right = () => app.evaluate(() => (globalThis as any).arcBrowser.window.size().width - 13 - 54)
-  await dispatch({ type: 'settings', patch: { sidebarRight: true } })
-  expect(await lights()).toEqual({ x: await right(), y: 16 })
-  await dispatch({ type: 'settings', patch: { sidebarVisible: false } })
-  await dispatch({ type: 'overlay', mode: { kind: 'sidebar' } })
-  expect(await lights()).toEqual({ x: await right(), y: 20 })
-  await dispatch({ type: 'overlay', mode: { kind: 'none' } })
-  await dispatch({ type: 'settings', patch: { sidebarVisible: true, sidebarRight: false } })
+  const right = () => app.evaluate((_e, width) => (globalThis as any).arcBrowser.window.size().width - 13 - width, trafficLightsWidth)
+  const reveal = async (show: boolean) => dispatch({ type: 'overlay', mode: { kind: show ? 'sidebar' : 'none' } })
   expect(await lights()).toEqual({ x: 13, y: 16 })
+  await dispatch({ type: 'settings', patch: { sidebarVisible: false } })
+  await reveal(true)
+  expect(await lights()).toEqual({ x: 13, y: 20 })
+  await reveal(false)
+  await dispatch({ type: 'settings', patch: { sidebarRight: true } })
+  await reveal(true)
+  expect(await lights()).toEqual({ x: await right(), y: 20 })
+  await reveal(false)
+  await dispatch({ type: 'settings', patch: { sidebarVisible: true } })
+  expect(await lights()).toEqual({ x: await right(), y: 16 })
+  await dispatch({ type: 'settings', patch: { sidebarRight: false } })
+  expect(await lights()).toEqual({ x: 13, y: 16 })
+})
+
+test('moving the sidebar to the right moves the traffic lights in every window on macOS', async () => {
+  if (process.platform !== 'darwin') return
+  await app.evaluate(() => (globalThis as any).arcBrowser.openNewWindow())
+  const lights = () =>
+    app.evaluate((_e, width) => {
+      const wins = (globalThis as any).arcBrowser.wins
+      return wins.map((w: any) => w.main.win.getWindowButtonPosition().x - (w.main.size().width - 13 - width))
+    }, trafficLightsWidth)
+  await dispatch({ type: 'settings', patch: { sidebarRight: true } })
+  expect(await lights()).toEqual([0, 0])
+  await dispatch({ type: 'settings', patch: { sidebarRight: false } })
+  await app.evaluate(() => (globalThis as any).arcBrowser.wins[1].main.win.close())
 })
 
 test('the menu button opens Settings on Windows and Linux; macOS has the menu bar instead', async () => {
