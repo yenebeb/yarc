@@ -372,9 +372,14 @@ function SpotlightCard({ card }: { card: Spotlight }) {
   )
 }
 
+const NAMED_CONTRIBUTORS = 5
+
 function Thanks({ logins }: { logins: string[] }) {
   if (!logins.length) return null
-  return <p className="muted">Thanks to {new Intl.ListFormat('en').format(logins.map((login) => `@${login}`))} for contributing.</p>
+  const names = logins.slice(0, NAMED_CONTRIBUTORS).map((login) => `@${login}`)
+  const others = logins.length - names.length
+  if (others) names.push(others === 1 ? '1 other' : `${others} others`)
+  return <p className="muted">Thanks to {new Intl.ListFormat('en').format(names)} for contributing.</p>
 }
 
 function ReleaseList({ releases, title }: { releases: ReleaseNotes[]; title: string }) {
