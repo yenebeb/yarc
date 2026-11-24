@@ -356,6 +356,12 @@ export class Browser implements TabHost, FloatingHost {
       // Takes back the pages it shares with other windows.
       this.layout()
     })
+    // The reveal hides when the pointer leaves it, but a pointer over another app sends this window no moves.
+    win.on('blur', () =>
+      this.inWin(w, () => {
+        if (w.sidebarReveal && !w.tabDrag && w.main.overlayMode.kind === 'sidebar') this.setOverlay({ kind: 'none' }, false)
+      })
+    )
     win.on('resize', () =>
       this.inWin(w, () => {
         this.layout()

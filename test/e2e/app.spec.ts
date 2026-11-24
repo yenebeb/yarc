@@ -352,6 +352,16 @@ test('a shortcut changed in Settings runs its command, and its old keys reach th
   await dispatch({ type: 'settings', patch: { shortcuts: {} } })
 })
 
+test('a hover-revealed sidebar hides when the window loses focus', async () => {
+  await dispatch({ type: 'settings', patch: { sidebarVisible: false } })
+  await dispatch({ type: 'sidebarReveal', show: true })
+  expect(await overlayKind()).toBe('sidebar')
+  await app.evaluate(() => (globalThis as any).arcBrowser.window.win.emit('blur'))
+  await expect.poll(overlayKind).toBe('none')
+  expect((await state()).sidebarReveal).toBe(false)
+  await dispatch({ type: 'settings', patch: { sidebarVisible: true } })
+})
+
 test('dragging the sidebar edge resizes the sidebar and the page', async () => {
   const ui = app.windows().find((w) => w.url().endsWith('index.html'))!
   const drag = async (dx: number) => {
