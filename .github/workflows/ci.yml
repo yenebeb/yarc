@@ -71,3 +71,11 @@ jobs:
         run: xvfb-run --auto-servernum --server-args="-screen 0 1600x1000x24" pnpm test:e2e
       - if: runner.os != 'Linux'
         run: pnpm test:e2e
+      # The app crashes on macOS CI now and then and never locally: macOS's report says where.
+      - if: failure() && runner.os == 'macOS'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: macos-crash-reports
+          path: ~/Library/Logs/DiagnosticReports/Electron*
+          if-no-files-found: ignore
+          retention-days: 14
