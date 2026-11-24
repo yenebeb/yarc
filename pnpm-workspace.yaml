@@ -12,5 +12,5 @@ overrides:
   "minimatch@>=9 <11.0.1": 11.0.3
 
 patchedDependencies:
-  # A native messaging host that exits at once (e.g. on extension install) made stdin.write throw an uncaught EPIPE.
-  electron-chrome-extensions@4.10.0: patches/electron-chrome-extensions@4.10.0.patch
+  # A native messaging host that exits at once (e.g. on extension install) made stdin.write throw an uncaught EPIPE; drop once upstream handles it.
+  electron-chrome-extensions: patches/electron-chrome-extensions.patch

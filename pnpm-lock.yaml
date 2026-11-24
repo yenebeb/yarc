@@ -167,7 +167,7 @@ overrides:
   minimatch@>=9 <11.0.1: 11.0.3
 
 patchedDependencies:
-  electron-chrome-extensions@4.10.0: f5c808b89af0839b2f8307a659e1754708b06dbd40331c14c287cb7cfa751f35
+  electron-chrome-extensions: f5c808b89af0839b2f8307a659e1754708b06dbd40331c14c287cb7cfa751f35
 
 importers:
 
