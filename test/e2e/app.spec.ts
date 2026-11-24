@@ -2,7 +2,8 @@
 import { ElectronBlocker } from '@ghostery/adblocker-electron'
 import { _electron as electron, expect, test, type ElectronApplication, type Page } from '@playwright/test'
 import { spawn } from 'node:child_process'
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { createHash, generateKeyPairSync } from 'node:crypto'
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { createServer, type Server } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
@@ -1365,6 +1366,45 @@ test('an extension popup opens toward the page, whichever side the sidebar is on
   } finally {
     await dispatch({ type: 'settings', patch: { sidebarRight: false } })
     await dispatch({ type: 'close', id: tabId })
+    await removeExtension(extId)
+  }
+})
+
+// electron-chrome-extensions wrote to a host's closed stdin with no error listener: an uncaught EPIPE crashed the app (#122).
+test('an extension whose native messaging host stops reading gets a disconnect, and the app keeps running', async () => {
+  test.skip(process.platform === 'win32', 'Windows finds hosts in the registry')
+  const host = join(userData, 'closed-host.sh')
+  writeFileSync(host, '#!/bin/sh\nexec 0<&-\nsleep 30\n')
+  chmodSync(host, 0o755)
+  // The host must list the extension's ID before it loads: a manifest key fixes it, as Chrome derives it.
+  const key = generateKeyPairSync('rsa', { modulusLength: 2048 }).publicKey.export({ type: 'spki', format: 'der' })
+  const id = [...createHash('sha256').update(key).digest('hex').slice(0, 32)].map((c) => String.fromCharCode(97 + parseInt(c, 16))).join('')
+  const dir = extensionDir({
+    'manifest.json': { manifest_version: 3, name: 'closed host', version: '1.0', key: key.toString('base64'), permissions: ['nativeMessaging'], background: { service_worker: 'bg.js' } },
+    'bg.js': `const port = chrome.runtime.connectNative('org.yarc.closed_host')
+      const ping = setInterval(() => port.postMessage({ ping: true }), 100)
+      port.onDisconnect.addListener(() => { clearInterval(ping); console.log('native host disconnected') })`
+  })
+  mkdirSync(join(userData, 'NativeMessagingHosts'), { recursive: true })
+  writeFileSync(
+    join(userData, 'NativeMessagingHosts', 'org.yarc.closed_host.json'),
+    JSON.stringify({ name: 'org.yarc.closed_host', description: 'e2e', path: host, type: 'stdio', allowed_origins: [`chrome-extension://${id}/`] })
+  )
+  const extId = await app.evaluate(async (_e, extDir) => {
+    const b = (globalThis as any).arcBrowser
+    const ses = b.profiles.get(b.store.activeSpace.profileId).session
+    const disconnected = new Promise<void>((resolve) =>
+      ses.serviceWorkers.on('console-message', (_ev: unknown, d: { message: string }) => d.message === 'native host disconnected' && resolve())
+    )
+    const ext = await ses.extensions.loadExtension(extDir)
+    ;(globalThis as any).nativeHostDisconnected = disconnected
+    return ext.id
+  }, dir)
+  try {
+    expect(extId).toBe(id)
+    await app.evaluate(() => (globalThis as any).nativeHostDisconnected)
+    expect(readFileSync(join(userData, 'logs', 'main.log'), 'utf8')).not.toContain('EPIPE')
+  } finally {
     await removeExtension(extId)
   }
 })

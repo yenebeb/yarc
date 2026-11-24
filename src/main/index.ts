@@ -21,6 +21,12 @@ if (app.isPackaged && ['remote-debugging-port', 'remote-debugging-pipe'].some((s
 if (process.env.YARC_USER_DATA) app.setPath('userData', process.env.YARC_USER_DATA)
 else app.setPath('userData', profileDir(app.getPath('appData'), app.isPackaged ? 'YARC' : 'YARC (dev)'))
 startLog(join(app.isPackaged && !process.env.YARC_USER_DATA ? app.getPath('logs') : join(app.getPath('userData'), 'logs'), 'main.log'))
+// Electron's crash dialog waits for a click that never comes in a test run.
+if (process.env.YARC_TEST)
+  process.on('uncaughtException', (err) => {
+    console.error('Uncaught exception:', err)
+    app.exit(1)
+  })
 
 app.userAgentFallback = browserUserAgent(app.userAgentFallback)
 registerUiScheme()
