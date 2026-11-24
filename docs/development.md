@@ -20,7 +20,7 @@ pnpm dev             # start with hot reload
 | `pnpm start` | Run the production build |
 | `pnpm typecheck` | TypeScript check |
 | `pnpm test` | Unit tests: URL handling, shortcuts, sidebar model, Arc parser |
-| `pnpm test:e2e` | Build, then drive the real app with Playwright (tabs, spaces, splits, Little Window, persistence) |
+| `pnpm test:e2e` | Build, then drive the real app with Playwright (tabs, spaces, splits, Little Window, persistence): one spec file per area in `test/e2e/`, each with its own app and profile (`useApp()` in `test/e2e/app.ts`) |
 | `pnpm dist:win` | Windows installers in `release/` |
 | `pnpm dist:mac` | macOS DMGs in `release/` (run on a Mac) |
 | `pnpm dist:dir` | Unpacked app for quick local testing |
