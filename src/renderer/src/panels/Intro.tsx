@@ -285,6 +285,7 @@ export function UpdateReady({ update, close }: { update: UpdateStatus; close: ()
               ) : (
                 <p className="muted">Small fixes and improvements.</p>
               )}
+              <Thanks logins={r.thanks} />
             </section>
           ))
         ) : (
@@ -371,6 +372,11 @@ function SpotlightCard({ card }: { card: Spotlight }) {
   )
 }
 
+function Thanks({ logins }: { logins: string[] }) {
+  if (!logins.length) return null
+  return <p className="muted">Thanks to {new Intl.ListFormat('en').format(logins.map((login) => `@${login}`))} for contributing.</p>
+}
+
 function ReleaseList({ releases, title }: { releases: ReleaseNotes[]; title: string }) {
   return (
     <>
@@ -389,6 +395,7 @@ function ReleaseList({ releases, title }: { releases: ReleaseNotes[]; title: str
                   <li key={i}>{change}</li>
                 ))}
               </ul>
+              <Thanks logins={r.thanks} />
             </section>
           ))
         ) : (

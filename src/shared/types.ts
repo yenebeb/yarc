@@ -180,6 +180,8 @@ export interface ImportChoice {
 export interface ReleaseNotes {
   version: string
   changes: string[]
+  /** GitHub logins of the outside contributors whose PRs this version has. */
+  thanks: string[]
 }
 
 export interface LittleArcMemory {

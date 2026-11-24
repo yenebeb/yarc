@@ -1,15 +1,18 @@
 import type { ReleaseNotes } from '../shared/types'
 import { compareVersions } from './release.ts'
 
-/** Version → the changes for users merged in it (scripts/changelog.mjs). A version may have none. */
-export type Changelog = Record<string, string[]>
+/** scripts/changelog.mjs. `changes`: version → the changes for users merged in it; a version may have none. `thanks`: version → the outside contributors whose PRs it has. */
+export interface Changelog {
+  changes: Record<string, string[]>
+  thanks: Record<string, string[]>
+}
 
 export const RECENT_VERSIONS = 10
 
 function notes(changelog: Changelog, keep: (version: string) => boolean): ReleaseNotes[] {
-  return Object.entries(changelog)
+  return Object.entries(changelog.changes)
     .filter(([version]) => keep(version))
-    .map(([version, changes]) => ({ version, changes }))
+    .map(([version, changes]) => ({ version, changes, thanks: changelog.thanks[version] ?? [] }))
     .sort((a, b) => compareVersions(b.version, a.version))
 }
 
@@ -31,13 +34,15 @@ export function pendingReleases(changelog: Changelog, current: string, target: s
   return notes(changelog, (v) => compareVersions(v, current) > 0 && compareVersions(v, target) <= 0)
 }
 
-export function parseChangelog(json: unknown): Changelog {
+function listsOfText(json: unknown): Record<string, string[]> {
   if (!json || typeof json !== 'object' || Array.isArray(json)) return {}
-  const changelog: Changelog = {}
-  for (const [version, changes] of Object.entries(json)) {
-    if (Array.isArray(changes) && changes.every((c) => typeof c === 'string')) changelog[version] = changes
-  }
-  return changelog
+  return Object.fromEntries(Object.entries(json).filter(([, list]) => Array.isArray(list) && list.every((item) => typeof item === 'string')))
+}
+
+/** The file's versions sit at its top level, next to `thanks`, so apps from before `thanks` skip it. */
+export function parseChangelog(json: unknown): Changelog {
+  const thanks = json && typeof json === 'object' && 'thanks' in json ? listsOfText(json.thanks) : {}
+  return { changes: listsOfText(json), thanks }
 }
 
 export type StartupScreen = { kind: 'none' } | { kind: 'welcome' } | { kind: 'whats-new'; releases: ReleaseNotes[]; spotlights: string[] }

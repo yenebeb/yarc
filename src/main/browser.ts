@@ -50,7 +50,7 @@ import { AdBlock } from './adblock'
 import { bookmarksHtml } from './bookmarks-export'
 import { Canvases } from './canvas'
 import { recentSpotlights, SPOTLIGHTS, unseenSpotlights } from '../shared/spotlights'
-import { recentChanges, startupScreen, type Changelog } from './changelog'
+import { parseChangelog, recentChanges, startupScreen } from './changelog'
 import { openInChrome } from './chrome'
 import { DownloadList } from './download-list'
 import { Extensions } from './extensions'
@@ -82,8 +82,8 @@ import { applyView, captureView, cascade, inAnyView, newView, stateForView, view
 const isMac = process.platform === 'darwin'
 
 // Defined by electron.vite.config.ts from build/changelog.json; empty outside release builds.
-declare const __CHANGELOG__: Changelog
-const CHANGELOG: Changelog = __CHANGELOG__
+declare const __CHANGELOG__: unknown
+const CHANGELOG = parseChangelog(__CHANGELOG__)
 const UNLOAD_HIDDEN_AFTER = 3600_000
 const HOUSEKEEPING_EVERY = 5 * 60_000
 // Slack past the revealed sidebar's edge: room to grab it to resize, and no enter/leave flicker at the screen's edge.

@@ -4,18 +4,21 @@ import { changesSince, recentChanges, startupScreen, type Changelog } from '../.
 
 // 0.1.11 only had Dependabot bumps, so it has no entry; 0.1.12 has an empty one.
 const changelog: Changelog = {
-  '0.1.13': ['Add incognito windows'],
-  '0.1.12': [],
-  '0.1.10': ['Add split view by dragging', 'Import from Zen'],
-  '0.1.9': ['Restyle Little Arc'],
-  '0.1.8': ['Add Tab to Search']
+  changes: {
+    '0.1.13': ['Add incognito windows'],
+    '0.1.12': [],
+    '0.1.10': ['Add split view by dragging', 'Import from Zen'],
+    '0.1.9': ['Restyle Little Arc'],
+    '0.1.8': ['Add Tab to Search']
+  },
+  thanks: { '0.1.10': ['ada'] }
 }
 
 const versions = (notes: { version: string }[]) => notes.map((n) => n.version)
 
 describe("What's New lists the changes since the version the user last ran", () => {
   test('one release later: that release', () => {
-    assert.deepEqual(changesSince(changelog, '0.1.9', '0.1.10'), [{ version: '0.1.10', changes: ['Add split view by dragging', 'Import from Zen'] }])
+    assert.deepEqual(changesSince(changelog, '0.1.9', '0.1.10'), [{ version: '0.1.10', changes: ['Add split view by dragging', 'Import from Zen'], thanks: ['ada'] }])
   })
 
   test('several releases skipped in one update: all of them, newest first', () => {
@@ -49,7 +52,7 @@ describe("What's New lists the changes since the version the user last ran", () 
   })
 
   test('an empty changelog has nothing to show', () => {
-    assert.deepEqual(changesSince({}, '0.1.8', '0.1.13'), [])
+    assert.deepEqual(changesSince({ changes: {}, thanks: {} }, '0.1.8', '0.1.13'), [])
   })
 })
 
@@ -80,7 +83,7 @@ describe('A launch shows the welcome screen, What\'s New or nothing', () => {
 
   test('an existing profile updating to the first version that remembers: What\'s New for that version', () => {
     const screen = startupScreen(false, undefined, '0.1.13', changelog)
-    assert.deepEqual(screen, { kind: 'whats-new', releases: [{ version: '0.1.13', changes: ['Add incognito windows'] }], spotlights: [] })
+    assert.deepEqual(screen, { kind: 'whats-new', releases: [{ version: '0.1.13', changes: ['Add incognito windows'], thanks: [] }], spotlights: [] })
   })
 
   test('same version as last time: nothing', () => {
@@ -103,7 +106,7 @@ describe("Spotlights the user hasn't seen open What's New", () => {
 
   test('after an update: the spotlights, then that update\'s changes', () => {
     const screen = startupScreen(false, '0.1.10', '0.1.13', changelog, ['floating-player'])
-    assert.deepEqual(screen, { kind: 'whats-new', spotlights: ['floating-player'], releases: [{ version: '0.1.13', changes: ['Add incognito windows'] }] })
+    assert.deepEqual(screen, { kind: 'whats-new', spotlights: ['floating-player'], releases: [{ version: '0.1.13', changes: ['Add incognito windows'], thanks: [] }] })
   })
 
   test('an update whose changes are all "none" still shows its spotlights', () => {

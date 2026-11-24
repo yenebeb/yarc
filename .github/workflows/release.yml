@@ -126,13 +126,22 @@ jobs:
       # What's New in the app: each PR's "What's New" lines (or its title, for older PRs) per release
       # tag, including the one just made, so an update that skips versions still lists them all. One
       # JSON line, written into each build below and uploaded with the release for the update card.
+      # The draft also thanks the version's outside contributors, when it has any.
       - id: changelog
         name: Build the What's New changelog
         if: steps.next.outputs.version != ''
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          EVENT: ${{ github.event_name }}
+          VERSION: ${{ steps.next.outputs.version }}
         run: |
           node scripts/changelog.mjs build/changelog.json
+          thanks=$(node -e 'const t = JSON.parse(require("fs").readFileSync("build/changelog.json", "utf8")).thanks[process.env.VERSION] ?? []; process.stdout.write(new Intl.ListFormat("en").format(t.map((l) => "@" + l)))')
+          if [ -n "$thanks" ] && [ "$EVENT" != "pull_request" ]; then
+            gh release view "v$VERSION" --json body --jq .body > "$RUNNER_TEMP/notes.md"
+            printf '\n## Thanks\n\nThanks to %s for contributing to this release.\n' "$thanks" >> "$RUNNER_TEMP/notes.md"
+            gh release edit "v$VERSION" --notes-file "$RUNNER_TEMP/notes.md"
+          fi
           {
             echo "changelog<<CHANGELOG_EOF"
             node -e 'process.stdout.write(JSON.stringify(JSON.parse(require("fs").readFileSync("build/changelog.json", "utf8"))))'

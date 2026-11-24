@@ -1199,7 +1199,7 @@ test('a downloaded update opens the relaunch card only after a week, then at mos
   await app.evaluate((_e, since) => {
     const b = (globalThis as any).arcBrowser
     // set() also redraws the UI, so the sidebar pill appears.
-    b.updater.set({ state: 'ready', version: '9.0.2', notes: [{ version: '9.0.2', changes: ['Second'] }, { version: '9.0.1', changes: ['First'] }] })
+    b.updater.set({ state: 'ready', version: '9.0.2', notes: [{ version: '9.0.2', changes: ['Second'], thanks: [] }, { version: '9.0.1', changes: ['First'], thanks: [] }] })
     b.state.waitingUpdate = { from: '0.0.0', since }
   }, since)
   // The card waits for a visible window; right after launch it can still be hidden.
