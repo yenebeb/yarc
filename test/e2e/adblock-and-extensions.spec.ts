@@ -189,6 +189,12 @@ test('an extension popup opens next to its button, from the sidebar shown or hid
     expect(popupBounds.x + popupBounds.width).toBeGreaterThanOrEqual(buttonCenter)
     expect(Math.abs(popupBounds.y - (button.y + button.height))).toBeLessThan(40)
   }
+  // The hidden sidebar slides away once the real pointer leaves it; keep it out while its button is clicked.
+  await app.evaluate(() => {
+    const browser = (globalThis as any).arcBrowser
+    browser.realWatchSidebarReveal = browser.watchSidebarReveal
+    browser.watchSidebarReveal = () => {}
+  })
   try {
     for (const sidebarRight of [false, true]) {
       await dispatch({ type: 'settings', patch: { sidebarVisible: true, sidebarRight } })
@@ -200,6 +206,10 @@ test('an extension popup opens next to its button, from the sidebar shown or hid
       await popupNextToButton(overlay)
     }
   } finally {
+    await app.evaluate(() => {
+      const browser = (globalThis as any).arcBrowser
+      browser.watchSidebarReveal = browser.realWatchSidebarReveal
+    })
     await dispatch({ type: 'settings', patch: { sidebarVisible: true, sidebarRight: false } })
     await dispatch({ type: 'close', id: tabId })
     await removeExtension(extId)
