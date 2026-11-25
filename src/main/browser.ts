@@ -11,6 +11,7 @@ import {
   type ContextMenuParams,
   type Event,
   type Input,
+  type Point,
   type Rectangle,
   type Result,
   type View,
@@ -490,6 +491,13 @@ export class Browser implements TabHost {
 
   private winOf(tab: LiveTab): WindowSession {
     return this.wins.find((window) => window.peek?.tab === tab || (window.open && window.main.isShown(tab.view))) ?? this.cur
+  }
+
+  sidebarOrigin(win: BaseWindow): Point | undefined {
+    const window = this.wins.find((open) => open.main.win === win)
+    if (!window) return undefined
+    const sidebarVisible = window === this.cur ? this.state.settings.sidebarVisible : window.view.sidebarVisible
+    return sidebarVisible ? { x: 0, y: 0 } : window.main.sidebarOrigin()
   }
 
   isMainWindow(win: BaseWindow): boolean {

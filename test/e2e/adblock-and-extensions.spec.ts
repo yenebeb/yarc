@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test, type Page } from '@playwright/test'
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
@@ -149,7 +149,7 @@ test('an extension’s declarativeNetRequest rules block requests, from its mani
   }
 })
 
-test('an extension popup opens toward the page, whichever side the sidebar is on', async () => {
+test('an extension popup opens next to its button, from the sidebar shown or hidden, on either side', async () => {
   const dir = extensionDir({
     'manifest.json': { manifest_version: 3, name: 'popup side', version: '1.0', action: { default_popup: 'popup.html' } },
     'popup.html': 'popup'
@@ -161,33 +161,46 @@ test('an extension popup opens toward the page, whichever side the sidebar is on
   await dispatch({ type: 'open', url: `${base}/popup-anchor`, where: 'tab' })
   const tabId = (await space()).activeItemId!
   const ui = app.windows().find((page) => page.url().endsWith('index.html'))!
-  const popupInsideWindow = async () => {
+  const overlay = await pageWithUrl('overlay.html')
+  const popupNextToButton = async (page: Page) => {
     await app.evaluate(() => {
       const browser = (globalThis as any).arcBrowser
       browser.extensions.byProfile.get(browser.store.activeSpace.profileId).library.once('browser-action-popup-created', (popup: unknown) => ((globalThis as any).popup = popup))
     })
-    await ui.locator(`browser-action-list button[id="${extId}"]`).click()
+    await page.locator(`browser-action-list button[id="${extId}"]`).click()
     await expect.poll(() => app.evaluate(() => !!(globalThis as any).popup)).toBe(true)
-    const inside = await app.evaluate(() => {
+    const { popupBounds, button } = await app.evaluate((_electron, fromOverlay) => {
       const globals = globalThis as any
       const popup = globals.popup
       globals.popup = undefined
       // A hidden window doesn't render under test, so the popup never reports a size: size and place it as the library then would.
       popup.setSize({ width: 300, height: 200 })
       popup.updatePosition()
-      const popupBounds = popup.browserWindow.getBounds()
-      const windowBounds = globals.arcBrowser.window.win.getBounds()
+      const window = globals.arcBrowser.window
+      const view = fromOverlay ? window.overlay.getBounds() : { x: 0, y: 0 }
+      const content = window.win.getContentBounds()
+      const anchor = popup.anchorRect
+      const placed = { popupBounds: popup.browserWindow.getBounds(), button: { ...anchor, x: content.x + view.x + anchor.x, y: content.y + view.y + anchor.y } }
       popup.destroy()
-      return popupBounds.x >= windowBounds.x && popupBounds.x + popupBounds.width <= windowBounds.x + windowBounds.width
-    })
-    expect(inside).toBe(true)
+      return placed
+    }, page === overlay)
+    const buttonCenter = button.x + button.width / 2
+    expect(popupBounds.x).toBeLessThanOrEqual(buttonCenter)
+    expect(popupBounds.x + popupBounds.width).toBeGreaterThanOrEqual(buttonCenter)
+    expect(Math.abs(popupBounds.y - (button.y + button.height))).toBeLessThan(40)
   }
   try {
-    await popupInsideWindow()
-    await dispatch({ type: 'settings', patch: { sidebarRight: true } })
-    await popupInsideWindow()
+    for (const sidebarRight of [false, true]) {
+      await dispatch({ type: 'settings', patch: { sidebarVisible: true, sidebarRight } })
+      await expect(ui.locator('browser-action-list')).toHaveAttribute('alignment', sidebarRight ? 'bottom left' : 'bottom right')
+      await popupNextToButton(ui)
+      await dispatch({ type: 'settings', patch: { sidebarVisible: false } })
+      await dispatch({ type: 'sidebarReveal', show: true })
+      await expect(overlay.locator('browser-action-list')).toHaveAttribute('alignment', sidebarRight ? 'bottom left' : 'bottom right')
+      await popupNextToButton(overlay)
+    }
   } finally {
-    await dispatch({ type: 'settings', patch: { sidebarRight: false } })
+    await dispatch({ type: 'settings', patch: { sidebarVisible: true, sidebarRight: false } })
     await dispatch({ type: 'close', id: tabId })
     await removeExtension(extId)
   }

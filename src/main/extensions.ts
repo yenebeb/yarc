@@ -1,4 +1,4 @@
-import { session, type BaseWindow, type ContextMenuParams, type MenuItem, type Session } from 'electron'
+import { session, type BaseWindow, type ContextMenuParams, type MenuItem, type Point, type Session } from 'electron'
 import { ElectronChromeExtensions } from 'electron-chrome-extensions'
 import { installChromeWebStore, uninstallExtension, updateExtensions } from 'electron-chrome-web-store'
 import { join } from 'node:path'
@@ -13,6 +13,8 @@ const UPDATE_EVERY = 5 * 3600_000
 
 /** electron-chrome-extensions 4.10 keeps runtime grants in a private map; reaching it is the only way to restore them. */
 type LibraryInternals = { api?: { permissions?: { permissionMap?: Map<string, Grant> } } }
+/** The library's PopupView, which it doesn't export. */
+type Popup = { parent?: BaseWindow; on(event: 'will-move', listener: (position: Point) => void): void }
 
 interface ProfileExtensions {
   library: ElectronChromeExtensions
@@ -80,6 +82,11 @@ export class Extensions {
     // After the library's own listener, which resets an extension's grants to its manifest.
     const granted = (ext as unknown as LibraryInternals).api?.permissions?.permissionMap
     rt.session.extensions.on('extension-loaded', (_e, extension) => grants.restore(granted?.get(extension.id), extension.id))
+    ext.on('browser-action-popup-created', (popup: Popup) => {
+      const origin = popup.parent && b.sidebarOrigin(popup.parent)
+      // The library places the popup from the anchor plus the window's origin; the position it emits is the one it then applies.
+      if (origin) popup.on('will-move', (position: Point) => Object.assign(position, { x: position.x + origin.x, y: position.y + origin.y }))
+    })
     this.byProfile.set(rt.id, { library: ext, session: rt.session, folder, grants, rules })
     // After the library's preload (registered above), so `chrome` already has its APIs to copy.
     const filePath = join(__dirname, '../preload/extension-browser.js')

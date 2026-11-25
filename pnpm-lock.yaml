@@ -167,7 +167,7 @@ overrides:
   minimatch@>=9 <11.0.1: 11.0.3
 
 patchedDependencies:
-  electron-chrome-extensions: f5c808b89af0839b2f8307a659e1754708b06dbd40331c14c287cb7cfa751f35
+  electron-chrome-extensions: 7d1e18144c56c163aab1d9a40ff1dcc27cf9438584b635db739b0fdd08818d4e
 
 importers:
 
@@ -178,7 +178,7 @@ importers:
         version: 2.20.3(electron@45.4.1(supports-color@7.2.0))
       electron-chrome-extensions:
         specifier: 4.10.0
-        version: 4.10.0(patch_hash=f5c808b89af0839b2f8307a659e1754708b06dbd40331c14c287cb7cfa751f35)(supports-color@7.2.0)
+        version: 4.10.0(patch_hash=7d1e18144c56c163aab1d9a40ff1dcc27cf9438584b635db739b0fdd08818d4e)(supports-color@7.2.0)
       electron-chrome-web-store:
         specifier: 0.13.0
         version: 0.13.0(supports-color@7.2.0)
@@ -2914,7 +2914,7 @@ snapshots:
       - electron-builder-squirrel-windows
       - supports-color
 
-  electron-chrome-extensions@4.10.0(patch_hash=f5c808b89af0839b2f8307a659e1754708b06dbd40331c14c287cb7cfa751f35)(supports-color@7.2.0):
+  electron-chrome-extensions@4.10.0(patch_hash=7d1e18144c56c163aab1d9a40ff1dcc27cf9438584b635db739b0fdd08818d4e)(supports-color@7.2.0):
     dependencies:
       debug: 4.4.3(supports-color@7.2.0)
     transitivePeerDependencies:

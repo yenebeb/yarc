@@ -1,8 +1,18 @@
 diff --git a/dist/cjs/index.js b/dist/cjs/index.js
-index a91ca8fd07194abb081e9bb35fad0060fefddf91..aae3efde6fdf1dc85893b83757fc0742cad5c369 100644
+index a91ca8fd07194abb081e9bb35fad0060fefddf91..7d7c09d7d0319a8459e625274700228d4e890bb0 100644
 --- a/dist/cjs/index.js
 +++ b/dist/cjs/index.js
-@@ -1907,6 +1907,10 @@ var NativeMessagingHost = class {
+@@ -193,7 +193,8 @@ var _PopupView = class _PopupView extends import_node_events.EventEmitter {
+       resizable: false,
+       skipTaskbar: true,
+       backgroundColor: "#ffffff",
+-      roundedCorners: false,
++      // YARC: the native frame (rounded corners, hairline border, shadow) around an extension popup.
++      roundedCorners: true,
+       webPreferences: {
+         session: opts.session,
+         sandbox: true,
+@@ -1907,6 +1908,10 @@ var NativeMessagingHost = class {
      this.process = (0, import_node_child_process.spawn)(config.path, [extensionUrl], {
        shell: false
      });
@@ -14,10 +24,20 @@ index a91ca8fd07194abb081e9bb35fad0060fefddf91..aae3efde6fdf1dc85893b83757fc0742
      this.process.stderr.on("data", (data) => {
        d7("stderr: %s", data.toString());
 diff --git a/dist/esm/index.mjs b/dist/esm/index.mjs
-index 43929222572e4d6875cc192aca0750da79d8ff14..2b2a83bf712c45fe663dc92a542462f4ea0ca6ca 100644
+index 43929222572e4d6875cc192aca0750da79d8ff14..dcf954d598ee18a441fdd6f09121ac2b86a5a610 100644
 --- a/dist/esm/index.mjs
 +++ b/dist/esm/index.mjs
-@@ -1870,6 +1870,10 @@ var NativeMessagingHost = class {
+@@ -156,7 +156,8 @@ var _PopupView = class _PopupView extends EventEmitter {
+       resizable: false,
+       skipTaskbar: true,
+       backgroundColor: "#ffffff",
+-      roundedCorners: false,
++      // YARC: the native frame (rounded corners, hairline border, shadow) around an extension popup.
++      roundedCorners: true,
+       webPreferences: {
+         session: opts.session,
+         sandbox: true,
+@@ -1870,6 +1871,10 @@ var NativeMessagingHost = class {
      this.process = spawn2(config.path, [extensionUrl], {
        shell: false
      });

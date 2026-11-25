@@ -219,6 +219,13 @@ export class MainWindow {
     }
   }
 
+  /** <browser-action-list> measures its anchor inside the view showing the sidebar, not the window. */
+  sidebarOrigin(): Point {
+    if (this.overlayMode.kind !== 'sidebar') return { x: 0, y: 0 }
+    const { x, y } = this.overlay.getBounds()
+    return { x, y }
+  }
+
   isShown(view: View): boolean {
     return this.shown.includes(view)
   }
