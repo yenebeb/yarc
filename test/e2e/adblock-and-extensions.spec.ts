@@ -322,17 +322,18 @@ test("an extension's right-click menu opens in the window it was clicked in", as
   await dispatch({ type: 'extensionPin', profileId, extensionId: extId, pinned: true })
   await dispatch({ type: 'command', id: 'newWindow' })
   await expect.poll(() => app.windows().filter((page) => page.url().endsWith('index.html')).length).toBe(2)
-  const clickedId = await app.evaluate(({ Menu }) => {
+  const openedId: number = await app.evaluate(() => (globalThis as any).arcBrowser.cur.main.win.id)
+  const clickedId = await app.evaluate(({ Menu }, opened) => {
     const globals = globalThis as any
     const browser = globals.arcBrowser
-    const other = browser.wins.find((window: any) => window !== browser.cur).main
+    const other = browser.wins.find((window: any) => window.main.win.id !== opened).main
     void other.ui.executeJavaScript(`document.title = 'clicked'`)
     globals.realPopup = Menu.prototype.popup
     Menu.prototype.popup = function (options?: Electron.PopupOptions) {
       globals.menuWindowId = options?.window?.id
     }
     return other.win.id
-  })
+  }, openedId)
   try {
     const sidebars = () => app.windows().filter((page) => page.url().endsWith('index.html'))
     const titled = async () => (await Promise.all(sidebars().map(async (page) => ((await page.title()) === 'clicked' ? page : undefined)))).find(Boolean)
@@ -341,12 +342,13 @@ test("an extension's right-click menu opens in the window it was clicked in", as
     await page.locator(`button[is="browser-action"][id="${extId}"]`).click({ button: 'right' })
     await expect.poll(() => app.evaluate(() => (globalThis as any).menuWindowId)).toBe(clickedId)
   } finally {
-    await app.evaluate(({ Menu }) => {
+    await app.evaluate(({ BrowserWindow, Menu }, opened) => {
       const globals = globalThis as any
       Menu.prototype.popup = globals.realPopup
       globals.menuWindowId = undefined
-      globals.arcBrowser.cur.main.win.close()
-    })
+      BrowserWindow.fromId(opened)?.close()
+    }, openedId)
+    await expect.poll(() => app.windows().filter((page) => page.url().endsWith('index.html')).length).toBe(1)
     await dispatch({ type: 'extensionPin', profileId, extensionId: extId, pinned: false })
     await removeExtension(extId)
   }
