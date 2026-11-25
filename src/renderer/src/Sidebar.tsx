@@ -3,6 +3,7 @@ import type { DropTarget } from '../../shared/actions'
 import type { EditRequest } from '../../shared/ipc'
 import { SIDEBAR_WIDTH, type AppState, type ID, type UpdateStatus } from '../../shared/types'
 import { activeSpace, arc, cx, dispatch, displayHost, isMac } from './api'
+import { ExtensionBar } from './ExtensionBar'
 import { Icon } from './icons'
 import { MediaCards } from './media-cards'
 import { FavoriteTile, findTab, PinnedList, readDrag, SidebarList, type Ctx, type DropHint } from './sidebar-tree'
@@ -97,8 +98,8 @@ export function Sidebar({ state, floating }: { state: AppState; floating?: boole
             {live.shielded && live.blocked > 0 ? <span className="count">{live.blocked > 99 ? '99+' : live.blocked}</span> : null}
           </button>
         ) : null}
-        <span onClick={(event) => event.stopPropagation()}>
-          {state.extensions[space.profileId]?.length ? <browser-action-list partition={`persist:profile-${space.profileId}`} tab={live ? String(live.wcId) : undefined} alignment={state.settings.sidebarRight ? 'bottom left' : 'bottom right'} /> : null}
+        <span className="extension-bar" onClick={(event) => event.stopPropagation()}>
+          <ExtensionBar state={state} profileId={space.profileId} tab={live?.wcId} />
         </span>
       </div>
 
@@ -315,13 +316,4 @@ function BottomBar({ ctx }: { ctx: Ctx }) {
       </button>
     </div>
   )
-}
-
-declare module 'react' {
-  // eslint-disable-next-line @typescript-eslint/no-namespace
-  namespace JSX {
-    interface IntrinsicElements {
-      'browser-action-list': { partition?: string; alignment?: string; tab?: string }
-    }
-  }
 }

@@ -1760,7 +1760,11 @@ export class Browser implements TabHost {
         if (this.store.profile(action.profileId) && this.profiles.setSitePermission(action.profileId, action.origin, action.key, action.setting)) this.emitSoon()
         return
       case 'extensionPin':
-        return this.setExtensionPin(a.profileId, a.extensionId, a.pinned)
+        return this.setExtensionPin(action.profileId, action.extensionId, action.pinned)
+      case 'extensionsPopover': {
+        const origin = this.window.sidebarOrigin()
+        return this.setOverlay({ kind: 'extensions', profileId: action.profileId, anchor: { ...action.anchor, x: action.anchor.x + origin.x, y: action.anchor.y + origin.y } })
+      }
       case 'itemMenu':
         return buildItemMenu(this, action.id)?.popup({ window: this.window.win })
       case 'folderMenu':

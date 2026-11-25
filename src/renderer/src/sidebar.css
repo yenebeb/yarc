@@ -153,21 +153,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-browser-action-list {
-  display: flex;
-  gap: 2px;
-}
-
-browser-action-list::part(action) {
-  width: 24px;
-  height: 24px;
-  border-radius: 6px;
-}
-
-browser-action-list::part(action):hover {
-  background-color: var(--hover);
-}
-
 .bottombar {
   display: flex;
   align-items: center;

@@ -149,15 +149,54 @@ test('an extension’s declarativeNetRequest rules block requests, from its mani
   }
 })
 
+const loadExtension = (dir: string): Promise<string> =>
+  app.evaluate(async (_electron, extDir) => {
+    const browser = (globalThis as any).arcBrowser
+    return (await browser.profiles.get(browser.store.activeSpace.profileId).session.extensions.loadExtension(extDir)).id
+  }, dir)
+
+test('only pinned extensions show in the address field, after the puzzle button opens the rest', async () => {
+  const action = { default_popup: 'popup.html' }
+  const first = await loadExtension(extensionDir({ 'manifest.json': { manifest_version: 3, name: 'pinned', version: '1.0', action }, 'popup.html': 'popup' }))
+  const second = await loadExtension(
+    extensionDir({
+      'manifest.json': { manifest_version: 3, name: 'badged', version: '1.0', action, background: { service_worker: 'bg.js' } },
+      'bg.js': "chrome.action.setBadgeText({ text: '7' })",
+      'popup.html': 'popup'
+    })
+  )
+  const { profileId } = await space()
+  const ui = app.windows().find((page) => page.url().endsWith('index.html'))!
+  const button = (id: string) => ui.locator(`button[is="browser-action"][id="${id}"]`)
+  const pin = (extensionId: string, pinned: boolean) => dispatch({ type: 'extensionPin', profileId, extensionId, pinned })
+  try {
+    await pin(first, true)
+    await expect(button(first)).toBeVisible()
+    await expect(button(second)).toHaveCount(0)
+    await expect(ui.locator('.extensions-button')).toBeVisible()
+    await pin(first, false)
+    await expect(button(first)).toHaveCount(0)
+    await expect(ui.locator('.extensions-button')).toBeVisible()
+    await pin(second, true)
+    await expect(button(second).locator('.badge')).toHaveText('7')
+    await removeExtension(second)
+    await expect(button(second)).toHaveCount(0)
+  } finally {
+    await pin(first, false)
+    await pin(second, false)
+    await removeExtension(first)
+    await removeExtension(second)
+  }
+})
+
 test('an extension popup opens next to its button, from the sidebar shown or hidden, on either side', async () => {
   const dir = extensionDir({
     'manifest.json': { manifest_version: 3, name: 'popup side', version: '1.0', action: { default_popup: 'popup.html' } },
     'popup.html': 'popup'
   })
-  const extId = await app.evaluate(async (_electron, extDir) => {
-    const browser = (globalThis as any).arcBrowser
-    return (await browser.profiles.get(browser.store.activeSpace.profileId).session.extensions.loadExtension(extDir)).id
-  }, dir)
+  const extId = await loadExtension(dir)
+  const { profileId } = await space()
+  await dispatch({ type: 'extensionPin', profileId, extensionId: extId, pinned: true })
   await dispatch({ type: 'open', url: `${base}/popup-anchor`, where: 'tab' })
   const tabId = (await space()).activeItemId!
   const ui = app.windows().find((page) => page.url().endsWith('index.html'))!
@@ -167,7 +206,7 @@ test('an extension popup opens next to its button, from the sidebar shown or hid
       const browser = (globalThis as any).arcBrowser
       browser.extensions.byProfile.get(browser.store.activeSpace.profileId).library.once('browser-action-popup-created', (popup: unknown) => ((globalThis as any).popup = popup))
     })
-    await page.locator(`browser-action-list button[id="${extId}"]`).click()
+    await page.locator(`button[is="browser-action"][id="${extId}"]`).click()
     await expect.poll(() => app.evaluate(() => !!(globalThis as any).popup)).toBe(true)
     const { popupBounds, button } = await app.evaluate((_electron, fromOverlay) => {
       const globals = globalThis as any
@@ -198,11 +237,11 @@ test('an extension popup opens next to its button, from the sidebar shown or hid
   try {
     for (const sidebarRight of [false, true]) {
       await dispatch({ type: 'settings', patch: { sidebarVisible: true, sidebarRight } })
-      await expect(ui.locator('browser-action-list')).toHaveAttribute('alignment', sidebarRight ? 'bottom left' : 'bottom right')
+      await expect(ui.locator(`button[is="browser-action"][id="${extId}"]`)).toHaveAttribute('alignment', sidebarRight ? 'bottom left' : 'bottom right')
       await popupNextToButton(ui)
       await dispatch({ type: 'settings', patch: { sidebarVisible: false } })
       await dispatch({ type: 'sidebarReveal', show: true })
-      await expect(overlay.locator('browser-action-list')).toHaveAttribute('alignment', sidebarRight ? 'bottom left' : 'bottom right')
+      await expect(overlay.locator(`button[is="browser-action"][id="${extId}"]`)).toHaveAttribute('alignment', sidebarRight ? 'bottom left' : 'bottom right')
       await popupNextToButton(overlay)
     }
   } finally {
@@ -211,6 +250,7 @@ test('an extension popup opens next to its button, from the sidebar shown or hid
       browser.watchSidebarReveal = browser.realWatchSidebarReveal
     })
     await dispatch({ type: 'settings', patch: { sidebarVisible: true, sidebarRight: false } })
+    await dispatch({ type: 'extensionPin', profileId, extensionId: extId, pinned: false })
     await dispatch({ type: 'close', id: tabId })
     await removeExtension(extId)
   }

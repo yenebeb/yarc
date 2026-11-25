@@ -32,6 +32,8 @@ export function overlayRect(mode: OverlayMode, frame: WindowFrame, tabDrag: bool
       const sidebarWidth = settings.sidebarWidth + PAD
       return { x: settings.sidebarRight ? width - sidebarWidth : 0, y: 0, width: sidebarWidth, height }
     }
+    case 'extensions':
+      return whole
     case 'split-drop':
     case 'peek':
     case 'capture':

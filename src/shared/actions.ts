@@ -98,6 +98,8 @@ export type Action =
   /** `reset` forgets the answer so the site asks again. */
   | { type: 'sitePermission'; profileId: ID; origin: string; key: string; setting: 'allow' | 'block' | 'reset' }
   | { type: 'extensionPin'; profileId: ID; extensionId: string; pinned: boolean }
+  /** `anchor`: the puzzle button, in the coordinates of the view that sent it. */
+  | { type: 'extensionsPopover'; profileId: ID; anchor: Rect }
   | { type: 'renameCanvas'; id: ID; name: string }
   | { type: 'canvasMenu'; id: ID }
   /** `rect` is in overlay page coordinates. */
