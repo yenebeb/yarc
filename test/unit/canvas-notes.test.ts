@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { describe, test } from 'node:test'
 import { isBoardItem, type TextItem } from '../../src/shared/canvas.ts'
-import { enterInList, hasLongLine, linkParts, listLineStart, noteLine, rewrapped, toggledCheckbox, wrappedRows } from '../../src/shared/canvas-notes.ts'
+import { enterInList, hasLongLine, linkAddress, linkParts, listLineStart, noteLine, rewrapped, toggledCheckbox, withLinkLine, withListMark, wrappedRows } from '../../src/shared/canvas-notes.ts'
 
 const markOf = (typed: string) => noteLine(typed).mark
 const atTheEndOf = (text: string) => text.length
@@ -154,5 +154,70 @@ describe('what the board takes as a note', () => {
   test('refuses a wrap width the board can’t lay out', () => {
     assert.equal(isBoardItem({ ...text, wrapWidth: 'wide' }), false)
     assert.equal(isBoardItem({ ...text, wrapWidth: 0 }), false)
+  })
+})
+
+describe('the list and checklist buttons', () => {
+  const justOne = (text: string, kind: 'bullet' | 'checkbox') => withListMark([text], kind)[0]
+
+  test('put the mark on every line that has none', () => {
+    assert.equal(justOne('milk\neggs', 'bullet'), '- milk\n- eggs')
+    assert.equal(justOne('milk\neggs', 'checkbox'), '[ ] milk\n[ ] eggs')
+  })
+
+  test('take the mark away when every line already has it', () => {
+    assert.equal(justOne('- milk\n- eggs', 'bullet'), 'milk\neggs')
+    assert.equal(justOne('[ ] milk\n[x] eggs', 'checkbox'), 'milk\neggs')
+  })
+
+  test('mark the lines that lack it, and leave the ones that have it, when only some do', () => {
+    assert.equal(justOne('- milk\neggs', 'bullet'), '- milk\n- eggs')
+  })
+
+  test('swap one kind of mark for the other', () => {
+    assert.equal(justOne('- milk\n- eggs', 'checkbox'), '[ ] milk\n[ ] eggs')
+    assert.equal(justOne('[x] milk', 'bullet'), '- milk')
+  })
+
+  test('keep how deep a line is indented', () => {
+    assert.equal(justOne('milk\n\t- oat', 'bullet'), '- milk\n\t- oat')
+    assert.equal(justOne('\toat milk', 'bullet'), '\t- oat milk')
+    assert.equal(justOne('\t- oat milk', 'checkbox'), '\t[ ] oat milk')
+  })
+
+  test('leave blank lines and headings as they are', () => {
+    assert.equal(justOne('# Shopping\n\nmilk', 'bullet'), '# Shopping\n\n- milk')
+    assert.equal(justOne('# Shopping', 'bullet'), '# Shopping')
+  })
+
+  test('decide for all the selected texts together', () => {
+    assert.deepEqual(withListMark(['- milk', 'eggs'], 'bullet'), ['- milk', '- eggs'])
+    assert.deepEqual(withListMark(['- milk', '- eggs'], 'bullet'), ['milk', 'eggs'])
+  })
+})
+
+describe('the link button', () => {
+  test('takes a web address as typed, or without its https://', () => {
+    assert.equal(linkAddress('https://example.com/a?b=1'), 'https://example.com/a?b=1')
+    assert.equal(linkAddress('  example.com/docs '), 'https://example.com/docs')
+  })
+
+  test('turns down what is not a web address', () => {
+    assert.equal(linkAddress(''), undefined)
+    assert.equal(linkAddress('two words'), undefined)
+    assert.equal(linkAddress('javascript://alert(1)'), undefined)
+    assert.equal(linkAddress('file:///etc/passwd'), undefined)
+    assert.equal(linkAddress('nodots'), undefined)
+  })
+
+  test('adds the address as a new line at the end of the text, as a link', () => {
+    const text = withLinkLine('read this', 'https://example.com')
+    assert.equal(text, 'read this\nhttps://example.com')
+    assert.deepEqual(linkParts(text.split('\n')[1]), [{ text: 'https://example.com', url: 'https://example.com' }])
+  })
+
+  test('does not leave an empty line before it', () => {
+    assert.equal(withLinkLine('read this\n', 'https://example.com'), 'read this\nhttps://example.com')
+    assert.equal(withLinkLine('', 'https://example.com'), 'https://example.com')
   })
 })

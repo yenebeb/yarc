@@ -385,7 +385,9 @@ Built (2026-11-25):
 - The empty hint also says "Double-click anywhere to write".
 - A light/dark button beside the menu button gives a board its own look, saved with the canvas (`appearance` in the scene); without it the board follows its space.
 
-Built with the notes: the Note tool in the text group. Not built yet: list, checkbox and link buttons on the style bar.
+Built with the notes: the Note tool in the text group.
+
+Built (2026-11-25): list, checkbox and link buttons on the style bar when a text is selected (the link button when exactly one is). List and checkbox work on every line of every selected text as one undo step: a line without the mark gets it, every line with it loses it, and the other kind of mark is swapped (blank lines and headings are left alone). Link asks for an address in a field in the bar and adds it as a new last line; an address that isn't a web address is turned down. The rules are `withListMark`, `linkAddress` and `withLinkLine` in `src/shared/canvas-notes.ts`.
 
 ### 9.4 Order
 

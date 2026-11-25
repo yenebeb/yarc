@@ -1,4 +1,5 @@
 import { Fragment, useLayoutEffect, useRef, useState } from 'react'
+import { linkAddress, type ListKind } from '../../shared/canvas-notes'
 import { COLORS, TEXT_SIZES, type BoardItem, type Box, type TextItem } from '../../shared/canvas'
 import { cx } from './api'
 import { hasColor, type Style, type Tool } from './canvas-board'
@@ -60,7 +61,9 @@ export function StyleBar({
   selectionOnScreen,
   style,
   dark,
-  onRestyle
+  onRestyle,
+  onMarkLines,
+  onAddLink
 }: {
   tool: Tool
   chosen: BoardItem[]
@@ -68,9 +71,13 @@ export function StyleBar({
   style: Style
   dark: boolean
   onRestyle: (next: Partial<Style>) => void
+  onMarkLines: (kind: ListKind) => void
+  onAddLink: (address: string) => void
 }) {
   const bar = useRef<HTMLDivElement>(null)
   const [besideSelection, setBesideSelection] = useState<Point>()
+  const [linkFor, setLinkFor] = useState<string>()
+  const [typedAddress, setTypedAddress] = useState('')
   useLayoutEffect(() => {
     const page = bar.current?.offsetParent
     if (!bar.current || !page || !selectionOnScreen) return setBesideSelection(undefined)
@@ -83,6 +90,20 @@ export function StyleBar({
   if (!DRAWS_IN_COLOR.includes(tool) && !colored.length) return null
   const showFill = tool === 'rect' || tool === 'ellipse' || chosen.some(isShape)
   const showSizes = WRITES.includes(tool) || chosen.some((item) => item.kind === 'text')
+  const chosenTexts = chosen.filter((item) => item.kind === 'text')
+  const linkTarget = chosenTexts.length === 1 ? chosenTexts[0].id : undefined
+  const askingForLink = linkTarget !== undefined && linkFor === linkTarget
+  const typedAddressIsBad = typedAddress.trim() !== '' && !linkAddress(typedAddress)
+  const closeLinkField = () => {
+    setLinkFor(undefined)
+    setTypedAddress('')
+  }
+  const addTypedLink = () => {
+    const address = linkAddress(typedAddress)
+    if (!address) return
+    onAddLink(address)
+    closeLinkField()
+  }
   const currentColor = colored[0]?.color ?? style.color
   const firstShape = chosen.find((item) => item.kind === 'rect' || item.kind === 'ellipse')
   const currentFill = firstShape && (firstShape.kind === 'rect' || firstShape.kind === 'ellipse') ? firstShape.fill : style.fill
@@ -115,6 +136,36 @@ export function StyleBar({
               {TEXT[size].label}
             </button>
           ))}
+        </>
+      ) : null}
+      {chosenTexts.length ? (
+        <>
+          <span className="toolbar-line" />
+          <button title="Bulleted list" onClick={() => onMarkLines('bullet')}>
+            <Icon name="list" size={18} />
+          </button>
+          <button title="Checklist" onClick={() => onMarkLines('checkbox')}>
+            <Icon name="checklist" size={18} />
+          </button>
+          {linkTarget ? (
+            <button className={cx(askingForLink && 'on')} title="Add a link" onClick={() => (askingForLink ? closeLinkField() : setLinkFor(linkTarget))}>
+              <Icon name="link" size={18} />
+            </button>
+          ) : null}
+          {askingForLink ? (
+            <input
+              className={cx('link-field', typedAddressIsBad && 'invalid')}
+              autoFocus
+              placeholder="Paste an address"
+              value={typedAddress}
+              onChange={(event) => setTypedAddress(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') addTypedLink()
+                if (event.key === 'Escape') closeLinkField()
+                event.stopPropagation()
+              }}
+            />
+          ) : null}
         </>
       ) : null}
     </div>

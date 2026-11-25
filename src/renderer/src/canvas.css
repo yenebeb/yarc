@@ -555,6 +555,27 @@ svg.draft path {
   border-radius: 6px;
 }
 
+.toolbar .link-field {
+  width: 170px;
+  height: 30px;
+  margin: 0 2px 0 4px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  outline: none;
+}
+
+.toolbar .link-field:focus {
+  border-color: var(--accent);
+}
+
+.toolbar .link-field.invalid {
+  border-color: #d64545;
+}
+
 .zoombar {
   right: 16px;
   bottom: 16px;

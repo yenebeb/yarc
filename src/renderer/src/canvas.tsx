@@ -385,7 +385,7 @@ function BoardView({ loaded }: { loaded: CanvasLoad }) {
       </div>
 
       <Toolbar tool={tool} onTool={setTool} onPickImage={pickImage} />
-      <StyleBar tool={tool} chosen={chosenItems} selectionOnScreen={boundsOf(chosenItems.map((item) => toScreen(item, view)))} style={style} dark={dark} onRestyle={restyle} />
+      <StyleBar tool={tool} chosen={chosenItems} selectionOnScreen={boundsOf(chosenItems.map((item) => toScreen(item, view)))} style={style} dark={dark} onRestyle={restyle} onMarkLines={actions.markLines} onAddLink={actions.addLink} />
       <FindBar find={find} />
       <ZoomBar zoom={view.zoom} onZoomBy={zoomBy} onActualSize={() => zoomAt(middle(), 1)} />
 

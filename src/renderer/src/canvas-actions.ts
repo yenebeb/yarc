@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { arrangeInGrid, boundsOf, type BoardItem } from '../../shared/canvas'
+import { arrangeInGrid, boundsOf, type BoardItem, type TextItem } from '../../shared/canvas'
+import { withLinkLine, withListMark, type ListKind } from '../../shared/canvas-notes'
 import { arc } from './api'
 import { copyOf, hasColor, type Board, type Style } from './canvas-board'
 import { renderPng } from './canvas-png'
@@ -40,12 +41,24 @@ export function boardActions(board: Board) {
     change(itemsRef.current.map((item) => (isSelected(item) ? { ...item, x: item.x + dx, y: item.y + dy } : item)))
   }
   const togglePlay = (id: string) => setItems(itemsRef.current.map((item) => (item.id === id && item.kind === 'capture' ? { ...item, live: !item.live || undefined } : item)))
+  const selectedTexts = () => selectedItems().filter((item): item is TextItem => item.kind === 'text')
+  const rewriteSelectedTexts = (rewrite: (item: TextItem, index: number) => string) => {
+    const texts = selectedTexts()
+    const rewritten = new Map(texts.map((item, index) => [item.id, rewrite(item, index)]))
+    if (texts.every((item) => rewritten.get(item.id) === item.text)) return
+    change(itemsRef.current.map((item) => (item.kind === 'text' && rewritten.has(item.id) ? { ...item, text: rewritten.get(item.id)! } : item)))
+  }
+  const markLines = (kind: ListKind) => {
+    const marked = withListMark(selectedTexts().map((item) => item.text), kind)
+    rewriteSelectedTexts((_item, index) => marked[index])
+  }
+  const addLink = (address: string) => rewriteSelectedTexts((item) => withLinkLine(item.text, address))
   const exportPng = async (to: 'file' | 'clipboard') => {
     const png = await renderPng(itemsRef.current, files)
     if (png) await arc.canvasExport(png, to)
   }
 
-  return { selectAll, zoomToFit, duplicate, remove, reorder, arrange, makeTitle, nudge, togglePlay, exportPng }
+  return { selectAll, zoomToFit, duplicate, remove, reorder, arrange, makeTitle, nudge, togglePlay, markLines, addLink, exportPng }
 }
 
 export type BoardActions = ReturnType<typeof boardActions>

@@ -59,6 +59,40 @@ export function toggledCheckbox(text: string, lineIndex: number): string {
     .join('\n')
 }
 
+export type ListKind = 'bullet' | 'checkbox'
+
+const MARK_OF: Record<ListKind, string> = { bullet: '- ', checkbox: '[ ] ' }
+const isOfKind = (line: NoteLine, kind: ListKind) => (kind === 'bullet' ? line.mark === 'bullet' : line.mark === 'unchecked' || line.mark === 'checked')
+const takesAMark = (typed: string) => !!typed.trim() && noteLine(typed).mark !== 'heading'
+
+/** The list button: every line of the texts gets the mark, or loses it when every line already has it; a line with the other kind of mark swaps it. Blank lines and headings are left alone. */
+export function withListMark(texts: string[], kind: ListKind): string[] {
+  const lines = texts.flatMap((text) => text.split('\n').filter(takesAMark))
+  const remove = lines.length > 0 && lines.every((typed) => isOfKind(noteLine(typed), kind))
+  const marked = (typed: string) => {
+    if (!takesAMark(typed)) return typed
+    const line = noteLine(typed)
+    const indent = /^[\t ]*/.exec(typed)![0]
+    const body = line.mark ? line.text : typed.slice(indent.length)
+    return indent + (remove ? '' : MARK_OF[kind]) + body
+  }
+  return texts.map((text) => text.split('\n').map(marked).join('\n'))
+}
+
+/** What was typed in the link field as a web address, adding https:// when it has no scheme; undefined when it isn't one. */
+export function linkAddress(typed: string): string | undefined {
+  const address = /^[a-z][a-z0-9+.-]*:\/\//i.test(typed.trim()) ? typed.trim() : `https://${typed.trim()}`
+  try {
+    const { protocol, hostname } = new URL(address)
+    const isWebAddress = (protocol === 'http:' || protocol === 'https:') && (hostname.includes('.') || hostname === 'localhost') && !/\s/.test(address)
+    return isWebAddress ? address : undefined
+  } catch {
+    return undefined
+  }
+}
+
+export const withLinkLine = (text: string, address: string) => (text && !text.endsWith('\n') ? `${text}\n${address}` : text + address)
+
 export const hasLongLine = (text: string) => text.split('\n').some((typed) => typed.length > LONG_LINE)
 
 export interface TextPart {
