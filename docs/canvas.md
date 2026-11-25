@@ -387,8 +387,10 @@ Built with the notes: the Note tool in the text group. Not built yet: list, chec
 ### 9.4 Order
 
 1. Wrapping text, the Note tool, lines, the keys, export, the grid and the hint (one PR, with a spotlight card). Built: the line rules are in `src/shared/canvas-notes.ts`.
-2. "Add Selection to Canvas" in a page's context menu: a quote note with the same source footer as a capture card, through the inbox. ⌘F on a canvas finds in its text and pans to each match (today it does nothing). Canvases by name in the command bar.
+2. "Add Selection to Canvas" in a page's context menu: a quote note with the same source footer as a capture card, through the inbox. ⌘F on a canvas finds in its texts and pans to each match (built, below). Canvases by name in the command bar.
 3. A canvas as a split pane, to write next to the page being read. Biggest piece: splits only hold tabs today. Planned in section 10: about 2½ weeks.
+
+Find on a canvas (built 2026-11-25): ⌘F opens a small bar at the top of the canvas page, not the app's find bar, which belongs to the overlay and drives a web page's own `findInPage`. Main sends ⌘F, ⌘G and ⇧⌘G to the canvas page when no tab is showing (`CANVAS_FIND_OPS` in `browser.ts`). It searches the texts only, ignoring case; each text that holds the words once or more is one match, in reading order (top to bottom, then left to right; `textsHolding` in `src/shared/canvas-find.ts`). The shown match is outlined and put in the middle of the window at the current zoom (smaller only if it doesn't fit); the other matches get a dashed outline. Enter and ⇧Enter go on and back and wrap round at the ends, Escape closes. Selection and undo are not touched. Not searched: the footers of cards and quotes, and the words inside pictures.
 
 ### 9.5 Open
 

@@ -307,12 +307,55 @@ test.describe('the bars around the board', () => {
     await expect(canvas.board.locator('.canvas-page:not([data-from-before-reopening])')).toHaveClass(wasDark ? 'canvas-page' : 'canvas-page dark')
   })
 
-  test('Find in Page opens nothing on a canvas, which has no page to search', async () => {
-    await openCanvas('Nothing to find')
-    await app.evaluate(async () => {
-      ;(globalThis as any).arcBrowser.runCommand('find')
-      await new Promise((resolve) => setTimeout(resolve, 200))
-    })
+  test('Find on a canvas searches its texts, pans to each match and closes with Escape, and the page-find bar stays shut', async () => {
+    const canvas = await openCanvas('Find me')
+    const { board } = canvas
+    await startNote(board, 'chairs and tables')
+    await board.keyboard.press('Escape')
+    await board.keyboard.press('n')
+    await board.mouse.click(120, 420)
+    await expect(textBeingTyped(board)).toBeFocused()
+    await board.keyboard.type('more CHAIRS')
+    await board.keyboard.press('Escape')
+
+    await app.evaluate(() => (globalThis as any).arcBrowser.runCommand('find'))
+    const field = board.locator('.canvas-find input')
+    await expect(field).toBeFocused()
     expect(await overlayKind()).toBe('none')
+    await field.fill('chairs')
+    await expect(board.locator('.canvas-find .count')).toHaveText('1/2')
+    const centered = async (note: string) => {
+      await expect(board.locator('.item.found-current')).toContainText(note)
+      await expect
+        .poll(async () => {
+          const page = await boxOf(board.locator('.canvas-page'))
+          const shown = await boxOf(board.locator('.item.found-current'))
+          return Math.abs(shown.y + shown.height / 2 - (page.y + page.height / 2))
+        })
+        .toBeLessThan(40)
+    }
+    await centered('chairs and tables')
+    await field.press('Enter')
+    await expect(board.locator('.canvas-find .count')).toHaveText('2/2')
+    await centered('more CHAIRS')
+    await field.press('Enter')
+    await expect(board.locator('.canvas-find .count')).toHaveText('1/2')
+    await field.press('Shift+Enter')
+    await expect(board.locator('.canvas-find .count')).toHaveText('2/2')
+    await app.evaluate(() => (globalThis as any).arcBrowser.runCommand('findNext'))
+    await expect(board.locator('.canvas-find .count')).toHaveText('1/2')
+    await app.evaluate(() => (globalThis as any).arcBrowser.runCommand('findPrev'))
+    await expect(board.locator('.canvas-find .count')).toHaveText('2/2')
+    await field.press('Escape')
+    await expect(board.locator('.canvas-find')).toHaveCount(0)
+    await expect(board.locator('.item.found-current')).toHaveCount(0)
+  })
+
+  test('Find on a canvas says when nothing matches', async () => {
+    const { board } = await openCanvas('Nothing here')
+    await app.evaluate(() => (globalThis as any).arcBrowser.runCommand('find'))
+    await board.locator('.canvas-find input').fill('zebra')
+    await expect(board.locator('.canvas-find .count')).toHaveText('0/0')
+    await expect(board.locator('.item.found-current')).toHaveCount(0)
   })
 })

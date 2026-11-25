@@ -6,6 +6,7 @@ import { arc, cx, isMac } from './api'
 import { boardActions, useStyle } from './canvas-actions'
 import { StyleBar, Toolbar, TOOLS, ZoomBar } from './canvas-bars'
 import { isBlankText, isTyping, keepsShape, newId, titleOf, useBoard, type Tool } from './canvas-board'
+import { FindBar, useCanvasFind } from './canvas-find'
 import { useClipboard } from './canvas-clipboard'
 import { useDarkAppearance, useLiveCards, useSceneSave } from './canvas-hooks'
 import { useInbox, useSidebarRename } from './canvas-inbox'
@@ -42,6 +43,7 @@ function BoardView({ loaded }: { loaded: CanvasLoad }) {
   const { editing, editingRef, startText, editText, typeText, finishEdit } = useTextEditing(board, style)
   const addImageFiles = useClipboard(board, style.color, editingRef)
   useInbox(board)
+  const find = useCanvasFind(board)
   useSidebarRename(board)
 
   const [snapping, setSnapping] = useState(loaded.scene?.snapping ?? true)
@@ -356,6 +358,7 @@ function BoardView({ loaded }: { loaded: CanvasLoad }) {
               selected={selected.includes(item.id)}
               editing={editing === item.id}
               dark={dark}
+              found={find.found?.current === item.id ? 'current' : find.found?.others.includes(item.id) ? 'other' : undefined}
               files={board.files}
               nodeRef={(node) => (node ? board.textNodes.set(item.id, node) : board.textNodes.delete(item.id))}
               onTyped={(text) => typeText(item.id, text)}
@@ -383,6 +386,7 @@ function BoardView({ loaded }: { loaded: CanvasLoad }) {
 
       <Toolbar tool={tool} onTool={setTool} onPickImage={pickImage} />
       <StyleBar tool={tool} chosen={chosenItems} selectionOnScreen={boundsOf(chosenItems.map((item) => toScreen(item, view)))} style={style} dark={dark} onRestyle={restyle} />
+      <FindBar find={find} />
       <ZoomBar zoom={view.zoom} onZoomBy={zoomBy} onActualSize={() => zoomAt(middle(), 1)} />
 
       <button

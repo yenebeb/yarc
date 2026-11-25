@@ -473,6 +473,76 @@ svg.draft path {
   font-weight: 500;
 }
 
+.canvas-find {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 340px;
+  padding: 4px 6px 4px 12px;
+  box-sizing: border-box;
+  border-radius: 12px;
+  background: var(--chrome);
+  color: var(--chrome-text);
+  box-shadow: var(--shadow);
+}
+
+.canvas-find input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: 14px;
+}
+
+.canvas-find .count {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.6;
+}
+
+.canvas-find button {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.canvas-find button:hover {
+  background: var(--hover);
+}
+
+.canvas-find svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.item.found-current {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+  border-radius: 6px;
+}
+
+.item.found-other {
+  outline: 1px dashed var(--accent);
+  outline-offset: 4px;
+  border-radius: 6px;
+}
+
 .zoombar {
   right: 16px;
   bottom: 16px;

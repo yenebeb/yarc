@@ -1,4 +1,5 @@
 import type { Action } from './actions'
+import type { CanvasFindOp } from './canvas-find'
 import type { CanvasImage, CanvasLoad, CanvasScene, InboxItem, LiveCard } from './canvas'
 import type { AppState, OverlayMode, Rect, SearchResult } from './types'
 import type { HistoryRow, LittleState } from './ipc-types'
@@ -33,6 +34,7 @@ export const IPC = {
   canvasInbox: 'arc:canvas-inbox',
   canvasTakeInbox: 'arc:canvas-take-inbox',
   canvasRenamed: 'arc:canvas-renamed',
+  canvasFind: 'arc:canvas-find',
   canvasOpenUrl: 'arc:canvas-open-url',
   canvasExport: 'arc:canvas-export',
   canvasLive: 'arc:canvas-live',
@@ -130,6 +132,7 @@ export interface ArcApi {
   canvasSave(scene: CanvasScene, newFiles: Record<string, CanvasImage>): void
   canvasTakeInbox(): Promise<InboxItem[]>
   onCanvasInbox(cb: () => void): () => void
+  onCanvasFind(cb: (op: CanvasFindOp) => void): () => void
   onCanvasRenamed(cb: (r: { from: string; to: string }) => void): () => void
   canvasOpenUrl(url: string): Promise<void>
   canvasExport(png: Uint8Array, to: 'file' | 'clipboard'): Promise<void>

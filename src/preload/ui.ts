@@ -37,6 +37,7 @@ const api: ArcApi = {
   canvasSave: (scene, newFiles) => ipcRenderer.send(IPC.canvasSave, scene, newFiles),
   canvasTakeInbox: () => ipcRenderer.invoke(IPC.canvasTakeInbox),
   onCanvasInbox: (cb) => listen(IPC.canvasInbox, cb),
+  onCanvasFind: (cb) => listen(IPC.canvasFind, cb),
   onCanvasRenamed: (cb) => listen(IPC.canvasRenamed, cb),
   canvasOpenUrl: (url) => ipcRenderer.invoke(IPC.canvasOpenUrl, url),
   canvasExport: (png, to) => ipcRenderer.invoke(IPC.canvasExport, png, to),

@@ -11,6 +11,7 @@ import type { Browser } from './browser'
 import { CanvasFiles, emptyOldTrash } from './canvas-store'
 import { isLiveCard, LiveCapture } from './capture-live'
 import { logError } from './log'
+import type { CanvasFindOp } from '../shared/canvas-find'
 import { newId } from './store'
 import type { LiveTab } from './tab'
 import { handleUi, onUi } from './ui-origin'
@@ -92,6 +93,12 @@ export class Canvases {
     })
     this.pages.set(id, page)
     return page
+  }
+
+  find(id: ID, op: CanvasFindOp): void {
+    const { wc } = this.page(id)
+    wc.focus()
+    wc.send(IPC.canvasFind, op)
   }
 
   showing(isShown: (view: View) => boolean): void {

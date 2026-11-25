@@ -123,6 +123,7 @@ export function ItemView({
   selected,
   editing,
   dark,
+  found,
   files,
   nodeRef,
   onTyped,
@@ -133,6 +134,8 @@ export function ItemView({
   selected: boolean
   editing: boolean
   dark: boolean
+  /** A match of what ⌘F looks for: the one shown now, or another. */
+  found?: 'current' | 'other'
   files: Map<string, CanvasImage>
   nodeRef: (node: HTMLElement | null) => void
   onTyped: (text: string) => void
@@ -140,7 +143,7 @@ export function ItemView({
   onPlay: () => void
 }) {
   const place: CSSProperties = { left: item.x, top: item.y, width: item.width, height: item.height }
-  const classes = cx('item', item.kind, selected && 'selected')
+  const classes = cx('item', item.kind, selected && 'selected', found && `found-${found}`)
   if (item.kind === 'capture') {
     const source = item.source
     return (

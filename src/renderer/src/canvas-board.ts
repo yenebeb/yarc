@@ -68,6 +68,13 @@ export function useBoard(loaded: CanvasLoad, boardRef: RefObject<HTMLDivElement 
     setView({ zoom, x: width / 2 - (box.x + box.width / 2) * zoom, y: height / 2 - (box.y + box.height / 2) * zoom })
   }
 
+  /** Puts `box` in the middle of the window, at the zoom it has unless the box is too big for it. */
+  const panTo = (box: Box) => {
+    const { width, height } = viewSize()
+    const zoom = clampZoom(Math.min(viewRef.current.zoom, (width - 160) / Math.max(1, box.width), (height - 200) / Math.max(1, box.height)))
+    setView({ zoom, x: width / 2 - (box.x + box.width / 2) * zoom, y: height / 2 - (box.y + box.height / 2) * zoom })
+  }
+
   useLayoutEffect(() => {
     let changed = false
     const measured = items.map((item) => {
@@ -112,7 +119,8 @@ export function useBoard(loaded: CanvasLoad, boardRef: RefObject<HTMLDivElement 
     shownPartOfBoard,
     zoomAt,
     zoomBy,
-    reveal
+    reveal,
+    panTo
   }
 }
 

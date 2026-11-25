@@ -88,6 +88,9 @@ const HOUSEKEEPING_EVERY = 5 * 60_000
 const SIDEBAR_REVEAL_GRACE_PX = 32
 const SIDEBAR_REVEAL_HIDE_DELAY_MS = 300
 
+/** Find on a canvas goes to its own page, which searches the board's texts. */
+const CANVAS_FIND_OPS = { find: 'open', findNext: 'next', findPrev: 'previous' } as const
+
 const COMMAND_ACTIONS: Partial<Record<CommandId, Action>> = {
   newTab: { type: 'overlay', mode: { kind: 'command', target: 'tab' } },
   splitAdd: { type: 'overlay', mode: { kind: 'command', target: 'split' } },
@@ -1456,6 +1459,8 @@ export class Browser implements TabHost {
 
   runCommand(cmd: CommandId | string): void {
     const tab = this.activeTab()
+    const canvasId = tab ? undefined : this.space.activeItemId
+    if (canvasId && cmd in CANVAS_FIND_OPS && findCanvas(this.state, canvasId)) return this.canvases.find(canvasId, CANVAS_FIND_OPS[cmd as keyof typeof CANVAS_FIND_OPS])
     const findsWithNoPageToSearch = cmd === 'find' && !tab
     if (findsWithNoPageToSearch) return
     const action = Object.hasOwn(COMMAND_ACTIONS, cmd) && COMMAND_ACTIONS[cmd as CommandId]
