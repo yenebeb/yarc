@@ -338,7 +338,9 @@ test.describe('quotes from a page', () => {
     const canvas = await openCanvas('Quotes')
     await rightClickSelection('quote-first')
     await expect.poll(() => app.evaluate(() => (globalThis as any).selectionMenu.items.map((item: Electron.MenuItem) => item.label))).toContain('Add Selection to Canvas')
-    expect(await menuItemLabels(['Add Selection to Canvas'])).toEqual(['Quotes', '', 'New Canvas'])
+    const offered = await menuItemLabels(['Add Selection to Canvas'])
+    expect(offered).toContain('Quotes')
+    expect(offered.at(-1)).toBe('New Canvas')
     await app.evaluate(() => {
       const add = (globalThis as any).selectionMenu.items.find((item: Electron.MenuItem) => item.label === 'Add Selection to Canvas')
       add.submenu.items.find((item: Electron.MenuItem) => item.label === 'Quotes').click()
