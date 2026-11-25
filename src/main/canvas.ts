@@ -1,7 +1,7 @@
 import { BrowserWindow, clipboard, ClipboardItem, dialog, nativeImage, View, WebContentsView, type Event, type Input, type IpcMainEvent, type WebContents } from 'electron'
 import { existsSync, mkdirSync, renameSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { FILE_ID, IMAGE_TYPES, isBoardAppearance, type CanvasImage, type CanvasLoad, type CanvasScene, type CaptureGeometry, type CaptureSource, type LiveCard } from '../shared/canvas'
+import { FILE_ID, IMAGE_TYPES, isBoardAppearance, MAX_QUOTE_LENGTH, type CanvasImage, type CanvasLoad, type CanvasScene, type CaptureGeometry, type CaptureSource, type LiveCard, type QueuedInboxItem } from '../shared/canvas'
 import { IPC } from '../shared/ipc'
 import { bindingLabel, commandForInput, type CommandId } from '../shared/keymap'
 import { findCanvas } from '../shared/tree'
@@ -164,13 +164,26 @@ export class Canvases {
     const files = this.files(canvas.id)
     if (!files) return
     const fileId = files.addImage(bytes, mimeType)
-    files.pushInbox({ fileId, mimeType, width: size.width, height: size.height, data: { source, capture, imageUrl } })
+    this.queue(canvas, { fileId, mimeType, width: size.width, height: size.height, data: { source, capture, imageUrl } })
+  }
+
+  private queue(canvas: PinnedCanvas, entry: QueuedInboxItem): void {
+    this.files(canvas.id)?.pushInbox(entry)
     // The Send To list shows the canvas used last first.
     canvas.lastActive = Date.now()
     this.browser.changed()
     const page = this.pages.get(canvas.id)
     if (page && !page.wc.isDestroyed()) page.wc.send(IPC.canvasInbox)
     this.browser.toast(`Added to “${canvas.name}”`)
+  }
+
+  /** The selected text of a page, as a quote with the page as its source. `shownInMenu` is used when the page can't be asked: Chromium cuts what its menu holds short. */
+  async addSelection(tab: LiveTab, shownInMenu: string, canvasId: ID | 'new'): Promise<void> {
+    const selection = await tab.wc.executeJavaScriptInIsolatedWorld(PICK_WORLD, [{ code: 'getSelection().toString()' }]).catch(() => shownInMenu)
+    const quote = String(selection || shownInMenu).trim().slice(0, MAX_QUOTE_LENGTH)
+    if (!quote) return
+    const canvas = this.target(canvasId)
+    if (canvas) this.queue(canvas, { quote, source: this.sourceOf(tab) })
   }
 
   private sourceOf(tab: LiveTab): CaptureSource {

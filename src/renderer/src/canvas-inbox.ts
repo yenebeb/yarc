@@ -1,8 +1,22 @@
 import { useEffect, useRef } from 'react'
-import { boundsOf, placedSize, placeNext, type CardItem, type InboxItem } from '../../shared/canvas'
+import { boundsOf, placedSize, placeNext, type BoardItem, type InboxItem, type InboxPicture } from '../../shared/canvas'
+import { NOTE_WIDTH } from '../../shared/canvas-notes'
 import { arc } from './api'
 import { newId, titleOf, type Board } from './canvas-board'
 import { loadImage } from './canvas-png'
+
+const QUOTE_HEIGHT_BEFORE_MEASURED = 120
+
+async function pictureSize(picture: InboxPicture) {
+  const natural =
+    picture.width > 0 && picture.height > 0
+      ? picture
+      : await loadImage(picture.dataURL).then(
+          (image) => ({ width: image.naturalWidth, height: image.naturalHeight }),
+          () => ({ width: 320, height: 240 })
+        )
+  return placedSize(natural.width, natural.height)
+}
 
 /** Places the captures main queued for this canvas: at once while it's open, else when it opens. */
 export function useInbox(board: Board): void {
@@ -12,24 +26,21 @@ export function useInbox(board: Board): void {
   const takeInbox = async () => {
     const queued: InboxItem[] = await arc.canvasTakeInbox()
     if (!queued.length) return
-    const added: CardItem[] = []
+    const added: BoardItem[] = []
     for (const entry of queued) {
-      const natural =
-        entry.width > 0 && entry.height > 0
-          ? entry
-          : await loadImage(entry.dataURL).then(
-              (image) => ({ width: image.naturalWidth, height: image.naturalHeight }),
-              () => ({ width: 320, height: 240 })
-            )
-      const size = placedSize(natural.width, natural.height)
+      const size = 'quote' in entry ? { width: NOTE_WIDTH, height: QUOTE_HEIGHT_BEFORE_MEASURED } : await pictureSize(entry)
       const previous = [...itemsRef.current, ...added].find((item) => item.id === lastPlaced.current)
       const title = titleOf(itemsRef.current)
       const onlyTitle = !previous && title && itemsRef.current.every((item) => item === title)
       const spot = onlyTitle ? { x: Math.round(title.x + (title.width - size.width) / 2), y: Math.round(title.y + title.height + 32) } : placeNext(previous, size, center())
-      files.set(entry.fileId, { mimeType: entry.mimeType, dataURL: entry.dataURL })
-      const card: CardItem = { id: newId(), kind: 'capture', fileId: entry.fileId, ...spot, ...size, source: entry.data.source, capture: entry.data.capture, imageUrl: entry.data.imageUrl }
-      added.push(card)
-      lastPlaced.current = card.id
+      const placed = { id: newId(), ...spot, ...size }
+      if ('quote' in entry) {
+        added.push({ ...placed, kind: 'text', text: entry.quote, size: 'body', color: 'ink', wrapWidth: NOTE_WIDTH, card: true, source: entry.source })
+      } else {
+        files.set(entry.fileId, { mimeType: entry.mimeType, dataURL: entry.dataURL })
+        added.push({ ...placed, kind: 'capture', fileId: entry.fileId, source: entry.data.source, capture: entry.data.capture, imageUrl: entry.data.imageUrl })
+      }
+      lastPlaced.current = placed.id
     }
     change([...itemsRef.current, ...added])
     reveal(boundsOf(added), true)

@@ -1,5 +1,5 @@
-import { useLayoutEffect, useRef, type CSSProperties } from 'react'
-import { arrowEnds, arrowHead, smoothPath, type ArrowItem, type BoardItem, type CanvasImage, type CardItem, type Color, type DrawItem, type ImageItem, type TextItem, type TextSize } from '../../shared/canvas'
+import { useLayoutEffect, useRef, type CSSProperties, type ReactNode } from 'react'
+import { arrowEnds, arrowHead, smoothPath, type ArrowItem, type BoardItem, type CanvasImage, type CaptureSource, type CardItem, type Color, type DrawItem, type ImageItem, type TextItem, type TextSize } from '../../shared/canvas'
 import { isListed, linkParts, noteLine, type NoteLine } from '../../shared/canvas-notes'
 import { arc, cx } from './api'
 import { keepTypingOrFinish } from './canvas-text-keys'
@@ -72,6 +72,20 @@ function Lines({ item }: { item: TextItem }) {
   })
 }
 
+/** The page a card or a quote came from: its icon and title, the buttons in `children`, and one that opens the page. */
+function SourceFooter({ source, children }: { source: CaptureSource; children?: ReactNode }) {
+  return (
+    <div className="footer">
+      {source.favicon ? <img className="favicon" src={source.favicon} alt="" draggable={false} /> : <Icon name="globe" size={15} />}
+      <span className="title">{source.title || source.url}</span>
+      {children}
+      <button title="Open the page" onPointerDown={(event) => event.stopPropagation()} onClick={() => void arc.canvasOpenUrl(source.url)}>
+        <Icon name="external" size={14} />
+      </button>
+    </div>
+  )
+}
+
 function TextView({
   item,
   classes,
@@ -113,7 +127,12 @@ function TextView({
       onBlur={editing ? onEdited : undefined}
       onKeyDown={editing ? keepTypingOrFinish : undefined}
     >
-      {editing ? null : <Lines item={item} />}
+      {editing ? null : (
+        <>
+          <Lines item={item} />
+          {item.source ? <SourceFooter source={item.source} /> : null}
+        </>
+      )}
     </div>
   )
 }
@@ -148,18 +167,13 @@ export function ItemView({
         <div className="frame" />
         <img src={files.get(item.fileId)?.dataURL} alt={source?.title ?? ''} draggable={false} />
         {source ? (
-          <div className="footer">
-            {source.favicon ? <img className="favicon" src={source.favicon} alt="" draggable={false} /> : <Icon name="globe" size={15} />}
-            <span className="title">{source.title || source.url}</span>
+          <SourceFooter source={source}>
             {item.capture ? (
               <button title={item.live ? 'Show the picture' : 'Show the live page'} onPointerDown={(event) => event.stopPropagation()} onClick={onPlay}>
                 <Icon name={item.live ? 'pause' : 'play'} size={14} />
               </button>
             ) : null}
-            <button title="Open the page" onPointerDown={(event) => event.stopPropagation()} onClick={() => void arc.canvasOpenUrl(source.url)}>
-              <Icon name="external" size={14} />
-            </button>
-          </div>
+          </SourceFooter>
         ) : null}
       </div>
     )

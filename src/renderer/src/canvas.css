@@ -135,14 +135,14 @@ body {
   display: flex;
 }
 
-.card .footer .favicon {
+.footer .favicon {
   width: 16px;
   height: 16px;
   flex: none;
   border-radius: 3px;
 }
 
-.card .footer .title {
+.footer .title {
   flex: 1;
   min-width: 0;
   overflow: hidden;
@@ -150,7 +150,7 @@ body {
   text-overflow: ellipsis;
 }
 
-.card .footer button {
+.footer button {
   display: grid;
   place-items: center;
   flex: none;
@@ -164,7 +164,7 @@ body {
   cursor: pointer;
 }
 
-.card .footer button:hover {
+.footer button:hover {
   background: rgb(127 127 127 / 0.24);
 }
 
@@ -193,6 +193,18 @@ body {
   border-radius: 10px;
   background: var(--card);
   box-shadow: var(--shadow);
+}
+
+.item.text .footer {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--chrome-text);
 }
 
 .item.text .line {
