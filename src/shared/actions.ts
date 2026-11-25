@@ -97,6 +97,7 @@ export type Action =
   | { type: 'sharePick'; id: string; sourceId?: string; systemAudio?: boolean }
   /** `reset` forgets the answer so the site asks again. */
   | { type: 'sitePermission'; profileId: ID; origin: string; key: string; setting: 'allow' | 'block' | 'reset' }
+  | { type: 'extensionPin'; profileId: ID; extensionId: string; pinned: boolean }
   | { type: 'renameCanvas'; id: ID; name: string }
   | { type: 'canvasMenu'; id: ID }
   /** `rect` is in overlay page coordinates. */

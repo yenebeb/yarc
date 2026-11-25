@@ -22,6 +22,7 @@ import { rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
 import type { Action, DropTarget } from '../shared/actions'
+import { withPin } from '../shared/extension-pins'
 import { IPC, type LittleAnchor, type LittleOp } from '../shared/ipc'
 import { commandForInput, type CommandId } from '../shared/keymap'
 import { cleanLiveSource, liveFolderName } from '../shared/live-folders'
@@ -631,6 +632,13 @@ export class Browser implements TabHost {
   changed(): void {
     this.store.save()
     this.emitSoon()
+  }
+
+  setExtensionPin(profileId: ID, extensionId: string, pinned: boolean): void {
+    const p = this.store.profile(profileId)
+    if (!p) return
+    p.pinnedExtensions = withPin(p.pinnedExtensions ?? [], extensionId, pinned)
+    this.changed()
   }
 
   private relayout(): void {
@@ -1751,6 +1759,8 @@ export class Browser implements TabHost {
       case 'sitePermission':
         if (this.store.profile(action.profileId) && this.profiles.setSitePermission(action.profileId, action.origin, action.key, action.setting)) this.emitSoon()
         return
+      case 'extensionPin':
+        return this.setExtensionPin(a.profileId, a.extensionId, a.pinned)
       case 'itemMenu':
         return buildItemMenu(this, action.id)?.popup({ window: this.window.win })
       case 'folderMenu':
