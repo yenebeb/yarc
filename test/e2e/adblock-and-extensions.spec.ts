@@ -316,6 +316,42 @@ test("an extension's right-click menu can unpin it", async () => {
   }
 })
 
+test("an extension's right-click menu opens in the window it was clicked in", async () => {
+  const extId = await loadExtension(popupExtensionDir('menu window'))
+  const { profileId } = await space()
+  await dispatch({ type: 'extensionPin', profileId, extensionId: extId, pinned: true })
+  await dispatch({ type: 'command', id: 'newWindow' })
+  await expect.poll(() => app.windows().filter((page) => page.url().endsWith('index.html')).length).toBe(2)
+  const clickedId = await app.evaluate(({ Menu }) => {
+    const globals = globalThis as any
+    const browser = globals.arcBrowser
+    const other = browser.wins.find((window: any) => window !== browser.cur).main
+    void other.ui.executeJavaScript(`document.title = 'clicked'`)
+    globals.realPopup = Menu.prototype.popup
+    Menu.prototype.popup = function (options?: Electron.PopupOptions) {
+      globals.menuWindowId = options?.window?.id
+    }
+    return other.win.id
+  })
+  try {
+    const sidebars = () => app.windows().filter((page) => page.url().endsWith('index.html'))
+    const titled = async () => (await Promise.all(sidebars().map(async (page) => ((await page.title()) === 'clicked' ? page : undefined)))).find(Boolean)
+    await expect.poll(async () => !!(await titled())).toBe(true)
+    const page = (await titled())!
+    await page.locator(`button[is="browser-action"][id="${extId}"]`).click({ button: 'right' })
+    await expect.poll(() => app.evaluate(() => (globalThis as any).menuWindowId)).toBe(clickedId)
+  } finally {
+    await app.evaluate(({ Menu }) => {
+      const globals = globalThis as any
+      Menu.prototype.popup = globals.realPopup
+      globals.menuWindowId = undefined
+      globals.arcBrowser.cur.main.win.close()
+    })
+    await dispatch({ type: 'extensionPin', profileId, extensionId: extId, pinned: false })
+    await removeExtension(extId)
+  }
+})
+
 test('an extension popup opens next to its button, from the sidebar shown or hidden, on either side', async () => {
   const dir = extensionDir({
     'manifest.json': { manifest_version: 3, name: 'popup side', version: '1.0', action: { default_popup: 'popup.html' } },

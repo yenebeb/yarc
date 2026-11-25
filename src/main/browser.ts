@@ -2069,6 +2069,10 @@ export class Browser implements TabHost {
     return this.wins.find((window) => window.open && (window.main.ui === wc || window.main.overlay.webContents === wc))
   }
 
+  windowOf(wc: WebContents): MainWindow | undefined {
+    return this.winFor(wc)?.main
+  }
+
   private ownsLittle(wc: WebContents): boolean {
     return this.openLittles().some((little) => little.win.webContents === wc)
   }
