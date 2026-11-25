@@ -36,16 +36,41 @@ export function syncExposure(): string[] {
   return [...new Set(Object.values(EXPOSURE).flat())]
 }
 
+export type CloudDrive = 'google-drive' | 'onedrive' | 'dropbox'
+
+export const CLOUD_DRIVE_NAME: Record<CloudDrive, string> = { 'google-drive': 'Google Drive', onedrive: 'OneDrive', dropbox: 'Dropbox' }
+
+/** Where the encrypted sync files live. */
+export type SyncLocation =
+  /** A folder another app syncs: iCloud Drive, Syncthing, a network drive… */
+  | { kind: 'folder'; path: string }
+  /** Directly between computers on the same network (src/main/sync/nearby.ts). */
+  | { kind: 'nearby' }
+  /** A cloud drive reached through its web API after signing in; `account` is the email shown. */
+  | { kind: 'cloud'; drive: CloudDrive; account?: string }
+  /** A WebDAV server: Nextcloud, ownCloud, a NAS… The password is kept with the sync key, not here. */
+  | { kind: 'server'; url: string; username: string }
+
 /** Runtime state of history sync, sent to the UI with every snapshot. */
 export type HistorySyncStatus =
-  | { state: 'off' }
+  /** `drives`: the cloud drives this build can sign in to. `icloud`: iCloud Drive is on this computer. */
+  | { state: 'off'; drives: CloudDrive[]; icloud: boolean; error?: string }
   /**
-   * A folder was picked (or nearby sync chosen); waiting for the password. `existing` = another
-   * device already syncs there. `searched` = nearby sync looked and found no computer with that password.
+   * A location was picked; waiting for the password. `existing` = another device already syncs
+   * there. `searched` = nearby sync looked and found no computer with that password.
    */
-  | { state: 'setup'; folder: string; existing: boolean; nearby?: boolean; searched?: boolean; error?: string }
-  | { state: 'working'; folder: string; nearby?: boolean; message: string }
+  | { state: 'setup'; location: SyncLocation; existing: boolean; searched?: boolean; error?: string }
+  /** `cancellable`: waiting for the user to sign in in their browser. */
+  | { state: 'working'; location: SyncLocation; message: string; cancellable?: boolean }
   /** `peers`: with nearby sync, how many computers are connected right now. */
-  | { state: 'on'; folder: string; nearby?: boolean; peers?: number; emptyPassword: boolean; lastSync?: number; error?: string }
-  /** Sync is on but can't run until the password is typed again. */
-  | { state: 'locked'; folder: string; nearby?: boolean; reason: 'password-changed' | 'no-saved-key' | 'missing-folder'; error?: string }
+  | { state: 'on'; location: SyncLocation; peers?: number; emptyPassword: boolean; lastSync?: number; error?: string }
+  /** Sync is on but can't run until the password is typed again, or the cloud drive or server is signed in to again. */
+  | { state: 'locked'; location: SyncLocation; reason: 'password-changed' | 'no-saved-key' | 'missing-folder' | 'signed-out'; error?: string }
+
+/** How messages name the location: "Couldn’t reach Google Drive". */
+export function locationName(location: SyncLocation): string {
+  if (location.kind === 'cloud') return CLOUD_DRIVE_NAME[location.drive]
+  if (location.kind === 'server') return 'your server'
+  if (location.kind === 'nearby') return 'your other computers'
+  return 'the sync folder'
+}

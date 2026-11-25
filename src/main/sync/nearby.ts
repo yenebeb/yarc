@@ -17,15 +17,16 @@
 // compaction). sync.json is only replaced by one from the same sync with a later password change.
 //
 // No Electron imports, and value imports carry .ts, so unit tests can load it in plain Node.
-import { createCipheriv, createDecipheriv, createHash, createHmac, createPublicKey, diffieHellman, generateKeyPairSync, hkdfSync, randomBytes } from 'node:crypto'
+import { createCipheriv, createDecipheriv, createHmac, createPublicKey, diffieHellman, generateKeyPairSync, hkdfSync, randomBytes } from 'node:crypto'
 import { createSocket, type Socket as UdpSocket } from 'node:dgram'
 import { mkdirSync, rmSync, watch, type FSWatcher } from 'node:fs'
-import { readdir, readFile, stat } from 'node:fs/promises'
+import { readFile } from 'node:fs/promises'
 import { createServer, connect, type Server, type Socket } from 'node:net'
 import { networkInterfaces } from 'node:os'
 import { join } from 'node:path'
 import { DEFAULT_KDF_COST, deriveMasterKey, parseHeader } from './crypto.ts'
 import { HEADER_FILE, writeAtomic } from './engine.ts'
+import { acceptHeader, FolderHashes, headerInfo, ID_NAME, ownerOf, SYNC_PATH, type HeaderInfo } from './paths.ts'
 
 /** An organization-local multicast address and port; beacons never leave the local network (TTL 1). */
 const BEACON_GROUP = '239.255.89.65'
@@ -34,10 +35,6 @@ const BEACON_INTERVAL = 5_000
 const HANDSHAKE_TIMEOUT = 10_000
 /** A first sync can send one big chunk; anything larger than this is not from YARC. */
 const MAX_FRAME = 64 * 1024 * 1024
-const ID = '[0-9a-f]{16,64}'
-const SYNC_PATH = new RegExp(`^(${HEADER_FILE.replace('.', '\\.')}|profiles/${ID}|history/${ID}/${ID}/${ID})$`)
-const OWNED_PATH = new RegExp(`^(?:profiles/(${ID})|history/${ID}/(${ID})/${ID})$`)
-const ID_NAME = new RegExp(`^${ID}$`)
 
 /**
  * The key both computers derive from the sync password before they've exchanged anything. It
@@ -87,11 +84,6 @@ interface Hello {
   k: string
 }
 
-interface HeaderInfo {
-  folderId: string
-  generation: number
-}
-
 type Message =
   | { t: 'hello'; device: string; folderId?: string }
   | { t: 'manifest'; files: Record<string, string>; header?: HeaderInfo }
@@ -121,11 +113,14 @@ export class NearbySync {
   private manifestTimer: NodeJS.Timeout | undefined
   private receivedTimer: NodeJS.Timeout | undefined
   private watcher: FSWatcher | undefined
-  private hashes = new Map<string, { size: number; mtime: number; hash: string }>()
+  private readonly hashes: FolderHashes
+  private readonly options: NearbyOptions
   private stopped = false
 
-  constructor(private o: NearbyOptions) {
-    for (const key of o.keys) this.groups.set(groupId(key), key)
+  constructor(options: NearbyOptions) {
+    this.options = options
+    this.hashes = new FolderHashes(options.root)
+    for (const key of options.keys) this.groups.set(groupId(key), key)
   }
 
   get peerCount(): number {
@@ -133,7 +128,7 @@ export class NearbySync {
   }
 
   async start(): Promise<void> {
-    mkdirSync(this.o.root, { recursive: true })
+    mkdirSync(this.options.root, { recursive: true })
     this.server = createServer((socket) => this.open(socket))
     await new Promise<void>((resolve, reject) => {
       this.server!.once('error', reject)
@@ -156,7 +151,7 @@ export class NearbySync {
     listener.setMulticastLoopback(true)
 
     try {
-      this.watcher = watch(this.o.root, { recursive: true }, (_event, name) => {
+      this.watcher = watch(this.options.root, { recursive: true }, (_event, name) => {
         if (String(name ?? '').endsWith('.tmp')) return
         clearTimeout(this.manifestTimer)
         this.manifestTimer = setTimeout(() => this.sendManifests(), 1_000)
@@ -352,13 +347,13 @@ export class NearbySync {
       clearTimeout(timeout)
       const instance = peer?.instance ?? dialed?.instance
       if (instance && this.peers.get(instance)?.socket === socket) this.peers.delete(instance)
-      this.o.onPeers?.(this.peerCount)
+      this.options.onPeers?.(this.peerCount)
     })
   }
 
   private async greet(peer: Peer): Promise<void> {
     const header = await this.localHeader()
-    peer.send({ t: 'hello', device: this.o.deviceId, folderId: header?.folderId })
+    peer.send({ t: 'hello', device: this.options.deviceId, folderId: header?.folderId })
     peer.send(await this.manifest())
   }
 
@@ -367,14 +362,14 @@ export class NearbySync {
   private async handle(peer: Peer, m: Message): Promise<void> {
     switch (m.t) {
       case 'hello': {
-        if (!ID_NAME.test(m.device) || m.device === this.o.deviceId) return void peer.socket.destroy()
+        if (!ID_NAME.test(m.device) || m.device === this.options.deviceId) return void peer.socket.destroy()
         const header = await this.localHeader()
         if (header && m.folderId && m.folderId !== header.folderId) {
-          this.o.onConflict?.('Another computer on this network uses the same password for a different sync. Turn sync off on one of them and join the other.')
+          this.options.onConflict?.('Another computer on this network uses the same password for a different sync. Turn sync off on one of them and join the other.')
           return void peer.socket.destroy()
         }
         peer.device = m.device
-        this.o.onPeers?.(this.peerCount)
+        this.options.onPeers?.(this.peerCount)
         return
       }
       case 'manifest':
@@ -383,7 +378,7 @@ export class NearbySync {
         for (const path of m.paths) {
           if (!SYNC_PATH.test(path)) continue
           try {
-            peer.send({ t: 'file', path, data: (await readFile(join(this.o.root, path))).toString('base64') })
+            peer.send({ t: 'file', path, data: (await readFile(join(this.options.root, path))).toString('base64') })
           } catch {
             // Gone since the manifest (compacted); the next manifest says so.
           }
@@ -401,9 +396,9 @@ export class NearbySync {
           }
           if (!acceptHeader(next, await this.localHeader())) return
         }
-        writeAtomic(join(this.o.root, m.path), data)
+        writeAtomic(join(this.options.root, m.path), data)
         clearTimeout(this.receivedTimer)
-        this.receivedTimer = setTimeout(() => this.o.onReceived?.(), 500)
+        this.receivedTimer = setTimeout(() => this.options.onReceived?.(), 500)
         return
       }
     }
@@ -417,7 +412,7 @@ export class NearbySync {
     for (const [path, hash] of Object.entries(files)) {
       if (!SYNC_PATH.test(path) || local.get(path) === hash) continue
       const owner = ownerOf(path)
-      if (owner === this.o.deviceId) continue
+      if (owner === this.options.deviceId) continue
       if (path === HEADER_FILE) {
         if (header && acceptHeader(header, ours)) wanted.push(path)
       } else if (path.startsWith('profiles/')) {
@@ -429,8 +424,8 @@ export class NearbySync {
     // The owner no longer has these (it compacted them away): drop them here too.
     for (const path of local.keys()) {
       if (ownerOf(path) === peer.device && !(path in files)) {
-        rmSync(join(this.o.root, path), { force: true })
-        this.hashes.delete(path)
+        rmSync(join(this.options.root, path), { force: true })
+        this.hashes.forget(path)
       }
     }
     if (wanted.length === 0) return
@@ -452,37 +447,14 @@ export class NearbySync {
 
   private async localHeader(): Promise<ReturnType<typeof parseHeader> | undefined> {
     try {
-      return parseHeader(await readFile(join(this.o.root, HEADER_FILE), 'utf8'))
+      return parseHeader(await readFile(join(this.options.root, HEADER_FILE), 'utf8'))
     } catch {
       return undefined
     }
   }
 
-  /** Every sync file in the folder, with a hash of its content (cached by size and modification time). */
-  private async localFiles(): Promise<Map<string, string>> {
-    const root = this.o.root
-    const paths = [HEADER_FILE, ...(await ids(join(root, 'profiles'))).map((d) => `profiles/${d}`)]
-    for (const pk of await ids(join(root, 'history')))
-      for (const device of await ids(join(root, 'history', pk)))
-        for (const chunk of await ids(join(root, 'history', pk, device))) paths.push(`history/${pk}/${device}/${chunk}`)
-    const files = new Map<string, string>()
-    for (const path of paths) {
-      try {
-        const full = join(root, path)
-        const s = await stat(full)
-        const cached = this.hashes.get(path)
-        if (cached && cached.size === s.size && cached.mtime === s.mtimeMs) {
-          files.set(path, cached.hash)
-          continue
-        }
-        const hash = createHash('sha256').update(await readFile(full)).digest('hex').slice(0, 32)
-        this.hashes.set(path, { size: s.size, mtime: s.mtimeMs, hash })
-        files.set(path, hash)
-      } catch {
-        // Not there (no sync.json yet), or removed meanwhile.
-      }
-    }
-    return files
+  private localFiles(): Promise<Map<string, string>> {
+    return this.hashes.list()
   }
 }
 
@@ -491,27 +463,4 @@ function counterNonce(n: bigint): Buffer {
   const nonce = Buffer.alloc(12)
   nonce.writeBigUInt64BE(n, 4)
   return nonce
-}
-
-function ownerOf(path: string): string | undefined {
-  const m = OWNED_PATH.exec(path)
-  return m ? (m[1] ?? m[2]) : undefined
-}
-
-function headerInfo(header: ReturnType<typeof parseHeader>): HeaderInfo {
-  return { folderId: header.folderId, generation: header.generation ?? 0 }
-}
-
-/** sync.json is copied when this computer has none, or when it's the same sync after a later password change. */
-function acceptHeader(theirs: HeaderInfo, ours: ReturnType<typeof parseHeader> | undefined): boolean {
-  if (!ours) return true
-  return theirs.folderId === ours.folderId && theirs.generation > (ours.generation ?? 0)
-}
-
-async function ids(dir: string): Promise<string[]> {
-  try {
-    return (await readdir(dir)).filter((n) => ID_NAME.test(n))
-  } catch {
-    return []
-  }
 }

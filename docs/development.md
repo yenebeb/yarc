@@ -83,7 +83,7 @@ Details and gaps are in [docs/electron-notes.md](electron-notes.md#6-security-up
 | `src/main/peek.ts` | Peek: pages from pinned tabs and favorites floating over the current tab |
 | `src/main/canvas.ts`, `canvas-store.ts` | Canvases: their pages, capture, and their files in the profile folder (`docs/canvas.md`) |
 | `src/main/importers/` | Arc, Zen and Chromium importers |
-| `src/main/sync/` | Encrypted history sync through a folder you already sync (`docs/history-sync.md`) |
+| `src/main/sync/` | Encrypted history sync through a cloud drive, your own server or a synced folder (`docs/history-sync.md`) |
 | `src/shared/` | State types, actions, keymap, URL helpers (unit tested) |
 | `src/renderer/` | React UI: `index` (sidebar), `overlay` (command bar and panels), `little`, `canvas` (a canvas: a board YARC draws itself) |
 | `docs/` | Research notes: Arc's behavior and shortcuts, Arc's data format, Electron notes |

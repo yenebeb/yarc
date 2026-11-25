@@ -1,4 +1,5 @@
 import type { Side } from './split'
+import type { CloudDrive } from './sync'
 import type { ID, LiveSource, OverlayMode, Rect, Settings, SplitAt } from './types'
 
 /** `index` is within the target list. */
@@ -87,7 +88,13 @@ export type Action =
   | { type: 'relaunchUpdate' }
   // history sync
   | { type: 'syncPickFolder' }
+  | { type: 'syncICloud' }
   | { type: 'syncNearby' }
+  | { type: 'syncCloud'; drive: CloudDrive }
+  /** Sets up a WebDAV server, or signs in to it again when it refused the password. */
+  | { type: 'syncServer'; url: string; username: string; password: string }
+  /** Signs in to the cloud drive again after it signed YARC out. */
+  | { type: 'syncSignIn' }
   /** `create`: nearby sync found no computer to join; start a new sync with this password. */
   | { type: 'syncConnect'; password: string; create?: boolean }
   | { type: 'syncChangePassword'; password: string }

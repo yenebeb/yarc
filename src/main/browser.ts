@@ -591,7 +591,7 @@ export class Browser implements TabHost {
       archive: [],
       sitePermissions: {},
       media: this.media.snapshot(),
-      historySync: (this.main ?? this).historySync?.status ?? { state: 'off' }
+      historySync: (this.main ?? this).historySync?.status ?? { state: 'off', drives: [], icloud: false }
     }
   }
 
@@ -1733,8 +1733,16 @@ export class Browser implements TabHost {
         return this.restoreArchived(action.id)
       case 'syncPickFolder':
         return (this.main ?? this).historySync?.pickFolder()
+      case 'syncICloud':
+        return (this.main ?? this).historySync?.useICloud()
       case 'syncNearby':
         return (this.main ?? this).historySync?.setUpNearby()
+      case 'syncCloud':
+        return (this.main ?? this).historySync?.signInToDrive(action.drive)
+      case 'syncServer':
+        return (this.main ?? this).historySync?.setUpServer(action.url, action.username, action.password)
+      case 'syncSignIn':
+        return (this.main ?? this).historySync?.signInAgain()
       case 'syncConnect':
         return (this.main ?? this).historySync?.connect(action.password, action.create)
       case 'syncChangePassword':

@@ -3,7 +3,7 @@ import type { LinkRoute } from './link-routes'
 import type { SitePermissionRow } from './permissions'
 import type { Side } from './split'
 import type { TourStep } from './tour'
-import type { HistorySyncStatus } from './sync'
+import type { HistorySyncStatus, SyncLocation } from './sync'
 
 export type ID = string
 
@@ -132,11 +132,9 @@ export interface Settings {
   autoUpdate: boolean
   floatVideos: boolean
   shortcuts: Shortcuts
-  /** History sync through `syncFolder` (see src/main/sync). */
+  /** History sync through `syncLocation` (see src/main/sync). */
   syncHistory: boolean
-  syncFolder: string
-  /** `syncFolder` is nearby sync's private copy, kept in step with computers on the same network. */
-  syncNearby: boolean
+  syncLocation?: SyncLocation
 }
 
 export interface PersistedState {

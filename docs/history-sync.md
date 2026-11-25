@@ -1,11 +1,13 @@
 # History sync
 
-History sync carries browsing history between a user's computers through a folder they already
-sync (iCloud Drive, Dropbox, OneDrive). There is no YARC server, account or telemetry: the
-maintainers never hold or see anyone's data, and the cloud service only ever carries encrypted
-files. Code: `src/main/sync/` (crypto, log format, engine, Electron controller),
-`src/main/history.ts` (merge rules), `src/shared/sync.ts` (record types and what they expose).
-Tests: `test/unit/sync.test.ts`.
+History sync carries browsing history between a user's computers through a place they choose:
+Google Drive, OneDrive or Dropbox (YARC signs in to them), iCloud Drive or any other folder
+another app syncs, their own WebDAV server, or directly between computers on the same network.
+There is no YARC server, account or telemetry: the maintainers never hold or see anyone's data,
+and wherever the files are kept only ever sees encrypted files. Code: `src/main/sync/` (crypto,
+log format, engine, the stores, Electron controller), `src/main/history.ts` (merge rules),
+`src/shared/sync.ts` (record types and what they expose). Tests: `test/unit/sync.test.ts`,
+`test/unit/sync-remote.test.ts`.
 
 Why not something else: Chrome Sync is closed to other browsers and Google's My Activity has no
 write API (`electron-notes.md` section 4); a YARC server would make the project responsible for
@@ -124,6 +126,63 @@ reach the sync code; `History(undefined)` lives in memory), and anything but his
 - If the folder disappears (a drive unplugged, a cloud app signed out), sync pauses and Settings
   says so.
 
+## Cloud drives and your own server
+
+Settings → Sync offers, in order: the cloud drives this build has an app registration for
+(`availableDrives()`), iCloud Drive when its folder is on this computer (one click: its
+`YARC Sync` folder), your own server, any other folder, and nearby computers.
+
+For a cloud drive or a server, YARC keeps a copy of the sync folder in `<userData>/Sync/Remote`
+and the engine works on the copy; `remote.ts` moves the encrypted files between the copy and the
+store (`RemoteStore`: list, read, write, remove), by the same rules as nearby sync below: a
+computer uploads only its own files and `sync.json`, downloads the others' new and changed files,
+and drops copies their owner removed. Its own files come back only when the copy was cleared (sync
+turned off and on), so its log numbering continues. `sync.json` from the store replaces the copy's
+unless the copy holds the same sync after a later password change, not yet uploaded. Each pass:
+fetch, then the engine, then upload. Nothing announces changes in a store, so it's checked on
+focus (at most every 30 s) and every 5 minutes. What's waiting at quit is written to the copy and
+uploaded at the next launch.
+
+| | Where the files go | Access YARC asks for |
+| --- | --- | --- |
+| Google Drive | The hidden app data folder; each file named by its path | `drive.appdata` (only its own hidden folder), `openid email` to show the account |
+| OneDrive | `Apps/YARC` in the user's OneDrive (Microsoft Graph app folder) | `Files.ReadWrite.AppFolder`, `offline_access`, `openid email` |
+| Dropbox | `Apps/YARC` in the user's Dropbox (app folder app) | `files.metadata.read`, `files.content.read`, `files.content.write`, `account_info.read` |
+| Your own server | `YARC Sync` inside the WebDAV folder the user names | its user name and password (HTTP Basic); `http://` only on the local network |
+
+- **Signing in** (`oauth.ts`) is the installed-app flow (RFC 8252): the sign-in page opens in the
+  user's own browser, which returns to `http://localhost:47392/callback` (YARC listens there for
+  up to 10 minutes, on IPv4 and IPv6), with PKCE and a random state. The refresh token, or the
+  server's password, is saved with the sync key in `Sync/key.json` (the same protection, see
+  below); access tokens live in memory only. A revoked sign-in or a refused password locks sync
+  until the user signs in again.
+- **A cloud drive's own app is a different place.** The Google Drive app's folder can't meet a
+  Google Drive sign-in (the app data folder isn't visible), so the folder picker suggests other
+  sync apps instead. iCloud Drive has no API for this, so it's folder-only.
+
+## Registering YARC with the cloud drives
+
+The drives are offered only once `src/main/sync/cloud-drives.ts` has YARC's client IDs. They are
+public by design (every installed copy carries them). Each registration uses the redirect address
+`http://localhost:47392/callback`.
+
+- **Google Drive:** in Google Cloud Console, create a project, enable the Google Drive API,
+  configure the OAuth consent screen (external; scopes `openid`, `email`, `.../auth/drive.appdata`,
+  all non-sensitive, so no security review), and create an OAuth client of type *Desktop app*. Put
+  its client ID and client secret in `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`. Publish the
+  consent screen; while it's in testing, only listed test users can sign in and refresh tokens
+  expire after 7 days.
+- **OneDrive:** in the Microsoft Entra admin center, register an app for *accounts in any
+  organizational directory and personal Microsoft accounts*, add the platform *Mobile and desktop
+  applications* with redirect URI `http://localhost`, turn on *Allow public client flows*, and
+  add the delegated Graph permissions `Files.ReadWrite.AppFolder`, `offline_access`, `openid`,
+  `email`. Put the application (client) ID in `MICROSOFT_CLIENT_ID`. The app's display name names
+  the folder (`Apps/<name>`), so call it YARC.
+- **Dropbox:** in the Dropbox App Console, create a *Scoped access* app with *App folder* access
+  named YARC, tick the four permissions in the table above, add the redirect URI
+  `http://localhost:47392/callback`, and allow PKCE (no secret). Put the app key in
+  `DROPBOX_APP_KEY`. Until it's approved for production, only 500 users can link it.
+
 ## Nearby computers (proof of concept)
 
 `src/main/sync/nearby.ts`. Sync without a cloud folder: computers on the same network copy the
@@ -161,6 +220,8 @@ merge rules above are unchanged. Only the transport differs.
 
 ## Turning it off
 
-Settings → Sync → off: this device forgets its saved key, cursors and tombstones (which hold
-deleted URLs). Local history stays. The folder is left as it is; delete it to remove the synced
-history everywhere it isn't already merged.
+Settings → Sync → off: this device forgets its saved key and sign-in, cursors and tombstones
+(which hold deleted URLs), and deletes its copy of a cloud drive's or server's sync folder.
+Local history stays. The synced files are left as they are; delete them (the folder, `Apps/YARC`,
+or YARC's data in Google Drive's *Manage apps*) to remove the synced history everywhere it isn't
+already merged.

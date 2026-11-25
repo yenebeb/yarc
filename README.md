@@ -75,7 +75,7 @@ Links from other apps open in a small window. Close it, or keep the page with **
 - **Ads and trackers** are blocked out of the box.
 - **Chrome extensions** from the Chrome Web Store, per profile, Manifest V3 ad blockers included.
 - **Several windows**, all with the same sidebar.
-- **History sync** between your computers, end-to-end encrypted, through a folder you already sync (iCloud Drive, Dropbox, OneDrive). No account and no YARC server. [How it works](docs/history-sync.md).
+- **History sync** between your computers, end-to-end encrypted, through Google Drive, OneDrive, Dropbox, iCloud Drive or your own server. No YARC account and no YARC server. [How it works](docs/history-sync.md).
 - **Import** from Arc, Zen, Chrome, Edge and Brave.
 - Find in page, a `Ctrl+Tab` switcher, the Library, light and dark themes, and *Open in Chrome* for the odd site that needs it.
 
@@ -194,7 +194,7 @@ It collects nothing: no telemetry, no account, no servers. It only goes online o
 Yes, including company SSO. Only sites that demand *managed* Google Chrome won't work; use *Open in Chrome* for those.
 
 **Does it sync with my Google account, or between my computers?**
-Google only lets Chrome use Chrome Sync, so use *Import from Chrome* once instead. Your history can sync between your own computers, encrypted, through a folder you already sync: **Settings → Sync**. Spaces and pinned tabs don't sync yet.
+Google only lets Chrome use Chrome Sync, so use *Import from Chrome* once instead. Your history can sync between your own computers, encrypted, through Google Drive, OneDrive, Dropbox, iCloud Drive or your own server: **Settings → Sync**. Spaces and pinned tabs don't sync yet.
 
 **Why Electron?**
 It's real Chromium, so sites and Chrome extensions work as in Chrome, and Chromium's security fixes reach you within days, without a one-person project maintaining a fork. Per page it uses the same memory as Chrome: with 8 pages open, Chrome used 746 MB and YARC 844 MB, the difference being YARC's sidebar, panels and ad blocker. [Why Electron, and how we measured](docs/why-electron.md).
@@ -216,7 +216,7 @@ One person, in their spare time. YARC is independent and not affiliated with The
 | Extensions, per profile | `Profiles/<id>/Extensions` | same |
 | Extensions' blocking rules, per profile | `Profiles/<id>/Extension Rules` | same |
 | Canvases (deleted ones stay in `.trash` for 30 days) | `Profiles/<id>/Canvases` | same |
-| History sync: this computer's random ID, and the key derived from your sync password | `Sync/device.json`, `Sync/key.json` (DPAPI-protected) | same (not encrypted, like the cookies and history) |
+| History sync: this computer's random ID, the key derived from your sync password, and the sign-in for your cloud drive or server | `Sync/device.json`, `Sync/key.json` (DPAPI-protected) | same (not encrypted, like the cookies and history) |
 | Cookies, site storage, cache | `Partitions/profile-<id>` | same |
 | Error log | `logs\main.log` | `~/Library/Logs/YARC/main.log` |
 

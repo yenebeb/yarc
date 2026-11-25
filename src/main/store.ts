@@ -28,9 +28,7 @@ export const DEFAULT_SETTINGS: Settings = {
   floatVideos: true,
   shortcuts: {},
   theme: 'system',
-  syncHistory: false,
-  syncFolder: '',
-  syncNearby: false
+  syncHistory: false
 }
 
 export function defaultState(): PersistedState {
