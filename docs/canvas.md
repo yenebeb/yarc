@@ -393,5 +393,4 @@ With the notes themselves: the Note tool in the text group, and list, checkbox a
 
 - Whether split view (step 3) is in scope.
 - Spellcheck is off for every UI page (`uiWebPreferences`). On macOS it's free; on Windows Electron downloads dictionaries from Google's servers, which may not fit "nothing collected".
-- A pasted clip is checked item by item (`isBoardItem`) but may still carry `live: true`, which loads its page at once. A page can put a clip on the clipboard, so paste should drop `live`.
 - An item the board can't draw is dropped at load and gone after the next save. That matters only if an older build opens a canvas with a newer item kind.

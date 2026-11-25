@@ -33,6 +33,9 @@ export function copyText(text: string): void {
   document.execCommand('copy')
 }
 
+/** A page can put a clip on the clipboard, and a live card loads its page at once: a pasted card starts as its picture. */
+const asItsPicture = (item: BoardItem): BoardItem => (item.kind === 'capture' ? { ...item, live: undefined } : item)
+
 /** Copy, cut and paste on the board while no text is being typed; returns how image files are added, for a drop or the file picker too. */
 export function useClipboard(board: Board, textColor: Color, editingRef: RefObject<string | undefined>) {
   const { itemsRef, selectedRef, files, change, setSelected, selectedItems, center } = board
@@ -87,7 +90,7 @@ export function useClipboard(board: Board, textColor: Color, editingRef: RefObje
     } catch {
       return
     }
-    const pasted: BoardItem[] = Array.isArray(clip?.items) ? clip.items.filter(isBoardItem) : []
+    const pasted: BoardItem[] = Array.isArray(clip?.items) ? clip.items.filter(isBoardItem).map(asItsPicture) : []
     const bounds = boundsOf(pasted)
     if (!bounds) return
     for (const [id, file] of Object.entries<CanvasImage>(clip.files ?? {})) if (!files.has(id)) files.set(id, file)

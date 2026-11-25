@@ -156,6 +156,15 @@ test.describe('pasting onto a canvas', () => {
     await expect(texts(canvas.board)).toHaveText(['Odd clipboard', 'still works'])
   })
 
+  test('a pasted card that was showing its page live comes in as its picture, so a paste loads no page', async () => {
+    const canvas = await openCanvas('Live clip')
+    const onePixel = { mimeType: 'image/png', dataURL: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==' }
+    const liveCard = { id: 'live-card', kind: 'capture', x: 0, y: 0, width: 200, height: 120, fileId: 'one-pixel', live: true, source: { url: 'https://example.com/', title: 'Example' } }
+    await paste(canvas.board, CLIP_TYPE, JSON.stringify({ items: [liveCard], files: { 'one-pixel': onePixel } }))
+    await expect(canvas.board.locator('.item.capture')).toHaveCount(1)
+    await expect(canvas.board.locator('.item.capture.live')).toHaveCount(0)
+  })
+
   test('a picture deleted and brought back with undo is still there when the canvas is opened again', async () => {
     const canvas = await openCanvas('Picture')
     await pasteAPicture(canvas.board)
