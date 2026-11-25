@@ -1,6 +1,6 @@
 import { net } from 'electron'
 import { BINDINGS } from '../shared/keymap'
-import { spaceItems, tabTitle } from '../shared/tree'
+import { spaceCanvases, spaceItems, tabTitle } from '../shared/tree'
 import type { SearchResult } from '../shared/types'
 import { SEARCH_ENGINES, toUrl } from '../shared/url'
 import type { Browser } from './browser'
@@ -62,6 +62,13 @@ export function search(browser: Browser, raw: string): SearchResult[] {
     commands.push({ source: 'command', result: { kind: 'command', id: `space:${space.id}`, title, target: `space:${space.id}` } })
   }
 
+  const canvases: Candidate[] = spaces.flatMap((space) =>
+    spaceCanvases(space).map((canvas): Candidate => {
+      const subtitle = space === active ? 'Canvas' : `${space.emoji ?? ''} ${space.name} · Canvas`.trim()
+      return { source: 'canvas', inActiveSpace: space === active, result: { kind: 'canvas', id: `canvas:${canvas.id}`, title: canvas.name, subtitle, target: canvas.id, spaceId: space.id } }
+    })
+  )
+
   const history = historyCandidates(browser.profiles.get(active.profileId).history.search(query), query)
 
   const archive: Candidate[] = state.archive.map((a) => ({
@@ -71,7 +78,7 @@ export function search(browser: Browser, raw: string): SearchResult[] {
 
   const openUrls = new Set([typed.url, ...tabs.map((t) => t.result.url)])
   const elsewhere = [...history, ...archive].filter((c) => !c.result.url || !openUrls.has(c.result.url))
-  return arrange(query, typed, [...commands, ...tabs, ...elsewhere])
+  return arrange(query, typed, [...commands, ...tabs, ...canvases, ...elsewhere])
 }
 
 export async function suggest(browser: Browser, query: string): Promise<string[]> {

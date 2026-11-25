@@ -387,7 +387,7 @@ Built with the notes: the Note tool in the text group. Not built yet: list, chec
 ### 9.4 Order
 
 1. Wrapping text, the Note tool, lines, the keys, export, the grid and the hint (one PR, with a spotlight card). Built: the line rules are in `src/shared/canvas-notes.ts`.
-2. "Add Selection to Canvas" in a page's context menu: a quote note with the same source footer as a capture card, through the inbox. ⌘F on a canvas finds in its text and pans to each match (today it does nothing). Canvases by name in the command bar.
+2. "Add Selection to Canvas" in a page's context menu: a quote note with the same source footer as a capture card, through the inbox. ⌘F on a canvas finds in its text and pans to each match (today it does nothing). Built (2026-11-25): canvases by name in the command bar: typing a canvas's name offers it, ranked like an open tab (a canvas of the space you're in first; a name that starts with what was typed is a top hit), and Enter opens it, switching space if it lives in another. Shown with the canvas icon and the hint Open Canvas.
 3. A canvas as a split pane, to write next to the page being read. Biggest piece: splits only hold tabs today. Planned in section 10: about 2½ weeks.
 
 ### 9.5 Open

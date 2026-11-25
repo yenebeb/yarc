@@ -18,7 +18,8 @@ const KIND_ICON: Partial<Record<SearchResult['kind'], IconName>> = {
   pastSearch: 'clock',
   command: 'command',
   url: 'globe',
-  archive: 'archive'
+  archive: 'archive',
+  canvas: 'canvas'
 }
 
 const isTabResult = (result: SearchResult) => result.kind === 'tab' || result.kind === 'pinned' || result.kind === 'favorite'
@@ -102,6 +103,11 @@ export function CommandBar({ state, mode, close }: { state: AppState; mode: Extr
       } else dispatch({ type: 'command', id: result.target })
       return
     }
+    if (result.kind === 'canvas' && result.target) {
+      close()
+      dispatch({ type: 'activate', id: result.target })
+      return
+    }
     if (result.kind === 'archive' && result.target) return dispatch({ type: 'archiveRestore', id: result.target })
     dispatch({ type: 'open', url: result.url ?? result.title, where: alt ? 'split' : target, splitAt: target === 'split' ? mode.splitAt : undefined })
   }
@@ -183,6 +189,7 @@ export function CommandBar({ state, mode, close }: { state: AppState; mode: Extr
 function hintFor(result: SearchResult, activeSpaceId: string) {
   if (isTabResult(result)) return result.spaceId && result.spaceId !== activeSpaceId ? 'Switch to Space & Tab' : 'Switch to Tab'
   if (result.kind === 'command' && result.target && !result.target.startsWith('space:')) return shortcutLabel(result.target as CommandId)
+  if (result.kind === 'canvas') return result.spaceId && result.spaceId !== activeSpaceId ? 'Switch to Space & Canvas' : 'Open Canvas'
   if (result.kind === 'archive') return 'Restore'
   return ''
 }

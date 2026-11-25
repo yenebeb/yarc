@@ -305,13 +305,13 @@ export type OverlayMode =
 
 export interface SearchResult {
   /** `pastSearch`: something searched for before, found in history; its `url` is the query. */
-  kind: 'tab' | 'favorite' | 'pinned' | 'history' | 'pastSearch' | 'suggestion' | 'url' | 'command' | 'archive'
+  kind: 'tab' | 'favorite' | 'pinned' | 'history' | 'pastSearch' | 'suggestion' | 'url' | 'command' | 'archive' | 'canvas'
   id: string
   title: string
   subtitle?: string
   url?: string
   favicon?: string
-  /** For tabs: the item to activate. For commands: the command id. */
+  /** For tabs and canvases: the item to activate. For commands: the command id. */
   target?: string
   spaceId?: ID
 }
