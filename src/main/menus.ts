@@ -9,6 +9,19 @@ import type { LiveTab } from './tab'
 
 const WEB_LINK = /^https?:/i
 
+/** A submenu of the space's canvases, and a new one, for what a page offers to put on a canvas. */
+function addToCanvasItem(browser: Browser, label: string, add: (canvasId: string) => void): MenuItemConstructorOptions {
+  const canvases = spaceCanvases(browser.space)
+  return {
+    label,
+    submenu: [
+      ...canvases.map((canvas) => ({ label: canvas.name, click: () => add(canvas.id) })),
+      ...(canvases.length ? [{ type: 'separator' as const }] : []),
+      { label: 'New Canvas', click: () => add('new') }
+    ]
+  }
+}
+
 export function buildContextMenu(browser: Browser, tab: LiveTab, p: ContextMenuParams): Menu {
   const wc = tab.wc
   const items: MenuItemConstructorOptions[] = []
@@ -35,16 +48,7 @@ export function buildContextMenu(browser: Browser, tab: LiveTab, p: ContextMenuP
       items.push({ label: 'Open Image in New Tab', click: () => browser.open(p.srcURL, 'background') })
     }
     if (!browser.incognito && (WEB_LINK.test(p.srcURL) || /^data:image\//i.test(p.srcURL))) {
-      const add = (canvasId: string) => () => void browser.canvases.addImage(tab, p.srcURL, canvasId)
-      const canvases = spaceCanvases(browser.space)
-      items.push({
-        label: 'Add Image to Canvas',
-        submenu: [
-          ...canvases.map((c) => ({ label: c.name, click: add(c.id) })),
-          ...(canvases.length ? [{ type: 'separator' as const }] : []),
-          { label: 'New Canvas', click: add('new') }
-        ]
-      })
+      items.push(addToCanvasItem(browser, 'Add Image to Canvas', (canvasId) => void browser.canvases.addImage(tab, p.srcURL, canvasId)))
     }
     items.push(
       { label: 'Save Image As…', click: () => wc.downloadURL(p.srcURL) },
@@ -80,6 +84,7 @@ export function buildContextMenu(browser: Browser, tab: LiveTab, p: ContextMenuP
       { role: 'copy' },
       { label: `Search ${SEARCH_ENGINES[engine].name} for “${short}”`, click: () => browser.open(searchUrl(text, engine), 'tab') }
     )
+    if (!browser.incognito) items.push(addToCanvasItem(browser, 'Add Selection to Canvas', (canvasId) => void browser.canvases.addSelection(tab, text, canvasId)))
     sep()
   }
   if (!p.linkURL && !p.isEditable && !p.selectionText.trim() && p.mediaType === 'none') {

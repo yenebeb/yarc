@@ -144,6 +144,12 @@ describe('what the board takes from a clipboard or a saved canvas', () => {
     assert.equal(isBoardItem({ ...capture, source: { url: 'https://example.com/chairs', title: 'Chairs' } }), true)
   })
 
+  test('a text with the page it was quoted from, but not one with a source that has no address', () => {
+    const quote = { ...note, card: true, wrapWidth: 280, source: { url: 'https://example.com/chairs', title: 'Chairs', favicon: 'https://example.com/icon.png' } }
+    assert.equal(isBoardItem(quote), true)
+    assert.equal(isBoardItem({ ...quote, source: { title: 'Chairs' } }), false)
+  })
+
   test('refuses a drawing without its points, because the board can’t draw it', () => {
     assert.equal(isBoardItem({ id: 'scribble', kind: 'draw', ...place, color: 'ink' }), false)
   })
@@ -243,8 +249,21 @@ describe('captures waiting for the canvas page (the inbox)', () => {
     const fileId = files.addImage(pngBytes('capture'), 'image/png')
     files.pushInbox(captureOf(fileId))
     const [item] = files.takeInbox()
+    assert.ok('fileId' in item)
     assert.equal(item.fileId, fileId)
     assert.equal(item.dataURL, `data:image/png;base64,${pngBytes('capture').toString('base64')}`)
+    assert.deepEqual(files.takeInbox(), [])
+  })
+
+  test('a quote waits with its source and comes out in order with the captures around it', () => {
+    const { files } = aCanvas()
+    const source = { url: 'https://example.com/chairs', title: 'Chairs', favicon: 'https://example.com/icon.png' }
+    const fileId = files.addImage(pngBytes('capture'), 'image/png')
+    files.pushInbox({ quote: 'Oak lasts longest.', source })
+    files.pushInbox(captureOf(fileId))
+    const [quote, picture] = files.takeInbox()
+    assert.deepEqual(quote, { quote: 'Oak lasts longest.', source })
+    assert.ok('fileId' in picture)
     assert.deepEqual(files.takeInbox(), [])
   })
 

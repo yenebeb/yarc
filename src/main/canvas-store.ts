@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, utimesSync } from 'node:fs'
 import { extname, join } from 'node:path'
-import { FILE_ID, IMAGE_TYPES, type CanvasImage, type CanvasScene, type InboxItem } from '../shared/canvas.ts'
+import { FILE_ID, IMAGE_TYPES, type CanvasImage, type CanvasScene, type InboxItem, type QueuedInboxItem } from '../shared/canvas.ts'
 import { writeFileAtomic } from './atomic-file.ts'
 
 const TRASH_DAYS = 30
@@ -48,7 +48,7 @@ export class CanvasFiles {
     this.ensure()
     writeFileAtomic(join(this.dir, 'canvas.json'), JSON.stringify(scene))
     const used = referencedFiles(scene)
-    for (const item of this.readInbox()) used.add(item.fileId)
+    for (const item of this.readInbox()) if ('fileId' in item) used.add(item.fileId)
     for (const name of this.imageNames()) {
       if (!used.has(name.slice(0, -extname(name).length))) rmSync(join(this.images, name), { force: true })
     }
@@ -92,14 +92,14 @@ export class CanvasFiles {
     if (!existsSync(file)) writeFileAtomic(file, bytes)
   }
 
-  pushInbox(item: Omit<InboxItem, 'dataURL'>): void {
+  pushInbox(item: QueuedInboxItem): void {
     this.ensure()
     const inbox = this.readInbox()
     inbox.push(item)
     writeFileAtomic(join(this.dir, 'inbox.json'), JSON.stringify(inbox))
   }
 
-  private readInbox(): Omit<InboxItem, 'dataURL'>[] {
+  private readInbox(): QueuedInboxItem[] {
     try {
       const list = JSON.parse(readFileSync(join(this.dir, 'inbox.json'), 'utf8'))
       return Array.isArray(list) ? list : []
@@ -112,8 +112,9 @@ export class CanvasFiles {
     const queued = this.readInbox()
     if (!queued.length) return []
     rmSync(join(this.dir, 'inbox.json'), { force: true })
-    const images = this.readImages(new Set(queued.map((item) => item.fileId)))
-    return queued.flatMap((item) => {
+    const images = this.readImages(new Set(queued.flatMap((item) => ('fileId' in item ? [item.fileId] : []))))
+    return queued.flatMap((item): InboxItem[] => {
+      if (!('fileId' in item)) return [item]
       const image = images[item.fileId]
       return image ? [{ ...item, dataURL: image.dataURL }] : []
     })

@@ -1,4 +1,4 @@
-import { boundsOf, smoothPath, type BoardItem, type Box, type CanvasImage, type TextItem } from '../../shared/canvas'
+import { boundsOf, smoothPath, type BoardItem, type Box, type CanvasImage, type CaptureSource, type TextItem } from '../../shared/canvas'
 import { isListed, noteLine, wrappedRows, type NoteLine } from '../../shared/canvas-notes'
 import { arrowPath, DRAW_STROKE, drawScale, hasImageFile, LINE_HEIGHT, lineTextSize, LIST_INDENT_EM, NOTE_PADDING, paint, STROKE, TEXT, textFont } from './canvas-item'
 
@@ -64,6 +64,22 @@ function drawMarker(ctx: CanvasRenderingContext2D, line: NoteLine, column: { lef
   ctx.stroke()
 }
 
+const SOURCE_LINE_GAP = 10
+
+/** A quote's footer: a rule and the page's title (the icon and the button are left out of a picture). */
+function drawSourceLine(ctx: CanvasRenderingContext2D, source: CaptureSource, edges: { left: number; right: number; top: number }, family: string): void {
+  ctx.globalAlpha = 1
+  ctx.strokeStyle = '#8884'
+  ctx.beginPath()
+  ctx.moveTo(edges.left, edges.top)
+  ctx.lineTo(edges.right, edges.top)
+  ctx.stroke()
+  ctx.fillStyle = '#888'
+  ctx.font = `13px ${family}`
+  const [shown] = wrappedRows(source.title || source.url, edges.right - edges.left, (text) => ctx.measureText(text).width)
+  ctx.fillText(shown, edges.left, edges.top + 21)
+}
+
 /** The board lets the browser break a wrapped text's lines; a 2D canvas doesn't, so they're broken here with `measureText`. */
 function drawText(ctx: CanvasRenderingContext2D, item: TextItem, family: string): void {
   const padding = item.card ? NOTE_PADDING : { x: 0, y: 0 }
@@ -93,6 +109,7 @@ function drawText(ctx: CanvasRenderingContext2D, item: TextItem, family: string)
     })
     top += rows.length * rowHeight
   }
+  if (item.source) drawSourceLine(ctx, item.source, { left: item.x + padding.x, right: item.x + item.width - padding.x, top: top + SOURCE_LINE_GAP }, family)
 }
 
 function drawItem(ctx: CanvasRenderingContext2D, item: BoardItem, images: Map<string, HTMLImageElement | undefined>, family: string): void {

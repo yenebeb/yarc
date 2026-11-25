@@ -342,6 +342,7 @@ Decided with the maintainer on 2026-11-25. The board stays freeform; text become
 
 ### 9.1 Decisions
 
+- **A quote is a note with a `source`.** "Add Selection to Canvas" (page context menu, when text is selected, beside Add Image to Canvas) queues `{ quote, source }` in the canvas's inbox, next to the pictures; the canvas page places it as a note (`card: true`, `wrapWidth: 280`, the selection as its text, at most 5000 characters) and draws the same footer as a capture card inside it: favicon, title, and a button that opens the page. Main reads the whole selection from the page in an isolated world, because Chromium cuts the text its menu holds short. While the note is being typed in, its footer is hidden; it comes back when the typing ends. A PNG export draws the title under a rule, without the icon or the button. Not in incognito windows, like Add Image.
 - **Plain text, not rich text.** A text stays a string. Line prefixes are drawn when it isn't being edited; while editing, the raw text shows. No bold or italic. Copying a note gives Markdown-like text. Arc's `richText` Easel objects (5.3) import without their formatting.
 - **One item kind.** A note is a `TextItem` with two more optional fields, not a new kind:
 
@@ -356,10 +357,12 @@ Decided with the maintainer on 2026-11-25. The board stays freeform; text become
     wrapWidth?: number
     /** Drawn on a card: a note. */
     card?: boolean
+    /** The page a quote came from, shown as the note's footer. */
+    source?: CaptureSource
   }
   ```
 
-  The two are independent: a wrapped text without a card is a paragraph on the board. `isBoardItem` accepts both. An older build drops nothing: it ignores fields it doesn't know.
+  The first two are independent: a wrapped text without a card is a paragraph on the board. `isBoardItem` accepts all three (a `source` needs a `url` and a `title`, like a capture card's). An older build drops nothing: it ignores fields it doesn't know.
 
 ### 9.2 Behaviour
 
@@ -387,7 +390,7 @@ Built with the notes: the Note tool in the text group. Not built yet: list, chec
 ### 9.4 Order
 
 1. Wrapping text, the Note tool, lines, the keys, export, the grid and the hint (one PR, with a spotlight card). Built: the line rules are in `src/shared/canvas-notes.ts`.
-2. "Add Selection to Canvas" in a page's context menu: a quote note with the same source footer as a capture card, through the inbox. ⌘F on a canvas finds in its texts and pans to each match (built, below). Canvases by name in the command bar.
+2. Built: "Add Selection to Canvas" in a page's context menu (a quote note with the same source footer as a capture card, through the inbox; see 9.1), ⌘F on a canvas (below) and canvases by name in the command bar (below).
 3. A canvas as a split pane, to write next to the page being read. Biggest piece: splits only hold tabs today. Planned in section 10: about 2½ weeks.
 
 Find on a canvas (built 2026-11-25): ⌘F opens a small bar at the top of the canvas page, not the app's find bar, which belongs to the overlay and drives a web page's own `findInPage`. Main sends ⌘F, ⌘G and ⇧⌘G to the canvas page when no tab is showing (`CANVAS_FIND_OPS` in `browser.ts`). It searches the texts only, ignoring case; each text that holds the words once or more is one match, in reading order (top to bottom, then left to right; `textsHolding` in `src/shared/canvas-find.ts`). The shown match is outlined and put in the middle of the window at the current zoom (smaller only if it doesn't fit); the other matches get a dashed outline. Enter and ⇧Enter go on and back and wrap round at the ends, Escape closes. Selection and undo are not touched. Not searched: the footers of cards and quotes, and the words inside pictures.

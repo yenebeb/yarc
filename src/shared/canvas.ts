@@ -25,7 +25,7 @@ export interface CanvasImage {
 }
 
 /** Main can't lay out a board, so the canvas page places these. */
-export interface InboxItem {
+export interface InboxPicture {
   fileId: string
   mimeType: string
   dataURL: string
@@ -33,6 +33,18 @@ export interface InboxItem {
   height: number
   data: YarcImageData
 }
+
+/** Selected text from a page: it becomes a note with `source` as its footer. */
+export interface InboxQuote {
+  quote: string
+  source: CaptureSource
+}
+
+export type InboxItem = InboxPicture | InboxQuote
+/** What waits in `inbox.json`: a picture's file is read when it is taken. */
+export type QueuedInboxItem = Omit<InboxPicture, 'dataURL'> | InboxQuote
+
+export const MAX_QUOTE_LENGTH = 5000
 
 /** `ink` is black on a light board and white on a dark one. */
 export const COLORS = ['ink', 'grey', 'red', 'orange', 'yellow', 'green', 'blue', 'purple'] as const
@@ -90,6 +102,8 @@ export interface TextItem extends ItemBox {
   wrapWidth?: number
   /** Drawn on a card: a note. */
   card?: boolean
+  /** The page a quote came from, shown as the note's footer (docs/canvas.md 9.1). */
+  source?: CaptureSource
 }
 
 export interface ShapeItem extends ItemBox {
@@ -160,7 +174,7 @@ const isShape = (item: Fields) => isColor(item.color) && typeof item.fill === 'b
 const isOptionalWrapWidth = (value: unknown) => value === undefined || (isRealNumber(value) && value > 0)
 const isOptionalFlag = (value: unknown) => value === undefined || typeof value === 'boolean'
 const isText = (item: Fields) =>
-  typeof item.text === 'string' && TEXT_SIZES.some((size) => size === item.size) && isColor(item.color) && isOptionalWrapWidth(item.wrapWidth) && isOptionalFlag(item.card)
+  typeof item.text === 'string' && TEXT_SIZES.some((size) => size === item.size) && isColor(item.color) && isOptionalWrapWidth(item.wrapWidth) && isOptionalFlag(item.card) && isOptionalSource(item.source)
 
 const HAS_ITS_OWN_FIELDS: Record<string, (item: Fields) => boolean> = {
   capture: (item) => isFileId(item.fileId) && isOptionalSource(item.source),
