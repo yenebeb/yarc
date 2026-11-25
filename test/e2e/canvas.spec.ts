@@ -180,6 +180,17 @@ test.describe('the bars around the board', () => {
     expect(await boxOf(selectTool)).toEqual(before)
   })
 
+  test('a selection’s colors and text sizes sit right above it', async () => {
+    const canvas = await openCanvas('Style bar')
+    const title = await boxOf(texts(canvas.board))
+    await canvas.board.mouse.click(title.x + title.width / 2, title.y + title.height / 2)
+    const styleBar = await boxOf(canvas.board.locator('.stylebar'))
+    const gapAboveTitle = title.y - (styleBar.y + styleBar.height)
+    expect(gapAboveTitle).toBeGreaterThan(0)
+    expect(gapAboveTitle).toBeLessThan(40)
+    await expect(canvas.board.locator('.stylebar .size')).toHaveText(['Body', 'Heading', 'Title'])
+  })
+
   test('Find in Page opens nothing on a canvas, which has no page to search', async () => {
     await openCanvas('Nothing to find')
     await app.evaluate(async () => {

@@ -375,10 +375,13 @@ Decided with the maintainer on 2026-11-25. The board stays freeform; text become
 
 ### 9.3 Look
 
-- The style bar moves from above the toolbar to above the selection, and S/M/L become Body, Heading and Title, with list, checkbox and link buttons.
-- Toolbar groups: select and hand, text and note, shapes, image.
-- A faint dot grid on the board, so panning an empty part shows movement.
+Built (2026-11-25):
+- The style bar sits beside the selection: above it, below it when there's no room above, never out of the window (`placeBarBy`). With nothing selected it shows what the chosen tool will draw with, above the toolbar. Text sizes read Body, Heading and Title.
+- Toolbar groups: select and hand, text, shapes, image.
+- A faint dot grid on the board, so panning an empty part shows movement; zoomed far out, every fourth dot is left.
 - The empty hint also says "Double-click anywhere to write".
+
+With the notes themselves: the Note tool in the text group, and list, checkbox and link buttons on the style bar.
 
 ### 9.4 Order
 

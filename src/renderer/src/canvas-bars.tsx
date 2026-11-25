@@ -1,19 +1,30 @@
-import { COLORS, TEXT_SIZES, type BoardItem, type TextItem } from '../../shared/canvas'
+import { Fragment, useLayoutEffect, useRef, useState } from 'react'
+import { COLORS, TEXT_SIZES, type BoardItem, type Box, type TextItem } from '../../shared/canvas'
 import { cx } from './api'
 import { hasColor, type Style, type Tool } from './canvas-board'
 import { paint, TEXT } from './canvas-item'
 import { shortcut } from './canvas-menu'
+import { placeBarBy, type Point } from './canvas-view'
 import { Icon, type IconName } from './icons'
 
-export const TOOLS: { tool: Tool; icon: IconName; label: string; key: string }[] = [
-  { tool: 'select', icon: 'pointer', label: 'Select', key: 'V' },
-  { tool: 'hand', icon: 'hand', label: 'Move the board', key: 'H' },
-  { tool: 'text', icon: 'text', label: 'Text', key: 'T' },
-  { tool: 'rect', icon: 'rectangle', label: 'Rectangle', key: 'R' },
-  { tool: 'ellipse', icon: 'ellipse', label: 'Ellipse', key: 'O' },
-  { tool: 'arrow', icon: 'arrow', label: 'Arrow', key: 'A' },
-  { tool: 'draw', icon: 'pen', label: 'Draw', key: 'P' }
+type ToolButton = { tool: Tool; icon: IconName; label: string; key: string }
+
+const TOOL_GROUPS: ToolButton[][] = [
+  [
+    { tool: 'select', icon: 'pointer', label: 'Select', key: 'V' },
+    { tool: 'hand', icon: 'hand', label: 'Move the board', key: 'H' }
+  ],
+  [{ tool: 'text', icon: 'text', label: 'Text', key: 'T' }],
+  [
+    { tool: 'rect', icon: 'rectangle', label: 'Rectangle', key: 'R' },
+    { tool: 'ellipse', icon: 'ellipse', label: 'Ellipse', key: 'O' },
+    { tool: 'arrow', icon: 'arrow', label: 'Arrow', key: 'A' },
+    { tool: 'draw', icon: 'pen', label: 'Draw', key: 'P' }
+  ]
 ]
+export const TOOLS = TOOL_GROUPS.flat()
+const ROOM_FOR_TOOLBAR = 68
+const SMALLEST_SIZE_FIRST = [...TEXT_SIZES].reverse()
 
 const DRAWS_IN_COLOR: Tool[] = ['text', 'rect', 'ellipse', 'arrow', 'draw']
 const isShape = (item: BoardItem) => item.kind === 'rect' || item.kind === 'ellipse'
@@ -21,10 +32,15 @@ const isShape = (item: BoardItem) => item.kind === 'rect' || item.kind === 'elli
 export function Toolbar({ tool, onTool, onPickImage }: { tool: Tool; onTool: (tool: Tool) => void; onPickImage: () => void }) {
   return (
     <div className="toolbar" onPointerDown={(event) => event.stopPropagation()}>
-      {TOOLS.map((entry) => (
-        <button key={entry.tool} className={cx(tool === entry.tool && 'on')} title={`${entry.label} (${entry.key})`} onClick={() => onTool(entry.tool)}>
-          <Icon name={entry.icon} size={18} />
-        </button>
+      {TOOL_GROUPS.map((group, groupIndex) => (
+        <Fragment key={groupIndex}>
+          {group.map((entry) => (
+            <button key={entry.tool} className={cx(tool === entry.tool && 'on')} title={`${entry.label} (${entry.key})`} onClick={() => onTool(entry.tool)}>
+              <Icon name={entry.icon} size={18} />
+            </button>
+          ))}
+          <span className="toolbar-line" />
+        </Fragment>
       ))}
       <button title="Image from a file (I)" onClick={onPickImage}>
         <Icon name="image" size={18} />
@@ -33,8 +49,32 @@ export function Toolbar({ tool, onTool, onPickImage }: { tool: Tool; onTool: (to
   )
 }
 
-/** Shows the selection's color, fill and text size, or the ones the chosen tool will draw with. */
-export function StyleBar({ tool, chosen, style, dark, onRestyle }: { tool: Tool; chosen: BoardItem[]; style: Style; dark: boolean; onRestyle: (next: Partial<Style>) => void }) {
+/** The selection's color, fill and text size, beside the selection; with nothing selected, what the chosen tool will draw with, above the toolbar. */
+export function StyleBar({
+  tool,
+  chosen,
+  selectionOnScreen,
+  style,
+  dark,
+  onRestyle
+}: {
+  tool: Tool
+  chosen: BoardItem[]
+  selectionOnScreen: Box | undefined
+  style: Style
+  dark: boolean
+  onRestyle: (next: Partial<Style>) => void
+}) {
+  const bar = useRef<HTMLDivElement>(null)
+  const [besideSelection, setBesideSelection] = useState<Point>()
+  useLayoutEffect(() => {
+    const page = bar.current?.offsetParent
+    if (!bar.current || !page || !selectionOnScreen) return setBesideSelection(undefined)
+    const barSize = { width: bar.current.offsetWidth, height: bar.current.offsetHeight }
+    const spot = placeBarBy(selectionOnScreen, barSize, { width: page.clientWidth, height: page.clientHeight - ROOM_FOR_TOOLBAR })
+    setBesideSelection((current) => (current?.x === spot.x && current.y === spot.y ? current : spot))
+  })
+
   const colored = chosen.filter(hasColor)
   if (!DRAWS_IN_COLOR.includes(tool) && !colored.length) return null
   const showFill = tool === 'rect' || tool === 'ellipse' || chosen.some(isShape)
@@ -44,7 +84,12 @@ export function StyleBar({ tool, chosen, style, dark, onRestyle }: { tool: Tool;
   const currentFill = firstShape && (firstShape.kind === 'rect' || firstShape.kind === 'ellipse') ? firstShape.fill : style.fill
   const currentSize = chosen.find((item): item is TextItem => item.kind === 'text')?.size ?? style.textSize
   return (
-    <div className="toolbar stylebar" onPointerDown={(event) => event.stopPropagation()}>
+    <div
+      ref={bar}
+      className={cx('toolbar', 'stylebar', besideSelection && 'beside-selection')}
+      style={besideSelection ? { left: besideSelection.x, top: besideSelection.y } : undefined}
+      onPointerDown={(event) => event.stopPropagation()}
+    >
       {COLORS.map((color) => (
         <button key={color} className={cx('swatch', currentColor === color && 'on')} title={color} onClick={() => onRestyle({ color })}>
           <span style={{ background: paint(color, dark) }} />
@@ -61,9 +106,9 @@ export function StyleBar({ tool, chosen, style, dark, onRestyle }: { tool: Tool;
       {showSizes ? (
         <>
           <span className="toolbar-line" />
-          {TEXT_SIZES.map((size) => (
-            <button key={size} className={cx('size', currentSize === size && 'on')} title={TEXT[size].label} onClick={() => onRestyle({ textSize: size })}>
-              {size === 'title' ? 'L' : size === 'heading' ? 'M' : 'S'}
+          {SMALLEST_SIZE_FIRST.map((size) => (
+            <button key={size} className={cx('size', currentSize === size && 'on')} onClick={() => onRestyle({ textSize: size })}>
+              {TEXT[size].label}
             </button>
           ))}
         </>

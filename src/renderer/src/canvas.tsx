@@ -12,7 +12,7 @@ import { DRAW_STROKE, ItemView, paint } from './canvas-item'
 import { Menu, menuEntries } from './canvas-menu'
 import { SelectionOverlay } from './canvas-overlay'
 import { useTextEditing } from './canvas-text-editing'
-import { toWorld, type Point, type View } from './canvas-view'
+import { gridBackground, toScreen, toWorld, type Point, type View } from './canvas-view'
 import { Icon } from './icons'
 import './canvas.css'
 
@@ -301,6 +301,7 @@ function BoardView({ loaded }: { loaded: CanvasLoad }) {
       <div
         ref={boardRef}
         className={cx('board', `tool-${tool}`, panning && 'panning')}
+        style={gridBackground(view)}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
@@ -343,6 +344,8 @@ function BoardView({ loaded }: { loaded: CanvasLoad }) {
         <SelectionOverlay chosen={chosenItems} view={view} guides={guides} marquee={marquee} editing={!!editing} />
         {empty ? (
           <div className={cx('empty-hint', !hintAt && 'centered')} style={hintAt ?? { left: '50%', top: '50%' }}>
+            Double-click anywhere to write.
+            <br />
             Capture part of any page with <kbd>{loaded.captureKey}</kbd>, or right-click an image and choose <b>Add Image to Canvas</b>.
             <br />
             You can also paste or drop images here.
@@ -351,7 +354,7 @@ function BoardView({ loaded }: { loaded: CanvasLoad }) {
       </div>
 
       <Toolbar tool={tool} onTool={setTool} onPickImage={pickImage} />
-      <StyleBar tool={tool} chosen={chosenItems} style={style} dark={dark} onRestyle={restyle} />
+      <StyleBar tool={tool} chosen={chosenItems} selectionOnScreen={boundsOf(chosenItems.map((item) => toScreen(item, view)))} style={style} dark={dark} onRestyle={restyle} />
       <ZoomBar zoom={view.zoom} onZoomBy={zoomBy} onActualSize={() => zoomAt(middle(), 1)} />
 
       <button

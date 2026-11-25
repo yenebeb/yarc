@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { describe, test } from 'node:test'
 import { arrangeInGrid, freeSpot, isBoardItem, MAX_PLACED, placedSize, placeNext, resized, snapMove, withBox, type BoardItem } from '../../src/shared/canvas.ts'
 import { CanvasFiles, emptyOldTrash } from '../../src/main/canvas-store.ts'
+import { placeBarBy } from '../../src/renderer/src/canvas-view.ts'
 
 const GAP = 24
 const DAY = 86_400_000
@@ -161,6 +162,30 @@ describe('what the board takes from a clipboard or a saved canvas', () => {
 
   test('refuses a picture whose file id could be a path', () => {
     assert.equal(isBoardItem({ id: 'picture', kind: 'image', ...place, fileId: '../../Cookies' }), false)
+  })
+})
+
+describe('where the bar with colors goes for a selection', () => {
+  const GAP = 14
+  const EDGE = 8
+  const bar = { width: 300, height: 44 }
+  const window = { width: 1000, height: 700 }
+  const selectionAt = (x: number, y: number) => ({ x, y, width: 200, height: 100 })
+
+  test('centered above the selection, a gap away', () => {
+    const selection = selectionAt(400, 300)
+    const middleOfSelection = selection.x + selection.width / 2
+    assert.deepEqual(placeBarBy(selection, bar, window), { x: middleOfSelection - bar.width / 2, y: selection.y - GAP - bar.height })
+  })
+
+  test('below the selection when there is no room above it', () => {
+    const atTheTop = selectionAt(400, 20)
+    assert.equal(placeBarBy(atTheTop, bar, window).y, atTheTop.y + atTheTop.height + GAP)
+  })
+
+  test('kept inside the window when the selection is at its left or right side', () => {
+    assert.equal(placeBarBy(selectionAt(0, 300), bar, window).x, EDGE)
+    assert.equal(placeBarBy(selectionAt(window.width - 200, 300), bar, window).x, window.width - bar.width - EDGE)
   })
 })
 

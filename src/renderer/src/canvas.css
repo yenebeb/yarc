@@ -21,6 +21,7 @@ body {
   --line: rgb(127 127 127 / 0.2);
   --hover: rgb(127 127 127 / 0.12);
   --shadow: 0 1px 3px rgb(0 0 0 / 0.08), 0 6px 20px rgb(0 0 0 / 0.1);
+  --dot: rgb(127 127 127 / 0.3);
   position: relative;
   background: var(--board);
   color: var(--chrome-text);
@@ -51,6 +52,7 @@ body {
   inset: 0;
   /* Not hidden: a hidden box still scrolls to follow the caret of a text being typed, which moves the whole board. */
   overflow: clip;
+  background-image: radial-gradient(circle at 1px 1px, var(--dot) 1px, transparent 1.5px);
   touch-action: none;
   cursor: default;
 }
@@ -334,6 +336,11 @@ svg.draft path {
   bottom: 68px;
 }
 
+.stylebar.beside-selection {
+  bottom: auto;
+  transform: none;
+}
+
 .toolbar button,
 .zoombar button,
 .board-menu-button {
@@ -404,8 +411,8 @@ svg.draft path {
 }
 
 .toolbar .size {
-  min-width: 30px;
-  font-weight: 600;
+  padding: 0 9px;
+  font-weight: 500;
 }
 
 .zoombar {
