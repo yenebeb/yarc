@@ -326,6 +326,69 @@ Sizes are for one person who knows the codebase, including unit and e2e tests, a
 - SVG with links, PDF, single-file HTML, all saved as local files (section 6).
 - No sharing: no server, uploads or share links.
 
+### Phase N: notes on the board (decided 2026-11-25, not built)
+
+A canvas should also be a good place to write. Fixes that came first: PR #132 (text saved as it's typed, paste, undo) and PR #133 (`canvas.tsx` split by responsibility). Section 9 has the design.
+
 ### Open questions for the maintainer
 1. Canvases in incognito: none (simplest), or in-memory?
 2. Should a canvas be allowed in Today, or pinned only?
+
+---
+
+## 9. Notes on the board
+
+Decided with the maintainer on 2026-11-25. The board stays freeform; text becomes good enough to take notes with. What was wrong before: a text was one endless line (a pasted paragraph came out 1359 px wide on a 1280 px board), and nothing in a text had structure.
+
+### 9.1 Decisions
+
+- **Plain text, not rich text.** A text stays a string. Line prefixes are drawn when it isn't being edited; while editing, the raw text shows. No bold or italic. Copying a note gives Markdown-like text. Arc's `richText` Easel objects (5.3) import without their formatting.
+- **One item kind.** A note is a `TextItem` with two more optional fields, not a new kind:
+
+  ```ts
+  export interface TextItem extends ItemBox {
+    kind: 'text'
+    text: string
+    size: TextSize
+    color: Color
+    title?: boolean
+    /** Lines wrap at this width; without it the text is as wide as its longest line (titles, labels). */
+    wrapWidth?: number
+    /** Drawn on a card: a note. */
+    card?: boolean
+  }
+  ```
+
+  The two are independent: a wrapped text without a card is a paragraph on the board. `isBoardItem` accepts both. An older build drops nothing: it ignores fields it doesn't know.
+
+### 9.2 Behaviour
+
+- **Width.** A selected text gets a handle on its left and right side; dragging one sets `wrapWidth` (a text without one gets it on the first drag). Height follows the text. A pasted text with a line longer than about 60 characters gets `wrapWidth: 420`.
+- **Note tool (N).** A click places a note (`card`, `wrapWidth: 280`) and starts typing. The text tool (T) keeps making a plain label; dragging with it makes a wrapped text of the dragged width.
+- **Lines**, drawn when not editing:
+  - `- ` or `* ` at the start: a bullet.
+  - `[ ] ` and `[x] `: a checkbox. A click on it toggles it (one undo step) without starting an edit.
+  - `# `: a heading inside the note (heavier, one size up).
+  - A URL: a link. ⌘-click (Ctrl-click) opens it in Peek; a plain click selects the note as usual.
+- **Keys while typing.** Enter continues a list or checklist; Enter on an empty list line ends it. Tab and Shift+Tab indent a list line (Tab already inserts a tab elsewhere).
+- **PNG export** draws wrapped lines, bullets and checkboxes itself (`canvas-png.ts` breaks lines with `measureText`).
+
+### 9.3 Look
+
+- The style bar moves from above the toolbar to above the selection, and S/M/L become Body, Heading and Title, with list, checkbox and link buttons.
+- Toolbar groups: select and hand, text and note, shapes, image.
+- A faint dot grid on the board, so panning an empty part shows movement.
+- The empty hint also says "Double-click anywhere to write".
+
+### 9.4 Order
+
+1. Wrapping text, the Note tool, lines, the keys, export, the grid and the hint (one PR, with a spotlight card).
+2. "Add Selection to Canvas" in a page's context menu: a quote note with the same source footer as a capture card, through the inbox. ⌘F on a canvas finds in its text and pans to each match (today it does nothing). Canvases by name in the command bar.
+3. A canvas as a split pane, to write next to the page being read. Biggest piece: splits only hold tabs today. Not sized.
+
+### 9.5 Open
+
+- Whether split view (step 3) is in scope.
+- Spellcheck is off for every UI page (`uiWebPreferences`). On macOS it's free; on Windows Electron downloads dictionaries from Google's servers, which may not fit "nothing collected".
+- A pasted clip is checked item by item (`isBoardItem`) but may still carry `live: true`, which loads its page at once. A page can put a clip on the clipboard, so paste should drop `live`.
+- An item the board can't draw is dropped at load and gone after the next save. That matters only if an older build opens a canvas with a newer item kind.
