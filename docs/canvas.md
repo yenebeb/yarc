@@ -388,10 +388,92 @@ Built with the notes: the Note tool in the text group. Not built yet: list, chec
 
 1. Wrapping text, the Note tool, lines, the keys, export, the grid and the hint (one PR, with a spotlight card). Built: the line rules are in `src/shared/canvas-notes.ts`.
 2. "Add Selection to Canvas" in a page's context menu: a quote note with the same source footer as a capture card, through the inbox. ⌘F on a canvas finds in its text and pans to each match (today it does nothing). Canvases by name in the command bar.
-3. A canvas as a split pane, to write next to the page being read. Biggest piece: splits only hold tabs today. Not sized.
+3. A canvas as a split pane, to write next to the page being read. Biggest piece: splits only hold tabs today. Planned in section 10: about 2½ weeks.
 
 ### 9.5 Open
 
-- Whether split view (step 3) is in scope.
+- Whether split view (step 3) is in scope. Section 10 has the design, a size and its own open questions.
 - Spellcheck is off for every UI page (`uiWebPreferences`). On macOS it's free; on Windows Electron downloads dictionaries from Google's servers, which may not fit "nothing collected".
 - An item the board can't draw is dropped at load and gone after the next save. That matters only if an older build opens a canvas with a newer item kind.
+
+---
+
+## 10. A canvas in a split pane
+
+Planned 2026-11-25, not decided (9.5): step 3 of 9.4. The use is reading a page with a canvas beside it to write notes, capture parts of the page and drop them where they belong, without switching back and forth.
+
+### 10.1 Recommendation: a canvas is a pane like a tab
+
+A split pane holds an item id (`SplitPane.itemId`), and a canvas id is an item id in the same space. So a canvas becomes something a split can hold, next to tabs, with everything splits already do: drag to split, the drop zones, resize, flip, move, Separate, Close Split, the pane bar, one split per window per space, restored after a relaunch.
+
+Options considered:
+
+- **A canvas as a split pane (recommended).** Reuses the split layout, its persistence and its menus; a Mac user who split Easels with tabs in Arc finds it where they expect it. Costs: every place that assumes a pane is a `LiveTab` has to accept a canvas (10.3, 10.4).
+- **A notes drawer per window**: a canvas docked to one side that stays while you switch tabs. Better for notes across several pages, but it's a second layout system beside splits (its own resize, persistence in `WindowView`, drop zones, how it combines with a split, Peek and full screen) for one feature. If people want notes to stay across tabs, the split can learn that instead (question 1 in 10.7).
+- **The canvas in Peek or a Little Window.** Nothing new to lay out, but Peek dims and covers the page, and a Little Window is a separate OS window to arrange. Neither is "beside".
+
+### 10.2 What the user does
+
+In:
+- Drag a canvas's sidebar row onto the page's split drop zones, as with a tab.
+- **Open Canvas Beside ▸** in a tab's context menu and the pane bar's split menu: the space's canvases, most recently used first, then New Canvas. A new canvas opens beside with its name being edited, as from the sidebar.
+- The command bar's split target (⌃⇧= today) lists canvases by name once 9.4 step 2 puts them in the command bar.
+
+Out:
+- Separate from Split or Close Split, as for tabs. The canvas stays pinned and keeps its board.
+- ⌘W in the canvas pane takes the canvas out of the split and leaves the tab; ⌘W in the tab pane closes the tab, and the canvas is shown alone (`nextActiveAfter` picks the split partner already).
+- Deleting the canvas or moving it to another space takes it out of every split, as closing or moving a tab does.
+
+At most one canvas per split. Two boards side by side have no use we know of, and a capture from the split's page then has one obvious target (10.5).
+
+### 10.3 State, persistence and layout
+
+**State.** No new fields. `Space.splits` and `WindowView.splits` already store pane ids; a canvas id fits. What changes is the code that checks a pane is a tab: `selectedIn` and `splitsIn` in `window-state.ts` drop ids that aren't in `spaceItems` (tabs only), so they need the space's canvases too. The selection half of that is a bug today: a selected canvas is dropped whenever another window is focused, and at relaunch. `splitWith`, `placeInSplit` and the layout use `findItem` and need the same.
+
+**Older builds.** An older build opening a `state.json` with a canvas pane drops that pane in `splitsIn` and the split with it, since it has one tab left. Nothing breaks and no migration is needed.
+
+**Layout.** `layout()` has three branches today (full screen, a canvas, tabs or a split). It becomes two: full screen, or the panes of the active item's split (one pane when there's none), where a pane's view is the tab's view or the canvas's `stage`. A canvas pane gets the pane bar like a tab: the canvas's name and icon, the split menu, the board's background color instead of a sampled page color.
+
+**The canvas page in a pane.** `CanvasPage.stage` is already a plain `View` that sizes the page to its own bounds, and the live cards are its children, so it goes into a pane rect as it goes into the whole content rect. What a pane changes:
+- **Live cards' clipping.** A live view is the card's box cut to the board's rect (`intersect` in `capture-live.ts`), both in the stage's coordinates, so a narrower pane clips them correctly already. A view doesn't clip its children on macOS, which is why that cut matters; it has to be checked with a card half off the pane's edge, on both platforms.
+- **Resizing.** Dragging the divider resizes the stage on every frame. The board keeps its pan (its top-left stays put), so items don't slide while the divider moves; the page sends the live cards' boxes again as it already does on resize.
+- **Narrow panes.** The toolbar and the style bar need about 360 px. A canvas pane gets that as its minimum width (`dragBorder` has 15 % of the split today); below that the toolbar can't fit.
+- **Toolbars under live cards.** A live view drawn over the toolbars is a known gap (4.1). A narrow pane makes it more likely, so it's fixed in this work: the page cuts the toolbars' rects out of a live card's clip.
+
+### 10.4 Focus and shortcuts
+
+- Clicking into the canvas pane makes it the split's active item, as `onTabFocus` does for a tab; the canvas page's webContents gets the same `focus` handler.
+- Shortcuts reach the canvas through its `before-input-event` as today, and it keeps ⌘D and ⌘± for itself (`CANVAS_KEYS`).
+- Commands that need a page (⌘R, ⌘[ / ⌘], ⌘⇧C, ⌘L to edit the URL) act on the split's tab while the canvas pane is focused: the canvas has no URL or history of its own, and the user means the page beside it.
+- ⌘F finds in whichever pane is focused (9.4 step 2 gives a canvas its own find).
+
+### 10.5 What needs care
+
+**Capturing into the canvas beside.** Capture (⌘⇧2) captures the split's tab even when the canvas pane is focused (`startCapture` uses the active tab today, which would be the canvas). The Send To list puts the canvas beside first. A capture or an "Add Selection to Canvas" (9.4 step 2) that goes to the canvas beside lands where the user can see it: at the middle of the board's visible part, selected, without the "Added to" toast. Dragging an image or a link from the page pane onto the canvas pane is a normal OS drop between two views; it should work already and needs testing.
+
+**A second window showing the same split.** A canvas is in one window at a time, as a tab is (5.2). The focused window takes the stage; the other window marks the pane `elsewhere` and shows a still, as for a tab: `lend()` and `Mirror` look up `LiveTab`s today and need to accept the canvas page's webContents. The still is the page without its live cards (they are other webContents), so live cards show their last picture there. Clicking the still or focusing that window takes the canvas back, and its live cards load again (`setShown`).
+
+**Incognito.** No. An incognito window has no canvases (Open Canvas Beside isn't shown, and a canvas row dragged from a normal window's sidebar onto an incognito page does nothing), because a capture from an incognito page beside a canvas would write that page to disk.
+
+**Profiles.** A split's tab may be a favorite of the space's profile; the canvas loads its live cards with the space's profile (5.2), so both panes use the same sign-ins. Nothing new.
+
+**Cost.** A split with a canvas keeps the canvas page and its live views alive while the split is shown. That is what showing the canvas alone does today; rule 2 of 4.1 still closes them when the split isn't shown.
+
+### 10.6 Steps and size
+
+Sizes as in section 8: one person who knows the codebase, with unit and e2e tests and the macOS + Windows check.
+
+1. **A canvas id in a split** (3–4 days): `window-state.ts`, `splitWith` / `placeInSplit`, one layout path for tabs and the canvas stage, the canvas pane bar, the 360 px minimum, out of splits on delete and move. Fixes the canvas selection being dropped (10.3) on the way. Unit tests for `window-state.ts` and `split.ts`; e2e: a canvas beside a tab survives a window switch and a relaunch.
+2. **Ways in and out** (2–3 days): drag a canvas row onto the drop zones, Open Canvas Beside ▸, ⌘W in each pane, the sidebar's split row drawing a canvas next to a tab, the command bar's split target once 9.4 step 2 is in.
+3. **Focus, shortcuts and capture** (2–3 days): focus switching, page commands going to the tab, Capture and Add Selection targeting the canvas beside and landing in view.
+4. **Second window** (1–2 days): `lend()` and `Mirror` for the canvas page, live cards coming back when the canvas does.
+5. **Narrow panes and polish** (2 days): toolbars cut out of live cards' clips, live-card clipping checked on macOS and Windows, the drag-and-drop check, a spotlight card.
+
+Total: 10–14 days, about 2½ weeks. Steps 1 and 2 together are usable on their own; 3 is what makes it a note-taking tool.
+
+### 10.7 Open questions for the maintainer
+
+1. Selecting another tab in the sidebar leaves the split today. With a canvas in the split, should it instead replace the split's tab, so the notes stay while reading several pages? It's what makes the split feel like a notes drawer (10.1), and costs about 2 days more.
+2. Is one canvas per split the right limit?
+3. Should page commands (⌘R, ⌘L, back and forward) go to the split's tab when the canvas pane is focused (10.4), or do nothing there?
+4. Which side does Open Canvas Beside put the canvas on: always the right, or the side away from the sidebar (`sidebarRight`)?
