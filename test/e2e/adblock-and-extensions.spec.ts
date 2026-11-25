@@ -3,7 +3,7 @@ import { chmodSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from '
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { createHash, generateKeyPairSync } from 'node:crypto'
-import { app, base, dispatch, hits, pageWithUrl, space, state, useApp, userData } from './app'
+import { app, base, dispatch, hits, overlayKind, pageWithUrl, space, state, useApp, userData } from './app'
 
 useApp()
 
@@ -186,6 +186,86 @@ test('only pinned extensions show in the address field, after the puzzle button 
     await pin(second, false)
     await removeExtension(first)
     await removeExtension(second)
+  }
+})
+
+/** Clicking opens an extension popup; it must lie within the main window's width. */
+async function expectPopupInsideWindow(click: () => Promise<void>): Promise<void> {
+  await app.evaluate(() => {
+    const browser = (globalThis as any).arcBrowser
+    browser.extensions.byProfile.get(browser.store.activeSpace.profileId).library.once('browser-action-popup-created', (popup: unknown) => ((globalThis as any).popup = popup))
+  })
+  await click()
+  await expect.poll(() => app.evaluate(() => !!(globalThis as any).popup)).toBe(true)
+  const inside = await app.evaluate(() => {
+    const globals = globalThis as any
+    const popup = globals.popup
+    globals.popup = undefined
+    // A hidden window doesn't render under test, so the popup never reports a size: size and place it as the library then would.
+    popup.setSize({ width: 300, height: 200 })
+    popup.updatePosition()
+    const popupBounds = popup.browserWindow.getBounds()
+    const windowBounds = globals.arcBrowser.window.win.getBounds()
+    popup.destroy()
+    return popupBounds.x >= windowBounds.x && popupBounds.x + popupBounds.width <= windowBounds.x + windowBounds.width
+  })
+  expect(inside).toBe(true)
+}
+
+const popupExtensionDir = (name: string) =>
+  extensionDir({ 'manifest.json': { manifest_version: 3, name, version: '1.0', action: { default_popup: 'popup.html' } }, 'popup.html': 'popup' })
+
+test('the extensions popover pins and unpins', async () => {
+  const extId = await loadExtension(popupExtensionDir('popover pin'))
+  const { profileId } = await space()
+  const ui = app.windows().find((page) => page.url().endsWith('index.html'))!
+  const overlay = await pageWithUrl('overlay.html')
+  const pins = async () => (await state()).profiles.find((profile) => profile.id === profileId)!.pinnedExtensions ?? []
+  const inBar = ui.locator(`button[is="browser-action"][id="${extId}"]`)
+  try {
+    await ui.locator('.extensions-button').click()
+    await expect.poll(overlayKind).toBe('extensions')
+    const pin = overlay.locator(`.extension-row[data-id="${extId}"] .pin`)
+    await pin.click()
+    await expect.poll(pins).toContain(extId)
+    await expect(inBar).toBeVisible()
+    await pin.click()
+    await expect.poll(pins).not.toContain(extId)
+    await expect(inBar).toHaveCount(0)
+  } finally {
+    await dispatch({ type: 'overlay', mode: { kind: 'none' } })
+    await removeExtension(extId)
+  }
+})
+
+test('an extension opened from the popover opens inside the window, whichever side the sidebar is on', async () => {
+  const extId = await loadExtension(popupExtensionDir('popover open'))
+  await dispatch({ type: 'open', url: `${base}/popover-open`, where: 'tab' })
+  const tabId = (await space()).activeItemId!
+  const ui = app.windows().find((page) => page.url().endsWith('index.html'))!
+  const overlay = await pageWithUrl('overlay.html')
+  try {
+    for (const sidebarRight of [false, true]) {
+      await dispatch({ type: 'settings', patch: { sidebarRight } })
+      const puzzle = ui.locator('.extensions-button')
+      const width = await ui.evaluate(() => window.innerWidth)
+      await expect.poll(async () => (await puzzle.boundingBox())!.x > width / 2).toBe(sidebarRight)
+      await puzzle.click()
+      await expect.poll(overlayKind).toBe('extensions')
+      await expectPopupInsideWindow(() => overlay.locator(`.extension-row[data-id="${extId}"] button[is="browser-action"]`).click())
+      expect(await overlayKind()).toBe('none')
+    }
+    await dispatch({ type: 'settings', patch: { sidebarVisible: false, sidebarRight: true } })
+    await dispatch({ type: 'sidebarReveal', show: true })
+    await overlay.locator('.extensions-button').click()
+    await expect.poll(overlayKind).toBe('extensions')
+    const card = (await overlay.locator('.extensions-popover').boundingBox())!
+    expect(card.x).toBeGreaterThan((await overlay.evaluate(() => window.innerWidth)) / 2)
+    await expectPopupInsideWindow(() => overlay.locator(`.extension-row[data-id="${extId}"] button[is="browser-action"]`).click())
+  } finally {
+    await dispatch({ type: 'settings', patch: { sidebarVisible: true, sidebarRight: false } })
+    await dispatch({ type: 'close', id: tabId })
+    await removeExtension(extId)
   }
 })
 

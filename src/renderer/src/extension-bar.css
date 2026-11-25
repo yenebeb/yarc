@@ -52,3 +52,65 @@
   align-items: center;
   gap: 2px;
 }
+
+.extensions-popover {
+  position: fixed;
+  padding: 6px;
+  background: var(--panel);
+  border: 1px solid var(--panel-line);
+  border-radius: 12px;
+  box-shadow: var(--shadow-lg);
+  animation: fade 0.12s ease-out;
+}
+
+.extensions-title {
+  padding: 4px 8px 6px;
+  font-size: 12px;
+  font-weight: 600;
+  opacity: 0.7;
+}
+
+.extension-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 4px 6px;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: default;
+}
+
+.extension-row:hover {
+  background: var(--hover);
+}
+
+.extension-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.extension-row.manage {
+  padding-left: 11px;
+  gap: 13px;
+}
+
+.extension-row .pin:not(.on) {
+  opacity: 0.35;
+}
+
+.extension-row:hover .pin:not(.on) {
+  opacity: 0.7;
+}
+
+.extensions-line {
+  height: 1px;
+  margin: 6px 4px;
+  background: var(--panel-line);
+}

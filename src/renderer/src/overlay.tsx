@@ -6,6 +6,7 @@ import { findItem, tabTitle } from '../../shared/tree'
 import type { AppState, ID, Rect } from '../../shared/types'
 import { activeSpace, arc, cx, dispatch, displayHost, isMac, useAppState, useOverlayMode, useSpaceTheme } from './api'
 import { Favicon, Icon } from './icons'
+import { ExtensionsPopover } from './panels/ExtensionsPopover'
 import { Tour, UpdateReady, WhatsNew } from './panels/Intro'
 import { Library } from './panels/Library'
 import { LiveFolderEditor } from './panels/LiveFolderEditor'
@@ -55,6 +56,8 @@ function App() {
           <CommandBar key={freshOnEachOpen} state={state} mode={mode} close={close} />
         </>
       )
+    case 'extensions':
+      return <ExtensionsPopover key={key} state={state} profileId={mode.profileId} anchor={mode.anchor} close={close} />
     case 'settings':
       return (
         <>
