@@ -1,5 +1,5 @@
-import type { CSSProperties } from 'react'
-import { arrowEnds, arrowHead, smoothPath, type ArrowItem, type BoardItem, type CanvasImage, type CardItem, type Color, type DrawItem, type ImageItem, type TextSize } from '../../shared/canvas'
+import { useLayoutEffect, useRef, type CSSProperties, type KeyboardEvent } from 'react'
+import { arrowEnds, arrowHead, smoothPath, type ArrowItem, type BoardItem, type CanvasImage, type CardItem, type Color, type DrawItem, type ImageItem, type TextItem, type TextSize } from '../../shared/canvas'
 import { arc, cx } from './api'
 import { Icon } from './icons'
 
@@ -32,6 +32,62 @@ export function arrowPath(item: ArrowItem): string {
   return `M ${x1} ${y1} L ${x2} ${y2} ${arrowHead(x1, y1, x2, y2)}`
 }
 
+function TextView({
+  item,
+  classes,
+  editing,
+  dark,
+  nodeRef,
+  onTyped,
+  onEdited
+}: {
+  item: TextItem
+  classes: string
+  editing: boolean
+  dark: boolean
+  nodeRef: (node: HTMLElement | null) => void
+  onTyped: (text: string) => void
+  onEdited: () => void
+}) {
+  const textStyle = TEXT[item.size]
+  const node = useRef<HTMLDivElement>(null)
+  // While it's being edited the browser owns the text: React writing each keystroke back would move the caret to the start.
+  useLayoutEffect(() => {
+    if (editing && node.current) node.current.textContent = item.text
+  }, [editing])
+  return (
+    <div
+      ref={(element) => {
+        node.current = element
+        nodeRef(element)
+      }}
+      className={cx(classes, editing && 'editing')}
+      data-id={item.id}
+      style={{ left: item.x, top: item.y, color: paint(item.color, dark), fontSize: textStyle.size, fontWeight: textStyle.weight, lineHeight: LINE_HEIGHT }}
+      contentEditable={editing ? 'plaintext-only' : undefined}
+      suppressContentEditableWarning
+      spellCheck={editing}
+      onInput={editing ? (event) => onTyped(event.currentTarget.innerText.replace(/\n$/, '')) : undefined}
+      onBlur={editing ? onEdited : undefined}
+      onKeyDown={editing ? keepTypingOrFinish : undefined}
+    >
+      {editing ? null : item.text}
+    </div>
+  )
+}
+
+function keepTypingOrFinish(event: KeyboardEvent<HTMLDivElement>): void {
+  const finishes = event.key === 'Escape' || (event.key === 'Enter' && (event.metaKey || event.ctrlKey))
+  if (finishes) {
+    event.preventDefault()
+    event.currentTarget.blur()
+  }
+  if (event.key !== 'Tab') return
+  // Tab would otherwise move focus to the toolbar, which ends the edit.
+  event.preventDefault()
+  document.execCommand('insertText', false, '\t')
+}
+
 export function ItemView({
   item,
   selected,
@@ -39,6 +95,7 @@ export function ItemView({
   dark,
   files,
   nodeRef,
+  onTyped,
   onEdited,
   onPlay
 }: {
@@ -48,7 +105,8 @@ export function ItemView({
   dark: boolean
   files: Map<string, CanvasImage>
   nodeRef: (node: HTMLElement | null) => void
-  onEdited: (text: string) => void
+  onTyped: (text: string) => void
+  onEdited: () => void
   onPlay: () => void
 }) {
   const place: CSSProperties = { left: item.x, top: item.y, width: item.width, height: item.height }
@@ -83,33 +141,7 @@ export function ItemView({
       </div>
     )
   }
-  if (item.kind === 'text') {
-    const textStyle = TEXT[item.size]
-    return (
-      <div
-        ref={nodeRef}
-        className={cx(classes, editing && 'editing')}
-        data-id={item.id}
-        style={{ left: item.x, top: item.y, color: paint(item.color, dark), fontSize: textStyle.size, fontWeight: textStyle.weight, lineHeight: LINE_HEIGHT }}
-        contentEditable={editing ? 'plaintext-only' : undefined}
-        suppressContentEditableWarning
-        spellCheck={editing}
-        onBlur={editing ? (event) => onEdited(event.currentTarget.innerText.replace(/\n$/, '')) : undefined}
-        onKeyDown={
-          editing
-            ? (event) => {
-                if (event.key === 'Escape' || (event.key === 'Enter' && (event.metaKey || event.ctrlKey))) {
-                  event.preventDefault()
-                  event.currentTarget.blur()
-                }
-              }
-            : undefined
-        }
-      >
-        {item.text}
-      </div>
-    )
-  }
+  if (item.kind === 'text') return <TextView item={item} classes={classes} editing={editing} dark={dark} nodeRef={nodeRef} onTyped={onTyped} onEdited={onEdited} />
   if (item.kind === 'rect' || item.kind === 'ellipse') {
     const color = paint(item.color, dark)
     return <div className={classes} data-id={item.id} style={{ ...place, borderColor: color, background: item.fill ? `${color}2e` : 'transparent' }} />

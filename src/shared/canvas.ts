@@ -38,7 +38,8 @@ export interface InboxItem {
 export const COLORS = ['ink', 'grey', 'red', 'orange', 'yellow', 'green', 'blue', 'purple'] as const
 export type Color = (typeof COLORS)[number]
 
-export type TextSize = 'title' | 'heading' | 'body'
+export const TEXT_SIZES = ['title', 'heading', 'body'] as const
+export type TextSize = (typeof TEXT_SIZES)[number]
 
 export interface Box {
   x: number
@@ -137,6 +138,37 @@ export const IMAGE_TYPES: Record<string, string> = {
   'image/avif': 'avif',
   'image/bmp': 'bmp',
   'image/x-icon': 'ico'
+}
+
+type Fields = Record<string, unknown>
+const isFields = (value: unknown): value is Fields => typeof value === 'object' && value !== null
+const isRealNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value)
+const isColor = (value: unknown) => COLORS.some((color) => color === value)
+const isFileId = (value: unknown) => typeof value === 'string' && FILE_ID.test(value)
+const isOptionalText = (value: unknown) => value === undefined || typeof value === 'string'
+const isOptionalSource = (value: unknown) => value === undefined || (isFields(value) && typeof value.url === 'string' && typeof value.title === 'string' && isOptionalText(value.favicon))
+const isShape = (item: Fields) => isColor(item.color) && typeof item.fill === 'boolean'
+
+const HAS_ITS_OWN_FIELDS: Record<string, (item: Fields) => boolean> = {
+  capture: (item) => isFileId(item.fileId) && isOptionalSource(item.source),
+  image: (item) => isFileId(item.fileId),
+  text: (item) => typeof item.text === 'string' && TEXT_SIZES.some((size) => size === item.size) && isColor(item.color),
+  rect: isShape,
+  ellipse: isShape,
+  arrow: (item) => isColor(item.color) && typeof item.flipX === 'boolean' && typeof item.flipY === 'boolean',
+  draw: (item) => isColor(item.color) && Array.isArray(item.points) && item.points.every(isRealNumber) && isRealNumber(item.drawnWidth) && isRealNumber(item.drawnHeight)
+} satisfies Record<BoardItem['kind'], (item: Fields) => boolean>
+
+/** A clipboard or a canvas.json written elsewhere can hold anything, and the board can't draw an item with a field missing. */
+export function isBoardItem(value: unknown): value is BoardItem {
+  if (!isFields(value) || typeof value.id !== 'string' || typeof value.kind !== 'string' || !Object.hasOwn(HAS_ITS_OWN_FIELDS, value.kind)) return false
+  return [value.x, value.y, value.width, value.height].every(isRealNumber) && HAS_ITS_OWN_FIELDS[value.kind](value)
+}
+
+/** `spot`, or the first place a step down and right of it where no item already starts: a second paste doesn't hide the first. */
+export function freeSpot(taken: Box[], spot: { x: number; y: number }, step = 24): { x: number; y: number } {
+  const isTaken = taken.some((box) => Math.abs(box.x - spot.x) < 1 && Math.abs(box.y - spot.y) < 1)
+  return isTaken ? freeSpot(taken, { x: spot.x + step, y: spot.y + step }, step) : spot
 }
 
 /** The full-resolution image is kept. */

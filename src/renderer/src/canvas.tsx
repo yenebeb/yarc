@@ -4,13 +4,16 @@ import {
   arrangeInGrid,
   boundsOf,
   COLORS,
+  freeSpot,
   IMAGE_TYPES,
   intersects,
+  isBoardItem,
   placedSize,
   placeNext,
   resized,
   smoothPath,
   snapMove,
+  TEXT_SIZES,
   withBox,
   type BoardItem,
   type Box,
@@ -31,13 +34,15 @@ import { useBoardHistory, useDarkAppearance, useLiveCards, useSceneSave, useStat
 import { DRAW_STROKE, hasImageFile, ItemView, LINE_HEIGHT, paint, TEXT } from './canvas-item'
 import { Menu, type MenuEntry } from './canvas-menu'
 import { loadImage, renderPng } from './canvas-png'
-import { toScreen, toWorld, type Point, type View } from './canvas-view'
+import { reachesOutBy, toScreen, toWorld, type Point, type View } from './canvas-view'
 import { Icon, type IconName } from './icons'
 import './canvas.css'
 
 const MIN_ZOOM = 0.1
 const MAX_ZOOM = 4
 const SNAP_SCREEN_PX = 6
+const PASTE_STEP = 24
+const CARET_ROOM = { beside: 48, aboveToolbars: 130 }
 const CLIP_TYPE = 'application/x-yarc-canvas'
 
 type Tool = 'select' | 'hand' | 'text' | 'rect' | 'ellipse' | 'arrow' | 'draw'
@@ -67,8 +72,9 @@ const clampZoom = (zoom: number) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoom))
 const hasColor = (item: BoardItem): item is Extract<BoardItem, { color: Color }> => 'color' in item
 const keepsShape = (item: BoardItem) => item.kind === 'capture' || item.kind === 'image'
 const isTyping = (target: EventTarget | null) => target instanceof HTMLElement && (target.isContentEditable || target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')
-const copyOf = (item: BoardItem, offset: number): BoardItem =>
-  item.kind === 'text' ? { ...item, id: newId(), x: item.x + offset, y: item.y + offset, title: false } : { ...item, id: newId(), x: item.x + offset, y: item.y + offset }
+const isBlankText = (item: BoardItem) => item.kind === 'text' && !item.text.trim()
+const copyOf = (item: BoardItem, shift: Point): BoardItem =>
+  item.kind === 'text' ? { ...item, id: newId(), x: item.x + shift.x, y: item.y + shift.y, title: false } : { ...item, id: newId(), x: item.x + shift.x, y: item.y + shift.y }
 
 function readDataURL(file: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -107,7 +113,7 @@ function Board({ loaded }: { loaded: CanvasLoad }) {
     record,
     change,
     undo: undoItems
-  } = useBoardHistory(() => loaded.scene?.items ?? [{ id: newId(), kind: 'text', x: 0, y: 0, width: 0, height: 0, text: loaded.name, size: 'title', color: 'ink', title: true }])
+  } = useBoardHistory(() => loaded.scene?.items.filter(isBoardItem) ?? [{ id: newId(), kind: 'text', x: 0, y: 0, width: 0, height: 0, text: loaded.name, size: 'title', color: 'ink', title: true }])
   const [view, viewRef, setView] = useStateRef<View>(() => loaded.scene?.view ?? { x: 96, y: 96, zoom: 1 })
   const [selected, selectedRef, setSelected] = useStateRef<string[]>([])
   const [snapping, setSnapping] = useState(loaded.scene?.snapping ?? true)
@@ -139,7 +145,7 @@ function Board({ loaded }: { loaded: CanvasLoad }) {
     if (restored) setSelected(selectedRef.current.filter((id) => restored.some((item) => item.id === id)))
   }
 
-  useSceneSave(() => ({ items: itemsRef.current, view: viewRef.current, snapping: snappingRef.current }), files.current, Object.keys(loaded.files))
+  useSceneSave(() => ({ items: itemsRef.current.filter((item) => !isBlankText(item)), view: viewRef.current, snapping: snappingRef.current }), files.current, Object.keys(loaded.files))
 
   useLayoutEffect(() => {
     let changed = false
@@ -169,6 +175,10 @@ function Board({ loaded }: { loaded: CanvasLoad }) {
   const viewSize = () => ({ width: boardRef.current?.clientWidth ?? innerWidth, height: boardRef.current?.clientHeight ?? innerHeight })
   const middle = (): Point => ({ x: viewSize().width / 2, y: viewSize().height / 2 })
   const center = (): Point => toWorld(middle(), viewRef.current)
+  const shownPartOfBoard = (): Box => {
+    const { width, height } = viewSize()
+    return { ...toWorld({ x: 0, y: 0 }, viewRef.current), width: width / viewRef.current.zoom, height: height / viewRef.current.zoom }
+  }
   const zoomAt = (anchor: Point, requestedZoom: number) => {
     const zoom = clampZoom(requestedZoom)
     const anchorInWorld = toWorld(anchor, viewRef.current)
@@ -228,34 +238,46 @@ function Board({ loaded }: { loaded: CanvasLoad }) {
     }
   }
 
+  const pasteClip = (json: string) => {
+    let clip
+    try {
+      clip = JSON.parse(json)
+    } catch {
+      return
+    }
+    const pasted: BoardItem[] = Array.isArray(clip?.items) ? clip.items.filter(isBoardItem) : []
+    const bounds = boundsOf(pasted)
+    if (!bounds) return
+    for (const [id, file] of Object.entries<CanvasImage>(clip.files ?? {})) if (!files.current.has(id)) files.current.set(id, file)
+    pasteCount.current += 1
+    const step = PASTE_STEP * pasteCount.current
+    const middleOfBoard = center()
+    const copiedOutOfSight = !intersects(bounds, shownPartOfBoard())
+    const shift = copiedOutOfSight
+      ? { x: middleOfBoard.x - (bounds.x + bounds.width / 2) + step, y: middleOfBoard.y - (bounds.y + bounds.height / 2) + step }
+      : { x: step, y: step }
+    const copies = pasted.map((item) => copyOf(item, shift))
+    change([...itemsRef.current, ...copies])
+    setSelected(copies.map((item) => item.id))
+  }
+
   const paste = (event: ClipboardEvent) => {
     const data = event.clipboardData
     if (!data) return
     event.preventDefault()
     const ours = data.getData(CLIP_TYPE)
-    if (ours) {
-      try {
-        const clip = JSON.parse(ours) as { items: BoardItem[]; files: Record<string, CanvasImage> }
-        for (const [id, file] of Object.entries(clip.files ?? {})) if (!files.current.has(id)) files.current.set(id, file)
-        pasteCount.current += 1
-        const copies = clip.items.map((item) => copyOf(item, 24 * pasteCount.current))
-        change([...itemsRef.current, ...copies])
-        setSelected(copies.map((item) => item.id))
-      } catch {}
-      return
-    }
+    if (ours) return pasteClip(ours)
     const images = [...data.files].filter((file) => IMAGE_TYPES[file.type])
     if (images.length) return void addImageFiles(images, center())
     const text = data.getData('text/plain').trim()
     if (!text) return
-    const at = center()
-    const textItem: TextItem = { id: newId(), kind: 'text', x: at.x, y: at.y, width: 0, height: 0, text, size: 'body', color: style.color }
+    const textItem: TextItem = { id: newId(), kind: 'text', ...freeSpot(itemsRef.current, center(), PASTE_STEP), width: 0, height: 0, text, size: 'body', color: style.color }
     change([...itemsRef.current, textItem])
     setSelected([textItem.id])
   }
 
   const duplicate = () => {
-    const copies = selectedItems().map((item) => copyOf(item, 16))
+    const copies = selectedItems().map((item) => copyOf(item, { x: 16, y: 16 }))
     if (!copies.length) return
     change([...itemsRef.current, ...copies])
     setSelected(copies.map((item) => item.id))
@@ -316,32 +338,46 @@ function Board({ loaded }: { loaded: CanvasLoad }) {
     setSelected([id])
     setEditing(id)
   }
-  const finishEdit = (id: string, text: string) => {
+  const keepCaretInView = () => {
+    const selection = getSelection()
+    const board = boardRef.current?.getBoundingClientRect()
+    const [caret] = selection?.rangeCount ? selection.getRangeAt(0).getClientRects() : []
+    if (!board || !caret) return
+    const sideways = reachesOutBy(caret.left, caret.right, board.left + CARET_ROOM.beside, board.right - CARET_ROOM.beside)
+    const upOrDown = reachesOutBy(caret.top, caret.bottom, board.top + CARET_ROOM.beside, board.bottom - CARET_ROOM.aboveToolbars)
+    if (sideways || upOrDown) setView({ ...viewRef.current, x: viewRef.current.x - sideways, y: viewRef.current.y - upOrDown })
+  }
+  const typeText = (id: string, text: string) => {
+    setItems(itemsRef.current.map((item) => (item.id === id && item.kind === 'text' ? { ...item, text } : item)))
+    keepCaretInView()
+  }
+  const finishEdit = (id: string) => {
     const before = editBefore.current ?? itemsRef.current
     editBefore.current = undefined
     setEditing(undefined)
-    const wasThere = before.find((item) => item.id === id)
-    if (!text.trim()) {
+    const textIn = (list: BoardItem[]) => list.find((item): item is TextItem => item.id === id && item.kind === 'text')?.text
+    const original = textIn(before)
+    const edited = textIn(itemsRef.current) ?? ''
+    if (!edited.trim()) {
       setItems(itemsRef.current.filter((item) => item.id !== id))
       setSelected([])
-      if (wasThere) record(before)
+      if (original !== undefined) record(before)
       return
     }
-    if (wasThere?.kind === 'text' && wasThere.text === text) return
-    record(before)
-    setItems(itemsRef.current.map((item) => (item.id === id && item.kind === 'text' ? { ...item, text } : item)))
+    if (edited !== original) record(before)
   }
   useEffect(() => {
     if (!editing) return
     const node = nodes.current.get(editing)
     if (!node) return
-    node.focus()
+    node.focus({ preventScroll: true })
     const range = document.createRange()
     range.selectNodeContents(node)
     range.collapse(false)
     const selection = getSelection()
     selection?.removeAllRanges()
     selection?.addRange(range)
+    keepCaretInView()
   }, [editing])
 
   const takeInbox = async () => {
@@ -400,7 +436,13 @@ function Board({ loaded }: { loaded: CanvasLoad }) {
     }
     if (event.button !== 0) return
     event.currentTarget.setPointerCapture(event.pointerId)
-    if (tool === 'text') return startText(worldPoint)
+    const hit = target.closest('[data-id]')?.getAttribute('data-id') ?? undefined
+    if (tool === 'text') {
+      const textUnderPointer = itemsRef.current.find((item) => item.id === hit && item.kind === 'text')
+      if (!textUnderPointer) return startText(worldPoint)
+      setTool('select')
+      return editText(textUnderPointer.id)
+    }
     if (tool === 'rect' || tool === 'ellipse' || tool === 'arrow') {
       const id = newId()
       const base = { id, x: worldPoint.x, y: worldPoint.y, width: 0, height: 0, color: style.color }
@@ -420,7 +462,6 @@ function Board({ loaded }: { loaded: CanvasLoad }) {
       gestureRef.current = { kind: 'resize', start: worldPoint, before: itemsRef.current, id: selectedRef.current[0], handle }
       return
     }
-    const hit = target.closest('[data-id]')?.getAttribute('data-id') ?? undefined
     const now = Date.now()
     const doubleClick = now - lastDown.current.at < 350 && lastDown.current.id === hit
     lastDown.current = { at: now, id: hit }
@@ -580,6 +621,11 @@ function Board({ loaded }: { loaded: CanvasLoad }) {
         else setTool('select')
       })
     }
+    if (event.key === 'Enter') {
+      const [chosen, ...others] = selectedItems()
+      if (chosen?.kind === 'text' && !others.length) run(() => editText(chosen.id))
+      return
+    }
     const step = event.shiftKey ? 10 : 1
     if (event.key === 'ArrowLeft') return run(() => nudge(-step, 0))
     if (event.key === 'ArrowRight') return run(() => nudge(step, 0))
@@ -702,7 +748,8 @@ function Board({ loaded }: { loaded: CanvasLoad }) {
               dark={dark}
               files={files.current}
               nodeRef={(node) => (node ? nodes.current.set(item.id, node) : nodes.current.delete(item.id))}
-              onEdited={(text) => finishEdit(item.id, text)}
+              onTyped={(text) => typeText(item.id, text)}
+              onEdited={() => finishEdit(item.id)}
               onPlay={() => togglePlay(item.id)}
             />
           ))}
@@ -751,35 +798,35 @@ function Board({ loaded }: { loaded: CanvasLoad }) {
         <button title="Image from a file (I)" onClick={() => fileInput.current?.click()}>
           <Icon name="image" size={18} />
         </button>
-        {showColors ? (
-          <>
-            <span className="toolbar-line" />
-            {COLORS.map((color) => (
-              <button key={color} className={cx('swatch', currentColor === color && 'on')} title={color} onClick={() => restyle({ color })}>
-                <span style={{ background: paint(color, dark) }} />
-              </button>
-            ))}
-          </>
-        ) : null}
-        {showFill ? (
-          <>
-            <span className="toolbar-line" />
-            <button className={cx('fill', currentFill && 'on')} title="Fill" onClick={() => restyle({ fill: !currentFill })}>
-              <span style={{ borderColor: paint(currentColor, dark), background: currentFill ? `${paint(currentColor, dark)}55` : 'transparent' }} />
-            </button>
-          </>
-        ) : null}
-        {showSizes ? (
-          <>
-            <span className="toolbar-line" />
-            {(['title', 'heading', 'body'] as const).map((size) => (
-              <button key={size} className={cx('size', currentSize === size && 'on')} title={TEXT[size].label} onClick={() => restyle({ textSize: size })}>
-                {size === 'title' ? 'L' : size === 'heading' ? 'M' : 'S'}
-              </button>
-            ))}
-          </>
-        ) : null}
       </div>
+
+      {showColors ? (
+        <div className="toolbar stylebar" onPointerDown={(event) => event.stopPropagation()}>
+          {COLORS.map((color) => (
+            <button key={color} className={cx('swatch', currentColor === color && 'on')} title={color} onClick={() => restyle({ color })}>
+              <span style={{ background: paint(color, dark) }} />
+            </button>
+          ))}
+          {showFill ? (
+            <>
+              <span className="toolbar-line" />
+              <button className={cx('fill', currentFill && 'on')} title="Fill" onClick={() => restyle({ fill: !currentFill })}>
+                <span style={{ borderColor: paint(currentColor, dark), background: currentFill ? `${paint(currentColor, dark)}55` : 'transparent' }} />
+              </button>
+            </>
+          ) : null}
+          {showSizes ? (
+            <>
+              <span className="toolbar-line" />
+              {TEXT_SIZES.map((size) => (
+                <button key={size} className={cx('size', currentSize === size && 'on')} title={TEXT[size].label} onClick={() => restyle({ textSize: size })}>
+                  {size === 'title' ? 'L' : size === 'heading' ? 'M' : 'S'}
+                </button>
+              ))}
+            </>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="zoombar" onPointerDown={(event) => event.stopPropagation()}>
         <button title={`Zoom out (${shortcut('-')})`} onClick={() => zoomBy(0.8)}>

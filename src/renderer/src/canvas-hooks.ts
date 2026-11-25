@@ -62,16 +62,16 @@ export function useSceneSave(currentScene: () => CanvasScene, files: Map<string,
   const save = () => {
     const scene = currentScene()
     const json = JSON.stringify(scene)
+    const shown = new Set(scene.items.filter(hasImageFile).map((item) => item.fileId))
     const newFiles: Record<string, CanvasImage> = {}
-    for (const item of scene.items) {
-      if (hasImageFile(item) && !onDisk.current.has(item.fileId)) {
-        const file = files.get(item.fileId)
-        if (file) newFiles[item.fileId] = file
-      }
+    for (const fileId of shown) {
+      const file = files.get(fileId)
+      if (file && !onDisk.current.has(fileId)) newFiles[fileId] = file
     }
     if (json === lastSaved.current && !Object.keys(newFiles).length) return
     arc.canvasSave(scene, newFiles)
-    for (const id of Object.keys(newFiles)) onDisk.current.add(id)
+    // Main deletes the images a saved board no longer shows, so one that comes back (undo, paste) has to be sent again.
+    onDisk.current = shown
     lastSaved.current = json
   }
   const latestSave = useRef(save)

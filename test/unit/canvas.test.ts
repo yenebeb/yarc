@@ -3,7 +3,7 @@ import { existsSync, mkdtempSync, readdirSync, utimesSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, test } from 'node:test'
-import { arrangeInGrid, MAX_PLACED, placedSize, placeNext, resized, snapMove, withBox, type BoardItem } from '../../src/shared/canvas.ts'
+import { arrangeInGrid, freeSpot, isBoardItem, MAX_PLACED, placedSize, placeNext, resized, snapMove, withBox, type BoardItem } from '../../src/shared/canvas.ts'
 import { CanvasFiles, emptyOldTrash } from '../../src/main/canvas-store.ts'
 
 const GAP = 24
@@ -104,6 +104,63 @@ describe('snapping while moving', () => {
   test('nothing within reach: no shift and no guides', () => {
     const farAway = { x: 1000, y: 1000, width: 50, height: 50 }
     assert.deepEqual(snapMove(farAway, [chair], NEAR), { dx: 0, dy: 0, guides: [] })
+  })
+})
+
+describe('where a pasted text lands', () => {
+  const PASTE_STEP = 24
+  const middleOfTheBoard = { x: 400, y: 300 }
+  const aStepFrom = (spot: { x: number; y: number }, steps = 1) => ({ x: spot.x + steps * PASTE_STEP, y: spot.y + steps * PASTE_STEP })
+
+  test('in the middle of the board, while nothing starts there', () => {
+    assert.deepEqual(freeSpot([photo('in-a-corner', 0, 0)], middleOfTheBoard), middleOfTheBoard)
+  })
+
+  test('a step down and to the right of a text pasted there before, so the first stays readable', () => {
+    const firstPaste = photo('first-paste', middleOfTheBoard.x, middleOfTheBoard.y)
+    assert.deepEqual(freeSpot([firstPaste], middleOfTheBoard), aStepFrom(middleOfTheBoard))
+  })
+
+  test('past every earlier paste: the third lands two steps away', () => {
+    const firstPaste = photo('first-paste', middleOfTheBoard.x, middleOfTheBoard.y)
+    const secondPaste = { ...firstPaste, id: 'second-paste', ...aStepFrom(middleOfTheBoard) }
+    assert.deepEqual(freeSpot([firstPaste, secondPaste], middleOfTheBoard), aStepFrom(middleOfTheBoard, 2))
+  })
+})
+
+describe('what the board takes from a clipboard or a saved canvas', () => {
+  const place = { x: 0, y: 0, width: 200, height: 40 }
+  const note = { id: 'note', kind: 'text', ...place, text: 'Buy chairs', size: 'body', color: 'ink' }
+  const pictureFile = 'a'.repeat(64)
+
+  test('a text with a size and a color from the palette', () => {
+    assert.equal(isBoardItem(note), true)
+  })
+
+  test('a capture, with or without the page it came from', () => {
+    const capture = { id: 'chair-photo', kind: 'capture', ...place, fileId: pictureFile }
+    assert.equal(isBoardItem(capture), true)
+    assert.equal(isBoardItem({ ...capture, source: { url: 'https://example.com/chairs', title: 'Chairs' } }), true)
+  })
+
+  test('refuses a drawing without its points, because the board can’t draw it', () => {
+    assert.equal(isBoardItem({ id: 'scribble', kind: 'draw', ...place, color: 'ink' }), false)
+  })
+
+  test('refuses a kind of item this version doesn’t know', () => {
+    assert.equal(isBoardItem({ ...note, kind: 'video' }), false)
+  })
+
+  test('refuses an item without a place on the board', () => {
+    assert.equal(isBoardItem({ ...note, x: undefined }), false)
+  })
+
+  test('refuses a text in a color that isn’t in the palette', () => {
+    assert.equal(isBoardItem({ ...note, color: 'neon' }), false)
+  })
+
+  test('refuses a picture whose file id could be a path', () => {
+    assert.equal(isBoardItem({ id: 'picture', kind: 'image', ...place, fileId: '../../Cookies' }), false)
   })
 })
 

@@ -1455,9 +1455,11 @@ export class Browser implements TabHost {
   }
 
   runCommand(cmd: CommandId | string): void {
+    const tab = this.activeTab()
+    const findsWithNoPageToSearch = cmd === 'find' && !tab
+    if (findsWithNoPageToSearch) return
     const action = Object.hasOwn(COMMAND_ACTIONS, cmd) && COMMAND_ACTIONS[cmd as CommandId]
     if (action) return void this.dispatch(action)
-    const tab = this.activeTab()
     const space = this.space
     const num = /^(space|tab)(\d)$/.exec(cmd)
     if (num) {

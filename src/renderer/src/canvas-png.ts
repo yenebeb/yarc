@@ -52,7 +52,9 @@ function drawItem(ctx: CanvasRenderingContext2D, item: BoardItem, images: Map<st
     ctx.font = textFont(item.size, family)
     ctx.fillStyle = paint(item.color, false)
     ctx.textBaseline = 'middle'
-    item.text.split('\n').forEach((line, lineIndex) => ctx.fillText(line, item.x, item.y + (lineIndex + 0.5) * size * LINE_HEIGHT))
+    // A 2D canvas draws a tab as one space; the board shows it four wide (`tab-size`).
+    const lines = item.text.replaceAll('\t', '    ').split('\n')
+    lines.forEach((line, lineIndex) => ctx.fillText(line, item.x, item.y + (lineIndex + 0.5) * size * LINE_HEIGHT))
   } else if (item.kind === 'rect' || item.kind === 'ellipse') {
     const color = paint(item.color, false)
     ctx.beginPath()
