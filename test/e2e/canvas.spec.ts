@@ -428,7 +428,7 @@ test.describe('quotes from a page', () => {
     const note = board.locator('.item.text.note')
     await expect(note).toContainText('findme findme findme')
     await expect(note.locator('.footer .title')).toHaveText('Page quote-first')
-    expect(await savedNote(canvas)).toMatchObject({ card: true, wrapWidth: 280, text: 'findme findme findme', source: { url: `${base}/quote-first`, title: 'Page quote-first' } })
+    await expect.poll(() => savedNote(canvas)).toMatchObject({ card: true, wrapWidth: 280, text: 'findme findme findme', source: { url: `${base}/quote-first`, title: 'Page quote-first' } })
   })
 
   test('a quote can be edited like any note, and the footer comes back when it is done', async () => {
