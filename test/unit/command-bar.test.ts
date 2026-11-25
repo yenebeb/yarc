@@ -21,6 +21,12 @@ function visited(url: string, title: string, { visits = 1, daysAgo = 1 } = {}): 
   return { source: 'history', result: { kind: 'history', id: `hist:${url}`, title, url }, visitCount: visits, lastVisit: NOW - daysAgo * DAY }
 }
 
+const canvasNamed = (title: string, { inActiveSpace = true } = {}): Candidate => ({
+  source: 'canvas',
+  result: { kind: 'canvas', id: `canvas:${title}`, title, target: title },
+  inActiveSpace
+})
+
 const archived = (title: string, url: string): Candidate => ({ source: 'archive', result: { kind: 'archive', id: `arch:${url}`, title, url } })
 
 /** The rows the bar shows for `typed`, by title; the search for what was typed reads `Search "…"`. */
@@ -71,6 +77,28 @@ describe('the top hit, above the search for what was typed', () => {
     const typedAddress: SearchResult = { kind: 'url', id: 'url:https://github.com', title: 'https://github.com', url: 'https://github.com' }
     const rows = arrange('github.com', typedAddress, [visited('https://github.com/yenebeb/yarc', 'yarc')], NOW)
     assert.deepEqual(rows.map((r) => r.title), ['https://github.com', 'yarc'])
+  })
+})
+
+describe('canvases in the bar', () => {
+  test("typing a canvas's first letters puts it first, above the search for what was typed", () => {
+    assert.deepEqual(typeInBar('kitch', [openTab('Kitchen shop with everything for a home cook', 'https://shop.example/kitchen'), canvasNamed('Kitchen ideas')]), [
+      'Kitchen ideas',
+      'Search "kitch"',
+      'Kitchen shop with everything for a home cook'
+    ])
+  })
+
+  test('a canvas is found by a word in its name too, but not as a top hit', () => {
+    assert.deepEqual(typeInBar('ideas', [canvasNamed('Kitchen ideas')]), ['Search "ideas"', 'Kitchen ideas'])
+  })
+
+  test('a canvas of the space you are in comes before one of another space', () => {
+    assert.deepEqual(typeInBar('trip', [canvasNamed('Trip (work)', { inActiveSpace: false }), canvasNamed('Trip (home)')]), ['Trip (home)', 'Search "trip"', 'Trip (work)'])
+  })
+
+  test('a canvas whose name has nothing of what was typed is left out', () => {
+    assert.deepEqual(typeInBar('zebra', [canvasNamed('Kitchen ideas')]), ['Search "zebra"'])
   })
 })
 

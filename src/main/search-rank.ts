@@ -103,6 +103,7 @@ export type Candidate =
   | { source: 'tab'; result: SearchResult; inActiveSpace: boolean; loaded: boolean }
   | { source: 'history'; result: SearchResult; visitCount: number; lastVisit: number }
   | { source: 'archive'; result: SearchResult }
+  | { source: 'canvas'; result: SearchResult; inActiveSpace: boolean }
 
 interface Ranked {
   candidate: Candidate
@@ -130,6 +131,9 @@ function rankOne(candidate: Candidate, query: string, now: number): Ranked {
     case 'command':
       within = OWN_BASE + coverage * 200 + 30
       break
+    case 'canvas':
+      within = OWN_BASE + coverage * 200 + (candidate.inActiveSpace ? 20 : 0)
+      break
     case 'tab':
       within = OWN_BASE + coverage * 200 + (candidate.inActiveSpace ? 20 : 0) + (candidate.loaded ? 10 : 0)
       break
@@ -153,7 +157,7 @@ export function rank(candidates: Candidate[], query: string, now = Date.now()): 
 /** Above "Search for …". */
 export function isTopHit(candidate: Candidate, query: string, typedUrl: boolean): boolean {
   const { result } = candidate
-  if (candidate.source === 'command' || candidate.source === 'tab') return bestMatch(result, query).match === Match.start
+  if (candidate.source === 'command' || candidate.source === 'tab' || candidate.source === 'canvas') return bestMatch(result, query).match === Match.start
   if (candidate.source !== 'history' || typedUrl || result.kind === 'pastSearch' || !result.url || /\s/.test(query.trim())) return false
   return bareUrl(result.url).toLowerCase().startsWith(query.trim().toLowerCase())
 }

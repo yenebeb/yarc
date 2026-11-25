@@ -38,6 +38,21 @@ test('command bar finds and switches to open tabs', async () => {
   await expect.poll(async () => (await space()).activeItemId).toBe(current.today.find((tab) => tab.url.endsWith('/one'))!.id)
 })
 
+test('typing a canvas’s name offers it, and Enter opens it', async () => {
+  const canvasId: string = await app.evaluate(() => {
+    const browser = (globalThis as any).arcBrowser
+    return browser.canvases.create(browser.space, 'Kitchen moodboard').id
+  })
+  await dispatch({ type: 'overlay', mode: { kind: 'command', target: 'tab' } })
+  const overlay = await pageWithUrl('overlay.html')
+  await overlay.locator('.command input').fill('kitchen mood')
+  await expect(overlay.locator('.result').first()).toContainText('Kitchen moodboard')
+  await expect(overlay.locator('.result.sel .hint')).toHaveText('Open Canvas')
+  await overlay.locator('.command input').press('Enter')
+  await expect.poll(async () => (await space()).activeItemId).toBe(canvasId)
+  await expect.poll(overlayKind).toBe('none')
+})
+
 test('the command bar stays open while a page behind it finishes loading', async () => {
   // Windows gives the keyboard to a page whenever it commits a navigation; that blur used to close the bar.
   // As if the user were in YARC: the test window needn't be the foreground app (leaving the window still closes the bar).

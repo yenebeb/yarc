@@ -397,6 +397,8 @@ Built (2026-11-25): list, checkbox and link buttons on the style bar when a text
 
 Find on a canvas (built 2026-11-25): ⌘F opens a small bar at the top of the canvas page, not the app's find bar, which belongs to the overlay and drives a web page's own `findInPage`. Main sends ⌘F, ⌘G and ⇧⌘G to the canvas page when no tab is showing (`CANVAS_FIND_OPS` in `browser.ts`). It searches the texts only, ignoring case; each text that holds the words once or more is one match, in reading order (top to bottom, then left to right; `textsHolding` in `src/shared/canvas-find.ts`). The shown match is outlined and put in the middle of the window at the current zoom (smaller only if it doesn't fit); the other matches get a dashed outline. Enter and ⇧Enter go on and back and wrap round at the ends, Escape closes. Selection and undo are not touched. Not searched: the footers of cards and quotes, and the words inside pictures.
 
+Canvases in the command bar (built 2026-11-25): typing a canvas's name offers it, ranked like an open tab (a canvas of the space you're in first; a name that starts with what was typed is a top hit), and Enter opens it, switching space if it lives in another. Shown with the canvas icon and the hint Open Canvas. Nothing is offered for an empty query.
+
 ### 9.5 Open
 
 - Whether split view (step 3) is in scope. Section 10 has the design, a size and its own open questions.
