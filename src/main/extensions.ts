@@ -1,4 +1,4 @@
-import { session, type BaseWindow, type ContextMenuParams, type MenuItem, type Point, type Session } from 'electron'
+import { MenuItem, session, type BaseWindow, type ContextMenuParams, type Menu, type Point, type Rectangle, type Session } from 'electron'
 import { ElectronChromeExtensions } from 'electron-chrome-extensions'
 import { installChromeWebStore, uninstallExtension, updateExtensions } from 'electron-chrome-web-store'
 import { join } from 'node:path'
@@ -15,6 +15,7 @@ const UPDATE_EVERY = 5 * 3600_000
 type LibraryInternals = { api?: { permissions?: { permissionMap?: Map<string, Grant> } } }
 /** The library's PopupView, which it doesn't export. */
 type Popup = { parent?: BaseWindow; on(event: 'will-move', listener: (position: Point) => void): void }
+type ActionMenu = { menu: Menu; extensionId: string; anchorRect: Rectangle }
 
 interface ProfileExtensions {
   library: ElectronChromeExtensions
@@ -86,6 +87,13 @@ export class Extensions {
       const origin = popup.parent && b.sidebarOrigin(popup.parent)
       // The library places the popup from the anchor plus the window's origin; the position it emits is the one it then applies.
       if (origin) popup.on('will-move', (position: Point) => Object.assign(position, { x: position.x + origin.x, y: position.y + origin.y }))
+    })
+    ext.on('browser-action-context-menu', ({ menu, extensionId, anchorRect }: ActionMenu) => {
+      const pinned = b.store.profile(rt.id)?.pinnedExtensions?.includes(extensionId) ?? false
+      menu.append(new MenuItem({ type: 'separator' }))
+      menu.append(new MenuItem({ label: pinned ? 'Unpin' : 'Pin', click: () => b.setExtensionPin(rt.id, extensionId, !pinned) }))
+      const origin = b.window.sidebarOrigin()
+      menu.popup({ window: b.window.win, x: Math.floor(anchorRect.x + origin.x), y: Math.floor(anchorRect.y + anchorRect.height + origin.y) })
     })
     this.byProfile.set(rt.id, { library: ext, session: rt.session, folder, grants, rules })
     // After the library's preload (registered above), so `chrome` already has its APIs to copy.

@@ -14,4 +14,5 @@ overrides:
 patchedDependencies:
   # A native messaging host that exits at once (e.g. on extension install) made stdin.write throw an uncaught EPIPE; drop once upstream handles it.
   # Extension popups get the native frame (roundedCorners); the library turns it off.
+  # An extension button's right-click menu is handed to the app (browser-action-context-menu) so it can add Pin/Unpin and place it.
   electron-chrome-extensions: patches/electron-chrome-extensions.patch

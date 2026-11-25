@@ -269,6 +269,35 @@ test('an extension opened from the popover opens inside the window, whichever si
   }
 })
 
+test("an extension's right-click menu can unpin it", async () => {
+  const extId = await loadExtension(popupExtensionDir('menu unpin'))
+  const { profileId } = await space()
+  const ui = app.windows().find((page) => page.url().endsWith('index.html'))!
+  const pins = async () => (await state()).profiles.find((profile) => profile.id === profileId)!.pinnedExtensions ?? []
+  await dispatch({ type: 'extensionPin', profileId, extensionId: extId, pinned: true })
+  await app.evaluate(({ Menu }) => {
+    const globals = globalThis as any
+    globals.realPopup = Menu.prototype.popup
+    Menu.prototype.popup = function (this: Electron.Menu) {
+      globals.shownMenu = this
+    }
+  })
+  try {
+    await ui.locator(`button[is="browser-action"][id="${extId}"]`).click({ button: 'right' })
+    await expect.poll(() => app.evaluate(() => (globalThis as any).shownMenu?.items.some((item: Electron.MenuItem) => item.label === 'Unpin') ?? false)).toBe(true)
+    await app.evaluate(() => (globalThis as any).shownMenu.items.find((item: Electron.MenuItem) => item.label === 'Unpin').click())
+    await expect.poll(pins).not.toContain(extId)
+  } finally {
+    await app.evaluate(({ Menu }) => {
+      const globals = globalThis as any
+      Menu.prototype.popup = globals.realPopup
+      globals.shownMenu = undefined
+    })
+    await dispatch({ type: 'extensionPin', profileId, extensionId: extId, pinned: false })
+    await removeExtension(extId)
+  }
+})
+
 test('an extension popup opens next to its button, from the sidebar shown or hidden, on either side', async () => {
   const dir = extensionDir({
     'manifest.json': { manifest_version: 3, name: 'popup side', version: '1.0', action: { default_popup: 'popup.html' } },
