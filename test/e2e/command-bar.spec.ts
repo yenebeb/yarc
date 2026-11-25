@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { app, base, dispatch, mod, overlayKind, pageWithUrl, pressInActiveTab, space, state, useApp } from './app'
+import { app, base, dispatch, mod, openCommandBar, overlayKind, pageWithUrl, pressInActiveTab, space, state, useApp } from './app'
 
 useApp()
 
@@ -21,15 +21,14 @@ test('keyboard shortcut Ctrl/Cmd+T opens the command bar from a web page', async
   const before = (await space()).today.map((tab) => tab.url)
   await pressInActiveTab('T', [mod])
   const overlay = await pageWithUrl('overlay.html')
-  await expect(overlay.locator('.command input')).toBeVisible()
+  await expect(overlay.locator('.command input')).toHaveValue('')
   await overlay.locator('.command input').fill(`${base}/two`)
   await overlay.locator('.command input').press('Enter')
   await expect.poll(async () => (await space()).today.map((tab) => tab.url)).toEqual([`${base}/two`, ...before])
 })
 
 test('command bar finds and switches to open tabs', async () => {
-  await dispatch({ type: 'overlay', mode: { kind: 'command', target: 'tab' } })
-  const overlay = await pageWithUrl('overlay.html')
+  const overlay = await openCommandBar()
   await overlay.locator('.command input').fill('page one')
   await expect(overlay.locator('.result').first()).toContainText('Page one')
   await expect(overlay.locator('.result.sel .hint')).toContainText('Switch to Tab')
@@ -43,8 +42,7 @@ test('typing a canvas’s name offers it, and Enter opens it', async () => {
     const browser = (globalThis as any).arcBrowser
     return browser.canvases.create(browser.space, 'Kitchen moodboard').id
   })
-  await dispatch({ type: 'overlay', mode: { kind: 'command', target: 'tab' } })
-  const overlay = await pageWithUrl('overlay.html')
+  const overlay = await openCommandBar()
   await overlay.locator('.command input').fill('kitchen mood')
   await expect(overlay.locator('.result').first()).toContainText('Kitchen moodboard')
   await expect(overlay.locator('.result.sel .hint')).toHaveText('Open Canvas')
@@ -76,8 +74,7 @@ test('the command bar stays open while a page behind it finishes loading', async
 })
 
 test('command bar completes the top URL inline, like Arc', async () => {
-  await dispatch({ type: 'overlay', mode: { kind: 'command', target: 'tab' } })
-  const overlay = await pageWithUrl('overlay.html')
+  const overlay = await openCommandBar()
   const input = overlay.locator('.command input')
   await input.pressSequentially('127.0.0', { delay: 30 })
   await expect(input).toHaveValue(/^127\.0\.0\.1:\d+\//)
@@ -102,11 +99,8 @@ test('Tab to Search: a site name, Tab, then a query searches that site, like Arc
   }, partition)
   const before = (await space()).activeItemId
   try {
-    await dispatch({ type: 'overlay', mode: { kind: 'none' } })
-    await dispatch({ type: 'overlay', mode: { kind: 'command', target: 'tab' } })
-    const overlay = await pageWithUrl('overlay.html')
+    const overlay = await openCommandBar()
     const input = overlay.locator('.command input')
-    await expect(input).toHaveValue('')
     await input.pressSequentially('you', { delay: 30 })
     await expect(overlay.locator('.command .tab-hint')).toContainText('Search YouTube')
     await pressInOverlay('Tab')

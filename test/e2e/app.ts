@@ -111,6 +111,15 @@ export const space = async () => {
 
 export const overlayKind = (): Promise<string> => app.evaluate(() => (globalThis as any).arcBrowser.window.overlayMode.kind)
 
+export async function openCommandBar(): Promise<Page> {
+  await dispatch({ type: 'overlay', mode: { kind: 'none' } })
+  await dispatch({ type: 'overlay', mode: { kind: 'command', target: 'tab' } })
+  const overlay = await pageWithUrl('overlay.html')
+  // Until the overlay hears the last bar closed, that bar's input stays on the page with what was typed into it.
+  await expect(overlay.locator('.command input')).toHaveValue('')
+  return overlay
+}
+
 export const captureNextMenu = (name: string) =>
   app.evaluate(({ Menu }, name) => {
     const popup = Menu.prototype.popup

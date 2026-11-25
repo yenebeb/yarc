@@ -1,11 +1,10 @@
 import { expect, test } from '@playwright/test'
-import { app, dispatch, overlayKind, pageWithUrl, useApp } from './app'
+import { app, dispatch, openCommandBar, overlayKind, pageWithUrl, useApp } from './app'
 
 useApp()
 
 test('updates: command bar check, then a sidebar pill and menu item once one is found', async () => {
-  await dispatch({ type: 'overlay', mode: { kind: 'command', target: 'tab' } })
-  const overlay = await pageWithUrl('overlay.html')
+  const overlay = await openCommandBar()
   await overlay.locator('.command input').fill('updates')
   await expect(overlay.locator('.result', { hasText: 'Check for Updates' })).toHaveCount(1)
   await expect(overlay.locator('.result', { hasText: 'Download YARC' })).toHaveCount(0)
@@ -19,7 +18,7 @@ test('updates: command bar check, then a sidebar pill and menu item once one is 
     const labels = await app.evaluate(({ Menu }) => Menu.getApplicationMenu()!.items[0].submenu!.items.map((item) => item.label))
     expect(labels).toContain('Update Available…')
   }
-  await dispatch({ type: 'overlay', mode: { kind: 'command', target: 'tab' } })
+  await openCommandBar()
   await overlay.locator('.command input').fill('download yarc')
   await expect(overlay.locator('.result', { hasText: 'Download YARC 99.0.0…' })).toHaveCount(1)
   await dispatch({ type: 'overlay', mode: { kind: 'none' } })
