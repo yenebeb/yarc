@@ -31,6 +31,16 @@ export class ExtensionGrants {
       origins: [...new Set([...had.origins, ...(request.origins ?? [])])],
       permissions: [...new Set([...had.permissions, ...(request.permissions ?? [])])]
     }
+    this.save()
+  }
+
+  forget(extensionId: string): void {
+    if (!(extensionId in this.all)) return
+    delete this.all[extensionId]
+    this.save()
+  }
+
+  private save(): void {
     try {
       writeFileAtomic(this.file, JSON.stringify(this.all))
     } catch (err) {

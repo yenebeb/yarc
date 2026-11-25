@@ -3,7 +3,7 @@ import { chmodSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from '
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { createHash, generateKeyPairSync } from 'node:crypto'
-import { app, base, dispatch, hits, space, state, useApp, userData } from './app'
+import { app, base, dispatch, hits, pageWithUrl, space, state, useApp, userData } from './app'
 
 useApp()
 
@@ -164,7 +164,7 @@ test('an extension popup opens toward the page, whichever side the sidebar is on
   const popupInsideWindow = async () => {
     await app.evaluate(() => {
       const browser = (globalThis as any).arcBrowser
-      browser.extensions.byProfile.get(browser.store.activeSpace.profileId).once('browser-action-popup-created', (popup: unknown) => ((globalThis as any).popup = popup))
+      browser.extensions.byProfile.get(browser.store.activeSpace.profileId).library.once('browser-action-popup-created', (popup: unknown) => ((globalThis as any).popup = popup))
     })
     await ui.locator(`browser-action-list button[id="${extId}"]`).click()
     await expect.poll(() => app.evaluate(() => !!(globalThis as any).popup)).toBe(true)
@@ -229,5 +229,24 @@ test('an extension whose native messaging host stops reading gets a disconnect, 
     expect(readFileSync(join(userData, 'logs', 'main.log'), 'utf8')).not.toContain('EPIPE')
   } finally {
     await removeExtension(extId)
+  }
+})
+
+test('Remove in Settings uninstalls an extension once the question is confirmed', async () => {
+  const dir = extensionDir({ 'manifest.json': { manifest_version: 3, name: 'removable', version: '1.0' } })
+  const extId = await app.evaluate(async (_electron, extDir) => {
+    const browser = (globalThis as any).arcBrowser
+    return (await browser.profiles.get(browser.store.activeSpace.profileId).session.extensions.loadExtension(extDir)).id
+  }, dir)
+  await dispatch({ type: 'overlay', mode: { kind: 'settings', section: 'extensions' } })
+  const overlay = await pageWithUrl('overlay.html')
+  const row = overlay.locator('.set-ext', { hasText: 'removable' })
+  try {
+    overlay.once('dialog', (question) => void question.accept())
+    await row.getByRole('button', { name: 'Remove' }).click()
+    await expect(row).toHaveCount(0)
+    expect(Object.values((await state()).extensions).flat().map((extension) => extension.id)).not.toContain(extId)
+  } finally {
+    await dispatch({ type: 'overlay', mode: { kind: 'none' } })
   }
 })

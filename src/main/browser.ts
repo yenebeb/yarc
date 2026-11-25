@@ -1767,6 +1767,8 @@ export class Browser implements TabHost {
         this.setOverlay({ kind: 'none' }, false)
         this.newTab('https://chromewebstore.google.com/category/extensions')
         return
+      case 'removeExtension':
+        return this.extensions.remove(action.profileId, action.id)
     }
   }
 

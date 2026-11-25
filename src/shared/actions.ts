@@ -91,6 +91,7 @@ export type Action =
   /** In window coordinates. */
   | { type: 'appMenu'; x: number; y: number }
   | { type: 'extensionsStore' }
+  | { type: 'removeExtension'; profileId: ID; id: string }
   | { type: 'adblockToggleSite'; id?: ID }
   /** No `sourceId` = cancel. `systemAudio` is Windows only. */
   | { type: 'sharePick'; id: string; sourceId?: string; systemAudio?: boolean }

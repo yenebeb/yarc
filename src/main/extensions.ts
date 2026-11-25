@@ -1,6 +1,6 @@
-import { session, type BaseWindow, type ContextMenuParams, type MenuItem } from 'electron'
+import { session, type BaseWindow, type ContextMenuParams, type MenuItem, type Session } from 'electron'
 import { ElectronChromeExtensions } from 'electron-chrome-extensions'
-import { installChromeWebStore, updateExtensions } from 'electron-chrome-web-store'
+import { installChromeWebStore, uninstallExtension, updateExtensions } from 'electron-chrome-web-store'
 import { join } from 'node:path'
 import type { ID } from '../shared/types'
 import type { Browser } from './browser'
@@ -14,8 +14,16 @@ const UPDATE_EVERY = 5 * 3600_000
 /** electron-chrome-extensions 4.10 keeps runtime grants in a private map; reaching it is the only way to restore them. */
 type LibraryInternals = { api?: { permissions?: { permissionMap?: Map<string, Grant> } } }
 
+interface ProfileExtensions {
+  library: ElectronChromeExtensions
+  session: Session
+  folder: string
+  grants: ExtensionGrants
+  rules: NetRules
+}
+
 export class Extensions {
-  private byProfile = new Map<ID, ElectronChromeExtensions>()
+  private byProfile = new Map<ID, ProfileExtensions>()
   private selecting = false
 
   constructor(private browser: Browser) {}
@@ -27,6 +35,7 @@ export class Extensions {
 
   async setup(rt: ProfileRuntime): Promise<void> {
     const b = this.browser
+    const folder = join(b.profiles.dir(rt.id), 'Extensions')
     const grants = new ExtensionGrants(join(b.profiles.dir(rt.id), 'extension-permissions.json'))
     const rules = new NetRules(
       rt.session,
@@ -71,24 +80,26 @@ export class Extensions {
     // After the library's own listener, which resets an extension's grants to its manifest.
     const granted = (ext as unknown as LibraryInternals).api?.permissions?.permissionMap
     rt.session.extensions.on('extension-loaded', (_e, extension) => grants.restore(granted?.get(extension.id), extension.id))
-    this.byProfile.set(rt.id, ext)
+    this.byProfile.set(rt.id, { library: ext, session: rt.session, folder, grants, rules })
     // After the library's preload (registered above), so `chrome` already has its APIs to copy.
     const filePath = join(__dirname, '../preload/extension-browser.js')
     rt.session.registerPreloadScript({ id: 'yarc-browser-namespace', type: 'frame', filePath })
     rt.session.registerPreloadScript({ id: 'yarc-browser-namespace-sw', type: 'service-worker', filePath })
 
-    const refresh = () => {
+    const refresh = (unloadedId?: string) => {
       b.extensionList[rt.id] = rt.session.extensions
         .getAllExtensions()
-        .map((e) => ({ id: e.id, name: e.name }))
+        .filter((extension) => extension.id !== unloadedId)
+        .map((extension) => ({ id: extension.id, name: extension.name }))
       b.emitSoon()
     }
-    rt.session.extensions.on('extension-loaded', refresh)
-    rt.session.extensions.on('extension-unloaded', refresh)
+    rt.session.extensions.on('extension-loaded', () => refresh())
+    // Electron still lists an extension while it emits extension-unloaded for it.
+    rt.session.extensions.on('extension-unloaded', (_event, unloaded) => refresh(unloaded.id))
     try {
       await installChromeWebStore({
         session: rt.session,
-        extensionsPath: join(b.profiles.dir(rt.id), 'Extensions'),
+        extensionsPath: folder,
         // The library's own updater only tracks one session; we update each profile ourselves.
         autoUpdate: false
       })
@@ -101,12 +112,21 @@ export class Extensions {
     setInterval(update, UPDATE_EVERY)
   }
 
+  async remove(profileId: ID, extensionId: string): Promise<void> {
+    const profile = this.byProfile.get(profileId)
+    if (!profile) return
+    await uninstallExtension(extensionId, { session: profile.session, extensionsPath: profile.folder })
+    profile.grants.forget(extensionId)
+    await profile.rules.forget(extensionId)
+    await profile.session.clearStorageData({ origin: `chrome-extension://${extensionId}` })
+  }
+
   addTab(tab: LiveTab, win: BaseWindow): void {
-    this.byProfile.get(tab.profileId)?.addTab(tab.wc, win)
+    this.byProfile.get(tab.profileId)?.library.addTab(tab.wc, win)
   }
 
   selectTab(tab: LiveTab): void {
-    const ext = this.byProfile.get(tab.profileId)
+    const ext = this.byProfile.get(tab.profileId)?.library
     if (!ext) return
     this.selecting = true
     try {
@@ -118,13 +138,13 @@ export class Extensions {
 
   /** Call it before YARC knows the tab as an item: the library's removeTab callback closes the item. */
   moveTab(tab: LiveTab, win: BaseWindow): void {
-    const ext = this.byProfile.get(tab.profileId)
+    const ext = this.byProfile.get(tab.profileId)?.library
     if (!ext) return
     ext.removeTab(tab.wc)
     ext.addTab(tab.wc, win)
   }
 
   contextMenuItems(tab: LiveTab, params: ContextMenuParams): MenuItem[] {
-    return this.byProfile.get(tab.profileId)?.getContextMenuItems(tab.wc, params) ?? []
+    return this.byProfile.get(tab.profileId)?.library.getContextMenuItems(tab.wc, params) ?? []
   }
 }

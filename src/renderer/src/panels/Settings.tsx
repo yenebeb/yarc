@@ -2,7 +2,7 @@ import { useState, type CSSProperties, type KeyboardEvent } from 'react'
 import logo from '../../../../build/icon.svg'
 import { cleanMatch } from '../../../shared/link-routes'
 import { permissionLabel, siteName, type SitePermissionRow } from '../../../shared/permissions'
-import { SIDEBAR_WIDTH, type AppState, type Profile, type SearchEngine, type Settings as SettingsT, type SettingsSection as Section } from '../../../shared/types'
+import { SIDEBAR_WIDTH, type AppState, type ExtensionInfo, type Profile, type SearchEngine, type Settings as SettingsT, type SettingsSection as Section } from '../../../shared/types'
 import { SEARCH_ENGINES } from '../../../shared/url'
 import { activeSpace, dispatch } from '../api'
 import { Icon, type IconName } from '../icons'
@@ -402,6 +402,10 @@ function Extensions({ state }: { state: AppState }) {
   const space = activeSpace(state)
   const profile = state.profiles.find((profile) => profile.id === space.profileId)
   const list = state.extensions[space.profileId] ?? []
+  const remove = (extension: ExtensionInfo) => {
+    const asked = `Remove “${extension.name}”? It is removed from the profile “${profile?.name ?? 'this profile'}”, along with its data.`
+    if (window.confirm(asked)) dispatch({ type: 'removeExtension', profileId: space.profileId, id: extension.id })
+  }
   return (
     <>
       <Group>
@@ -423,6 +427,9 @@ function Extensions({ state }: { state: AppState }) {
             {extension.icon ? <img className="set-ext-icon" src={extension.icon} alt="" /> : <span className="set-ext-icon"><Icon name="puzzle" /></span>}
             <span className="set-row-title">{extension.name}</span>
             <span className="set-ext-id">{extension.id}</span>
+            <button className="btn" onClick={() => remove(extension)}>
+              Remove
+            </button>
           </div>
         ))}
       </Group>

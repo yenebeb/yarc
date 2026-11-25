@@ -10,7 +10,7 @@ import {
   type Session,
   type WebFrameMain
 } from 'electron'
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { join, resolve, sep } from 'node:path'
 import {
   allowAllPriority,
@@ -308,6 +308,11 @@ export class NetRules {
   private unload(id: string): void {
     this.loading.delete(id)
     if (this.loaded.delete(id)) this.changed()
+  }
+
+  async forget(id: string): Promise<void> {
+    this.unload(id)
+    await rm(this.file(id), { force: true })
   }
 
   private changed(): void {
