@@ -215,6 +215,24 @@ async function expectPopupInsideWindow(click: () => Promise<void>): Promise<void
 const popupExtensionDir = (name: string) =>
   extensionDir({ 'manifest.json': { manifest_version: 3, name, version: '1.0', action: { default_popup: 'popup.html' } }, 'popup.html': 'popup' })
 
+test('a pinned extension shows in a profile whose extensions started after its sidebar did', async () => {
+  const before = await space()
+  await dispatch({ type: 'createSpace', name: 'Late', emoji: '🐢', color: '#3fa7d6', profileId: 'new' })
+  const late = await space()
+  const ui = app.windows().find((page) => page.url().endsWith('index.html'))!
+  await expect(ui.locator('.extensions-button')).toHaveCount(0)
+  await dispatch({ type: 'open', url: `${base}/late-profile`, where: 'tab' })
+  const extId = await loadExtension(popupExtensionDir('late profile'))
+  try {
+    await dispatch({ type: 'extensionPin', profileId: late.profileId, extensionId: extId, pinned: true })
+    await expect(ui.locator(`button[is="browser-action"][id="${extId}"]`)).toBeVisible()
+  } finally {
+    await removeExtension(extId)
+    await dispatch({ type: 'switchSpace', id: before.id })
+    await dispatch({ type: 'deleteSpace', id: late.id })
+  }
+})
+
 test('the extensions popover pins and unpins', async () => {
   const extId = await loadExtension(popupExtensionDir('popover pin'))
   const { profileId } = await space()

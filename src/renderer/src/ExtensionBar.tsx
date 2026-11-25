@@ -24,9 +24,11 @@ export const browserAction = (): BrowserActionApi => (globalThis as unknown as {
 export const partitionOf = (profileId: ID) => `persist:profile-${profileId}`
 
 /** Ids the library has state for: a `browser-action` button throws if drawn before that. */
-export function useBrowserActions(partition: string): Set<string> {
+export function useBrowserActions(partition: string, enabled = true): Set<string> {
   const [ids, setIds] = useState<Set<string>>(new Set())
   useEffect(() => {
+    // Before the profile's extensions start, the library drops the subscription for good.
+    if (!enabled) return
     const onUpdate = (state: ActionState) => {
       setIds(new Set(state.actions.map((a) => a.id)))
       // A standalone button only redraws when one of its attributes changes.
@@ -40,7 +42,7 @@ export function useBrowserActions(partition: string): Set<string> {
       api.removeEventListener('update', onUpdate)
       api.removeObserver(partition)
     }
-  }, [partition])
+  }, [partition, enabled])
   return ids
 }
 
@@ -52,7 +54,7 @@ export const actionAlignment = (state: AppState) => (state.settings.sidebarRight
 
 export function ExtensionBar({ state, profileId, tab }: { state: AppState; profileId: ID; tab?: number }) {
   const installed = state.extensions[profileId] ?? []
-  const ready = useBrowserActions(partitionOf(profileId))
+  const ready = useBrowserActions(partitionOf(profileId), installed.length > 0)
   const profile = state.profiles.find((p) => p.id === profileId)
   if (!installed.length || !profile) return null
   return (
