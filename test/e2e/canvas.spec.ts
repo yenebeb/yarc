@@ -169,20 +169,22 @@ test.describe('notes on a canvas', () => {
     await expect.poll(async () => (await boxOf(texts(canvas.board).nth(1))).width).toBe(PASTED_WIDTH)
   })
 
-  test('dragging a text’s right handle makes it narrower and taller', async () => {
+  test('dragging a text’s left handle makes it narrower and taller, and its right side stays', async () => {
     const canvas = await openCanvas('Handle')
     await paste(canvas.board, 'text/plain', LONGER_THAN_THE_WINDOW)
     const paragraph = texts(canvas.board).nth(1)
     await expect.poll(async () => (await boxOf(paragraph)).width).toBe(PASTED_WIDTH)
     const before = await boxOf(paragraph)
-    const handle = await boxOf(canvas.board.locator('.handle-e'))
-    await canvas.board.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2)
+    const handle = await boxOf(canvas.board.locator('.handle-w'))
+    const grabbedAt = { x: handle.x + handle.width / 2, y: handle.y + handle.height / 2 }
+    await canvas.board.mouse.move(grabbedAt.x, grabbedAt.y)
     await canvas.board.mouse.down()
-    await canvas.board.mouse.move(handle.x + handle.width / 2 - 200, handle.y + handle.height / 2, { steps: 5 })
+    await canvas.board.mouse.move(grabbedAt.x + 200, grabbedAt.y, { steps: 5 })
     await canvas.board.mouse.up()
     await expect.poll(async () => (await boxOf(paragraph)).width).toBe(PASTED_WIDTH - 200)
-    expect((await boxOf(paragraph)).height).toBeGreaterThan(before.height)
-    expect((await boxOf(paragraph)).x).toBe(before.x)
+    const after = await boxOf(paragraph)
+    expect(after.height).toBeGreaterThan(before.height)
+    expect(after.x + after.width).toBeCloseTo(before.x + before.width)
   })
 
   test('a click on a checkbox ticks it without starting to type, and undo unticks it', async () => {
