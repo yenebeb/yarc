@@ -1,5 +1,6 @@
 import { useEffect, useRef, type RefObject } from 'react'
 import { boundsOf, freeSpot, IMAGE_TYPES, intersects, isBoardItem, placedSize, placeNext, type BoardItem, type CanvasImage, type Color, type ImageItem, type TextItem } from '../../shared/canvas'
+import { hasLongLine, PASTED_WRAP_WIDTH } from '../../shared/canvas-notes'
 import { copyOf, isTyping, newId, type Board } from './canvas-board'
 import { hasImageFile } from './canvas-item'
 import { loadImage } from './canvas-png'
@@ -114,6 +115,7 @@ export function useClipboard(board: Board, textColor: Color, editingRef: RefObje
     const text = data.getData('text/plain').trim()
     if (!text) return
     const textItem: TextItem = { id: newId(), kind: 'text', ...freeSpot(itemsRef.current, center(), PASTE_STEP), width: 0, height: 0, text, size: 'body', color: textColor }
+    if (hasLongLine(text)) textItem.wrapWidth = PASTED_WRAP_WIDTH
     change([...itemsRef.current, textItem])
     setSelected([textItem.id])
   }

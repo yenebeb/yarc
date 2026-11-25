@@ -57,6 +57,25 @@ function Canvases() {
   )
 }
 
+function CanvasNotes() {
+  return (
+    <div className="cn-scene">
+      <div className="cn-note">
+        <b />
+        <span className="cn-line cn-ticked" />
+        <span className="cn-line cn-ticking" />
+        <span className="cn-line" />
+      </div>
+      <div className="cn-note cn-list">
+        <b />
+        <span className="cn-line" />
+        <span className="cn-line" />
+        <span className="cn-line cn-link" />
+      </div>
+    </div>
+  )
+}
+
 function TrafficControl() {
   return (
     <div className="tc-scene">
@@ -122,6 +141,7 @@ function LiveFolders() {
 }
 
 const PICTURES: Record<string, () => ReactNode> = {
+  'canvas-notes': CanvasNotes,
   'live-folders': LiveFolders,
   'traffic-control': TrafficControl,
   canvases: Canvases,

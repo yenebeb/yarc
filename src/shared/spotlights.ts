@@ -17,6 +17,14 @@ export interface Spotlight {
 /** Newest first. */
 export const SPOTLIGHTS: Spotlight[] = [
   {
+    id: 'canvas-notes',
+    title: 'Take notes on a canvas',
+    text:
+      'Press N on a canvas and click for a note: a card that wraps what you write. Start a line with - for a list, [ ] for a checkbox ' +
+      'you can tick, or # for a heading. Drag the side of any text to set its width, and ⌘-click (Ctrl-click on Windows) a link to peek at it.',
+    actions: [{ label: 'New Canvas', command: 'newCanvas' }]
+  },
+  {
     id: 'live-folders',
     title: 'Folders that fill themselves',
     text:

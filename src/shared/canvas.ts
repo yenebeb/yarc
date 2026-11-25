@@ -86,6 +86,10 @@ export interface TextItem extends ItemBox {
   size: TextSize
   color: Color
   title?: boolean
+  /** Lines wrap at this width; without it the text is as wide as its longest line (titles, labels). */
+  wrapWidth?: number
+  /** Drawn on a card: a note. */
+  card?: boolean
 }
 
 export interface ShapeItem extends ItemBox {
@@ -148,11 +152,15 @@ const isFileId = (value: unknown) => typeof value === 'string' && FILE_ID.test(v
 const isOptionalText = (value: unknown) => value === undefined || typeof value === 'string'
 const isOptionalSource = (value: unknown) => value === undefined || (isFields(value) && typeof value.url === 'string' && typeof value.title === 'string' && isOptionalText(value.favicon))
 const isShape = (item: Fields) => isColor(item.color) && typeof item.fill === 'boolean'
+const isOptionalWrapWidth = (value: unknown) => value === undefined || (isRealNumber(value) && value > 0)
+const isOptionalFlag = (value: unknown) => value === undefined || typeof value === 'boolean'
+const isText = (item: Fields) =>
+  typeof item.text === 'string' && TEXT_SIZES.some((size) => size === item.size) && isColor(item.color) && isOptionalWrapWidth(item.wrapWidth) && isOptionalFlag(item.card)
 
 const HAS_ITS_OWN_FIELDS: Record<string, (item: Fields) => boolean> = {
   capture: (item) => isFileId(item.fileId) && isOptionalSource(item.source),
   image: (item) => isFileId(item.fileId),
-  text: (item) => typeof item.text === 'string' && TEXT_SIZES.some((size) => size === item.size) && isColor(item.color),
+  text: isText,
   rect: isShape,
   ellipse: isShape,
   arrow: (item) => isColor(item.color) && typeof item.flipX === 'boolean' && typeof item.flipY === 'boolean',

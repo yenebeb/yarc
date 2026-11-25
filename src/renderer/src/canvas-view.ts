@@ -6,6 +6,13 @@ export type View = { x: number; y: number; zoom: number }
 export const toWorld = (point: Point, view: View): Point => ({ x: (point.x - view.x) / view.zoom, y: (point.y - view.y) / view.zoom })
 export const toScreen = (box: Box, view: View): Box => ({ x: box.x * view.zoom + view.x, y: box.y * view.zoom + view.y, width: box.width * view.zoom, height: box.height * view.zoom })
 
+export const boxBetween = (corner: Point, opposite: Point): Box => ({
+  x: Math.min(corner.x, opposite.x),
+  y: Math.min(corner.y, opposite.y),
+  width: Math.abs(opposite.x - corner.x),
+  height: Math.abs(opposite.y - corner.y)
+})
+
 /** How far a stretch from `start` to `end` reaches out of `min`…`max`: negative before `min`, positive past `max`. */
 export const reachesOutBy = (start: number, end: number, min: number, max: number): number => Math.min(0, start - min) + Math.max(0, end - max)
 

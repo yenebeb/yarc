@@ -6,7 +6,7 @@ import { toScreen, toWorld, type Point, type View } from './canvas-view'
 const MIN_ZOOM = 0.1
 const MAX_ZOOM = 4
 
-export type Tool = 'select' | 'hand' | 'text' | 'rect' | 'ellipse' | 'arrow' | 'draw'
+export type Tool = 'select' | 'hand' | 'text' | 'note' | 'rect' | 'ellipse' | 'arrow' | 'draw'
 export type Style = { color: Color; fill: boolean; textSize: TextSize }
 
 export const newId = () => crypto.randomUUID()

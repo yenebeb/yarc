@@ -1,11 +1,16 @@
-import { useLayoutEffect, useRef, type CSSProperties, type KeyboardEvent } from 'react'
+import { useLayoutEffect, useRef, type CSSProperties } from 'react'
 import { arrowEnds, arrowHead, smoothPath, type ArrowItem, type BoardItem, type CanvasImage, type CardItem, type Color, type DrawItem, type ImageItem, type TextItem, type TextSize } from '../../shared/canvas'
+import { isListed, linkParts, noteLine, type NoteLine } from '../../shared/canvas-notes'
 import { arc, cx } from './api'
+import { keepTypingOrFinish } from './canvas-text-keys'
 import { Icon } from './icons'
 
 export const STROKE = 2.5
 export const DRAW_STROKE = 3
 export const LINE_HEIGHT = 1.25
+export const NOTE_PADDING = { x: 14, y: 12 }
+export const LIST_INDENT_EM = 1.4
+const ONE_SIZE_UP: Record<TextSize, TextSize> = { body: 'heading', heading: 'title', title: 'title' }
 export const TEXT: Record<TextSize, { size: number; weight: number; label: string }> = {
   title: { size: 36, weight: 700, label: 'Title' },
   heading: { size: 24, weight: 600, label: 'Heading' },
@@ -24,12 +29,47 @@ const PALETTE: Record<Color, { light: string; dark: string }> = {
 
 export const paint = (color: Color, dark: boolean) => PALETTE[color][dark ? 'dark' : 'light']
 export const textFont = (size: TextSize, family: string) => `${TEXT[size].weight} ${TEXT[size].size}px ${family}`
+export const lineTextSize = (item: TextItem, line: NoteLine): TextSize => (line.mark === 'heading' ? ONE_SIZE_UP[item.size] : item.size)
 export const hasImageFile = (item: BoardItem): item is CardItem | ImageItem => item.kind === 'capture' || item.kind === 'image'
 export const drawScale = (item: DrawItem) => ({ scaleX: item.width / item.drawnWidth || 1, scaleY: item.height / item.drawnHeight || 1 })
 
 export function arrowPath(item: ArrowItem): string {
   const { x1, y1, x2, y2 } = arrowEnds(item)
   return `M ${x1} ${y1} L ${x2} ${y2} ${arrowHead(x1, y1, x2, y2)}`
+}
+
+function lineStyle(item: TextItem, line: NoteLine): CSSProperties | undefined {
+  if (isListed(line)) return { paddingLeft: `${(line.level + 1) * LIST_INDENT_EM}em` }
+  if (line.mark !== 'heading') return undefined
+  const heading = TEXT[lineTextSize(item, line)]
+  return { fontSize: heading.size, fontWeight: heading.weight }
+}
+
+/** A text that isn't being typed in: its lines with their bullets, checkboxes, headings and links drawn. */
+function Lines({ item }: { item: TextItem }) {
+  return item.text.split('\n').map((typed, lineIndex) => {
+    const line = noteLine(typed)
+    const markerLeft = `${line.level * LIST_INDENT_EM}em`
+    return (
+      <div key={lineIndex} className={cx('line', line.mark)} style={lineStyle(item, line)}>
+        {line.mark === 'bullet' ? (
+          <span className="marker" style={{ left: markerLeft }}>
+            •
+          </span>
+        ) : null}
+        {line.mark === 'unchecked' || line.mark === 'checked' ? <span className="marker box" data-check={lineIndex} style={{ left: markerLeft }} /> : null}
+        {linkParts(line.text).map((part, partIndex) =>
+          part.url ? (
+            <span key={partIndex} className="link" data-url={part.url}>
+              {part.text}
+            </span>
+          ) : (
+            part.text
+          )
+        )}
+      </div>
+    )
+  })
 }
 
 function TextView({
@@ -57,13 +97,15 @@ function TextView({
   }, [editing])
   return (
     <div
+      // A new element for each: what the browser left in the one that was typed in isn't React's to replace with lines.
+      key={editing ? 'typed' : 'drawn'}
       ref={(element) => {
         node.current = element
         nodeRef(element)
       }}
-      className={cx(classes, editing && 'editing')}
+      className={cx(classes, item.card && 'note', item.wrapWidth !== undefined && 'wrapped', editing && 'editing')}
       data-id={item.id}
-      style={{ left: item.x, top: item.y, color: paint(item.color, dark), fontSize: textStyle.size, fontWeight: textStyle.weight, lineHeight: LINE_HEIGHT }}
+      style={{ left: item.x, top: item.y, width: item.wrapWidth, color: paint(item.color, dark), fontSize: textStyle.size, fontWeight: textStyle.weight, lineHeight: LINE_HEIGHT }}
       contentEditable={editing ? 'plaintext-only' : undefined}
       suppressContentEditableWarning
       spellCheck={editing}
@@ -71,21 +113,9 @@ function TextView({
       onBlur={editing ? onEdited : undefined}
       onKeyDown={editing ? keepTypingOrFinish : undefined}
     >
-      {editing ? null : item.text}
+      {editing ? null : <Lines item={item} />}
     </div>
   )
-}
-
-function keepTypingOrFinish(event: KeyboardEvent<HTMLDivElement>): void {
-  const finishes = event.key === 'Escape' || (event.key === 'Enter' && (event.metaKey || event.ctrlKey))
-  if (finishes) {
-    event.preventDefault()
-    event.currentTarget.blur()
-  }
-  if (event.key !== 'Tab') return
-  // Tab would otherwise move focus to the toolbar, which ends the edit.
-  event.preventDefault()
-  document.execCommand('insertText', false, '\t')
 }
 
 export function ItemView({

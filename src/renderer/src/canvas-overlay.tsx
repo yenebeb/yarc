@@ -4,11 +4,13 @@ import { toScreen, type View } from './canvas-view'
 
 const CORNERS: Handle[] = ['nw', 'ne', 'sw', 'se']
 const CORNERS_AND_SIDES: Handle[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']
+const LEFT_AND_RIGHT: Handle[] = ['w', 'e']
 
-/** A text is as big as what it says, and an item being typed in isn't resized. */
+/** A text is as tall as what it says, so only its sides move; an item being typed in isn't resized. */
 function handlesOf(chosen: BoardItem[], editing: boolean): { item: BoardItem; handles: Handle[] } | undefined {
   const [item, ...others] = chosen
-  if (!item || others.length || item.kind === 'text' || editing) return undefined
+  if (!item || others.length || editing) return undefined
+  if (item.kind === 'text') return { item, handles: LEFT_AND_RIGHT }
   return { item, handles: keepsShape(item) ? CORNERS : CORNERS_AND_SIDES }
 }
 

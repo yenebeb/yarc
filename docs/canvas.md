@@ -326,7 +326,7 @@ Sizes are for one person who knows the codebase, including unit and e2e tests, a
 - SVG with links, PDF, single-file HTML, all saved as local files (section 6).
 - No sharing: no server, uploads or share links.
 
-### Phase N: notes on the board (decided 2026-11-25, not built)
+### Phase N: notes on the board (decided 2026-11-25, step 1 of 9.4 built)
 
 A canvas should also be a good place to write. Fixes that came first: PR #132 (text saved as it's typed, paste, undo) and PR #133 (`canvas.tsx` split by responsibility). Section 9 has the design.
 
@@ -381,11 +381,11 @@ Built (2026-11-25):
 - A faint dot grid on the board, so panning an empty part shows movement; zoomed far out, every fourth dot is left.
 - The empty hint also says "Double-click anywhere to write".
 
-With the notes themselves: the Note tool in the text group, and list, checkbox and link buttons on the style bar.
+Built with the notes: the Note tool in the text group. Not built yet: list, checkbox and link buttons on the style bar.
 
 ### 9.4 Order
 
-1. Wrapping text, the Note tool, lines, the keys, export, the grid and the hint (one PR, with a spotlight card).
+1. Wrapping text, the Note tool, lines, the keys, export, the grid and the hint (one PR, with a spotlight card). Built: the line rules are in `src/shared/canvas-notes.ts`.
 2. "Add Selection to Canvas" in a page's context menu: a quote note with the same source footer as a capture card, through the inbox. ⌘F on a canvas finds in its text and pans to each match (today it does nothing). Canvases by name in the command bar.
 3. A canvas as a split pane, to write next to the page being read. Biggest piece: splits only hold tabs today. Not sized.
 

@@ -706,3 +706,114 @@
     opacity: 0;
   }
 }
+
+.cn-scene {
+  position: relative;
+  width: 340px;
+  height: 168px;
+  border-radius: 10px;
+  background:
+    radial-gradient(circle at 1px 1px, color-mix(in oklab, var(--text) 16%, transparent) 1px, transparent 1.5px) 0 0 / 16px 16px,
+    color-mix(in oklab, var(--space) 14%, var(--panel));
+  box-shadow: 0 0 0 1px var(--line);
+}
+
+.cn-note {
+  position: absolute;
+  left: 26px;
+  top: 24px;
+  width: 136px;
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  padding: 14px;
+  box-sizing: border-box;
+  border-radius: 9px;
+  background: var(--panel);
+  box-shadow:
+    0 0 0 1px var(--line),
+    0 10px 24px rgb(20 10 40 / 0.18);
+}
+
+.cn-note.cn-list {
+  left: 184px;
+  top: 40px;
+  width: 130px;
+}
+
+.cn-note b {
+  width: 62%;
+  height: 10px;
+  border-radius: 4px;
+  background: color-mix(in oklab, var(--text) 30%, transparent);
+}
+
+.cn-line {
+  position: relative;
+  height: 8px;
+  margin-left: 18px;
+  border-radius: 4px;
+  background: color-mix(in oklab, var(--text) 14%, transparent);
+}
+
+.cn-line:nth-child(3) {
+  width: 62%;
+}
+
+.cn-line::before {
+  content: '';
+  position: absolute;
+  left: -18px;
+  top: -2px;
+  width: 12px;
+  height: 12px;
+  box-sizing: border-box;
+  border: 1.5px solid color-mix(in oklab, var(--text) 40%, transparent);
+  border-radius: 3px;
+}
+
+.cn-list .cn-line::before {
+  left: -14px;
+  top: 2px;
+  width: 4px;
+  height: 4px;
+  border: 0;
+  border-radius: 50%;
+  background: color-mix(in oklab, var(--text) 40%, transparent);
+}
+
+.cn-line.cn-link {
+  width: 70%;
+  background: color-mix(in oklab, var(--accent) 55%, transparent);
+}
+
+.cn-line.cn-ticked::before {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+.cn-line.cn-ticking::before {
+  animation: cn-tick 5s ease-in-out infinite;
+}
+
+@keyframes cn-tick {
+  0%,
+  40% {
+    border-color: color-mix(in oklab, var(--text) 40%, transparent);
+    background: transparent;
+    transform: scale(1);
+  }
+  46% {
+    transform: scale(0.8);
+  }
+  52%,
+  92% {
+    border-color: var(--accent);
+    background: var(--accent);
+    transform: scale(1);
+  }
+  100% {
+    border-color: color-mix(in oklab, var(--text) 40%, transparent);
+    background: transparent;
+  }
+}

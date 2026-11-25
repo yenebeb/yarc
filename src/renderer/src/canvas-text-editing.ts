@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { BoardItem, TextItem } from '../../shared/canvas'
 import { newId, type Board, type Style } from './canvas-board'
-import { LINE_HEIGHT, TEXT } from './canvas-item'
+import { LINE_HEIGHT, NOTE_PADDING, TEXT } from './canvas-item'
 import { reachesOutBy, type Point } from './canvas-view'
 
 const CARET_ROOM = { beside: 48, aboveToolbars: 130 }
@@ -14,8 +14,11 @@ export function useTextEditing(board: Board, style: Style) {
   editingRef.current = editing
   const itemsBeforeEdit = useRef<BoardItem[]>(undefined)
 
-  const startText = (at: Point) => {
-    const item: TextItem = { id: newId(), kind: 'text', x: at.x, y: at.y - (TEXT[style.textSize].size * LINE_HEIGHT) / 2, width: 0, height: 0, text: '', size: style.textSize, color: style.color }
+  const startText = (firstLineStartsAt: Point, shape: Pick<TextItem, 'wrapWidth' | 'card'> = {}) => {
+    const halfALine = (TEXT[style.textSize].size * LINE_HEIGHT) / 2
+    const padding = shape.card ? NOTE_PADDING : { x: 0, y: 0 }
+    const place = { x: firstLineStartsAt.x - padding.x, y: firstLineStartsAt.y - halfALine - padding.y, width: 0, height: 0 }
+    const item: TextItem = { id: newId(), kind: 'text', ...place, text: '', size: style.textSize, color: style.color, ...shape }
     itemsBeforeEdit.current = itemsRef.current
     setItems([...itemsRef.current, item])
     setSelected([item.id])

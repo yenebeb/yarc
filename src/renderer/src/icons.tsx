@@ -38,6 +38,12 @@ const paths: Record<string, ReactNode> = {
   pointer: <path d="M6 4l12 7-5.5 1.5L10 18z" />,
   hand: <path d="M8 13V6.5a1.5 1.5 0 0 1 3 0V11m0-5.5a1.5 1.5 0 0 1 3 0V11m0-4a1.5 1.5 0 0 1 3 0V15a5 5 0 0 1-5 5h-1.5a5 5 0 0 1-3.9-1.9L4.8 15a1.5 1.5 0 0 1 2.3-1.9L8 14" />,
   text: <path d="M5 7V5h14v2M12 5v14M9 19h6" />,
+  note: (
+    <>
+      <path d="M6 4h12a2 2 0 0 1 2 2v9l-5 5H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" />
+      <path d="M20 15h-3a2 2 0 0 0-2 2v3M8 9h8M8 13h4" />
+    </>
+  ),
   rectangle: <rect x="4" y="6" width="16" height="12" rx="2" />,
   ellipse: <ellipse cx="12" cy="12" rx="8.5" ry="6.5" />,
   arrow: <path d="M5 19L19 5M10 5h9v9" />,

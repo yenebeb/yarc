@@ -14,7 +14,10 @@ const TOOL_GROUPS: ToolButton[][] = [
     { tool: 'select', icon: 'pointer', label: 'Select', key: 'V' },
     { tool: 'hand', icon: 'hand', label: 'Move the board', key: 'H' }
   ],
-  [{ tool: 'text', icon: 'text', label: 'Text', key: 'T' }],
+  [
+    { tool: 'text', icon: 'text', label: 'Text', key: 'T' },
+    { tool: 'note', icon: 'note', label: 'Note', key: 'N' }
+  ],
   [
     { tool: 'rect', icon: 'rectangle', label: 'Rectangle', key: 'R' },
     { tool: 'ellipse', icon: 'ellipse', label: 'Ellipse', key: 'O' },
@@ -26,7 +29,8 @@ export const TOOLS = TOOL_GROUPS.flat()
 const ROOM_FOR_TOOLBAR = 68
 const SMALLEST_SIZE_FIRST = [...TEXT_SIZES].reverse()
 
-const DRAWS_IN_COLOR: Tool[] = ['text', 'rect', 'ellipse', 'arrow', 'draw']
+const WRITES: Tool[] = ['text', 'note']
+const DRAWS_IN_COLOR: Tool[] = [...WRITES, 'rect', 'ellipse', 'arrow', 'draw']
 const isShape = (item: BoardItem) => item.kind === 'rect' || item.kind === 'ellipse'
 
 export function Toolbar({ tool, onTool, onPickImage }: { tool: Tool; onTool: (tool: Tool) => void; onPickImage: () => void }) {
@@ -78,7 +82,7 @@ export function StyleBar({
   const colored = chosen.filter(hasColor)
   if (!DRAWS_IN_COLOR.includes(tool) && !colored.length) return null
   const showFill = tool === 'rect' || tool === 'ellipse' || chosen.some(isShape)
-  const showSizes = tool === 'text' || chosen.some((item) => item.kind === 'text')
+  const showSizes = WRITES.includes(tool) || chosen.some((item) => item.kind === 'text')
   const currentColor = colored[0]?.color ?? style.color
   const firstShape = chosen.find((item) => item.kind === 'rect' || item.kind === 'ellipse')
   const currentFill = firstShape && (firstShape.kind === 'rect' || firstShape.kind === 'ellipse') ? firstShape.fill : style.fill
