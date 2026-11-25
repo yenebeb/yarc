@@ -29,7 +29,9 @@ type Gesture =
   | { kind: 'draw'; points: number[] }
 
 function BoardView({ loaded }: { loaded: CanvasLoad }) {
-  const dark = useDarkAppearance()
+  const spaceIsDark = useDarkAppearance()
+  const [appearance, setAppearance] = useState(loaded.scene?.appearance)
+  const dark = appearance ? appearance === 'dark' : spaceIsDark
   const boardRef = useRef<HTMLDivElement>(null)
   const fileInput = useRef<HTMLInputElement>(null)
 
@@ -55,7 +57,7 @@ function BoardView({ loaded }: { loaded: CanvasLoad }) {
   const lastDown = useRef<{ at: number; id: string | undefined }>({ at: 0, id: undefined })
   const spaceDown = useRef(false)
 
-  useSceneSave(() => ({ items: itemsRef.current.filter((item) => !isBlankText(item)), view: viewRef.current, snapping: snappingRef.current }), board.files, Object.keys(loaded.files))
+  useSceneSave(() => ({ items: itemsRef.current.filter((item) => !isBlankText(item)), view: viewRef.current, snapping: snappingRef.current, appearance }), board.files, Object.keys(loaded.files))
   useLiveCards(boardRef, items, view, !!menu)
 
   const onPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -323,7 +325,7 @@ function BoardView({ loaded }: { loaded: CanvasLoad }) {
   const hintAt = title ? { left: (title.x + title.width / 2) * view.zoom + view.x, top: (title.y + title.height) * view.zoom + view.y + 14 } : undefined
 
   return (
-    <div className="canvas-page">
+    <div className={cx('canvas-page', dark && 'dark')}>
       <div
         ref={boardRef}
         className={cx('board', `tool-${tool}`, panning && 'panning')}
@@ -383,6 +385,14 @@ function BoardView({ loaded }: { loaded: CanvasLoad }) {
       <StyleBar tool={tool} chosen={chosenItems} selectionOnScreen={boundsOf(chosenItems.map((item) => toScreen(item, view)))} style={style} dark={dark} onRestyle={restyle} />
       <ZoomBar zoom={view.zoom} onZoomBy={zoomBy} onActualSize={() => zoomAt(middle(), 1)} />
 
+      <button
+        className="board-menu-button appearance-button"
+        title={dark ? 'Light board' : 'Dark board'}
+        onPointerDown={(event) => event.stopPropagation()}
+        onClick={() => setAppearance(dark ? 'light' : 'dark')}
+      >
+        <Icon name={dark ? 'sun' : 'moon'} size={18} />
+      </button>
       <button
         className="board-menu-button"
         title="More"

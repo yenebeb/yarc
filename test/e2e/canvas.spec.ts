@@ -29,6 +29,7 @@ const savedItems = (canvas: OpenCanvas): Promise<BoardItem[]> => app.evaluate((_
 const savedTexts = async (canvas: OpenCanvas) => (await savedItems(canvas)).flatMap((item) => (item.kind === 'text' ? [item.text] : []))
 const savedImageFiles = (canvas: OpenCanvas): Promise<number> =>
   app.evaluate((_electron, id) => Object.keys((globalThis as any).arcBrowser.canvases.files(id).readImages()).length, canvas.id)
+const savedAppearance = (canvas: OpenCanvas): Promise<string | undefined> => app.evaluate((_electron, id) => (globalThis as any).arcBrowser.canvases.files(id).readScene()?.appearance, canvas.id)
 const reopen = (canvas: OpenCanvas) => app.evaluate((_electron, id) => (globalThis as any).arcBrowser.canvases.page(id).wc.reload(), canvas.id)
 
 const texts = (board: Page) => board.locator('.item.text')
@@ -282,6 +283,19 @@ test.describe('the bars around the board', () => {
     expect(gapAboveTitle).toBeGreaterThan(0)
     expect(gapAboveTitle).toBeLessThan(40)
     await expect(canvas.board.locator('.stylebar .size')).toHaveText(['Body', 'Heading', 'Title'])
+  })
+
+  test('the light/dark button gives the board the other look, and the canvas keeps it when opened again', async () => {
+    const canvas = await openCanvas('Night board')
+    const page = canvas.board.locator('.canvas-page')
+    const wasDark = await page.evaluate((element) => element.classList.contains('dark'))
+    const otherLook = wasDark ? 'light' : 'dark'
+    await canvas.board.locator('.appearance-button').click()
+    await expect(page).toHaveClass(wasDark ? 'canvas-page' : 'canvas-page dark')
+    await expect.poll(() => savedAppearance(canvas)).toBe(otherLook)
+    await page.evaluate((element) => element.setAttribute('data-from-before-reopening', ''))
+    await reopen(canvas)
+    await expect(canvas.board.locator('.canvas-page:not([data-from-before-reopening])')).toHaveClass(wasDark ? 'canvas-page' : 'canvas-page dark')
   })
 
   test('Find in Page opens nothing on a canvas, which has no page to search', async () => {

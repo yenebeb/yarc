@@ -29,7 +29,7 @@ body {
   -webkit-user-select: none;
 }
 
-:root[data-appearance='dark'] .canvas-page {
+.canvas-page.dark {
   --board: #18171b;
   --card: #2a2930;
   --chrome: #2a2930;
@@ -494,6 +494,10 @@ svg.draft path {
   height: 36px;
   border-radius: 10px;
   background: var(--chrome);
+}
+
+.appearance-button {
+  right: 54px;
 }
 
 .menu {

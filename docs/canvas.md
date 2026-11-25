@@ -380,6 +380,7 @@ Built (2026-11-25):
 - Toolbar groups: select and hand, text, shapes, image.
 - A faint dot grid on the board, so panning an empty part shows movement; zoomed far out, every fourth dot is left.
 - The empty hint also says "Double-click anywhere to write".
+- A light/dark button beside the menu button gives a board its own look, saved with the canvas (`appearance` in the scene); without it the board follows its space.
 
 Built with the notes: the Note tool in the text group. Not built yet: list, checkbox and link buttons on the style bar.
 

@@ -121,7 +121,12 @@ export interface CanvasScene {
   items: BoardItem[]
   view?: { x: number; y: number; zoom: number }
   snapping?: boolean
+  /** The board's own look; without it the board follows its space. */
+  appearance?: BoardAppearance
 }
+
+export type BoardAppearance = 'light' | 'dark'
+export const isBoardAppearance = (value: unknown): value is BoardAppearance => value === 'light' || value === 'dark'
 
 export interface CanvasLoad {
   id: string

@@ -1,7 +1,7 @@
 import { BrowserWindow, clipboard, ClipboardItem, dialog, nativeImage, View, WebContentsView, type Event, type Input, type IpcMainEvent, type WebContents } from 'electron'
 import { existsSync, mkdirSync, renameSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { FILE_ID, IMAGE_TYPES, type CanvasImage, type CanvasLoad, type CanvasScene, type CaptureGeometry, type CaptureSource, type LiveCard } from '../shared/canvas'
+import { FILE_ID, IMAGE_TYPES, isBoardAppearance, type CanvasImage, type CanvasLoad, type CanvasScene, type CaptureGeometry, type CaptureSource, type LiveCard } from '../shared/canvas'
 import { IPC } from '../shared/ipc'
 import { bindingLabel, commandForInput, type CommandId } from '../shared/keymap'
 import { findCanvas } from '../shared/tree'
@@ -312,7 +312,7 @@ export class Canvases {
       if (!m || !FILE_ID.test(fileId) || !IMAGE_TYPES[m[1]]) continue
       files.writeImage(fileId, Buffer.from(m[2], 'base64'), m[1])
     }
-    files.writeScene({ items: scene.items, view: scene.view, snapping: scene.snapping })
+    files.writeScene({ items: scene.items, view: scene.view, snapping: scene.snapping, appearance: isBoardAppearance(scene.appearance) ? scene.appearance : undefined })
   }
 
   private play(page: CanvasPage, cards: LiveCard[]): void {
