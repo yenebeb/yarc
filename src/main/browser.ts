@@ -313,11 +313,15 @@ export class Browser implements TabHost {
     }
     state.lastSeenVersion = app.getVersion()
     this.changed()
-    if (!this.store.firstRun || plainWindowForTests()) return
-    const showTour = () => this.setOverlay({ kind: 'tour', step: 'welcome' })
+    if (plainWindowForTests()) return
+    if (this.store.firstRun) this.whenWindowShows(() => this.setOverlay({ kind: 'tour', step: 'welcome' }))
+    else if (this.waitingNews.spotlights.length) this.whenWindowShows(() => this.openWhatsNew())
+  }
+
+  private whenWindowShows(show: () => void): void {
     const win = this.window.win
-    if (win.isVisible()) showTour()
-    else win.once('show', showTour)
+    if (win.isVisible()) show()
+    else win.once('show', show)
   }
 
   private markSpotlightsSeen(): void {
@@ -348,7 +352,7 @@ export class Browser implements TabHost {
     return { boards: this.boardsToOffer().map((id) => ({ spotlight: id, title: spotlight(id)?.title ?? id })) }
   }
 
-  /** Only ever on the user's click. What waits when there is something, else the latest changes and features. */
+  /** On the user's click, or at launch for an unseen spotlight. What waits when there is something, else the latest changes and features. */
   private openWhatsNew(): void {
     const { releases } = this.waitingNews
     this.setOverlay({
@@ -371,7 +375,7 @@ export class Browser implements TabHost {
     const activeId = this.space.activeItemId
     if ((activeId && this.hasItem(activeId)) || this.store.firstRun || plainWindowForTests()) return
     const window = this.cur
-    const openCommandBar = () => this.inWin(window, () => this.runCommand('newTab'))
+    const openCommandBar = () => window.main.overlayMode.kind === 'whats-new' || this.inWin(window, () => this.runCommand('newTab'))
     if (window.main.win.isVisible()) openCommandBar()
     else window.main.win.once('show', openCommandBar)
   }
