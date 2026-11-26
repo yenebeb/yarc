@@ -649,3 +649,13 @@ svg.draft path {
   margin: 4px 6px;
   background: var(--line);
 }
+
+.item.image > .spotlight-picture {
+  --panel: var(--card);
+  --space: var(--accent);
+  --text: var(--chrome-text);
+  height: 100%;
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+  pointer-events: none;
+}

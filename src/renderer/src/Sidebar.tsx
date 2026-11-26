@@ -167,6 +167,7 @@ export function Sidebar({ state, floating }: { state: AppState; floating?: boole
 
       <MediaCards state={state} />
       <UpdatePill update={state.update} />
+      {state.update.state === 'none' || state.update.state === 'downloading' ? <WhatsNewPill waiting={state.whatsNewWaiting} /> : null}
       <BottomBar ctx={ctx} />
     </div>
   )
@@ -189,6 +190,21 @@ function UpdatePill({ update }: { update: UpdateStatus }) {
         <span>{ready ? 'Restart to Update' : 'Update Available'}</span>
       </button>
       <button className="icon-btn update-pill-close" title="Hide until YARC restarts" onClick={() => setDismissed(true)}>
+        <Icon name="x" size={12} />
+      </button>
+    </div>
+  )
+}
+
+function WhatsNewPill({ waiting }: { waiting: number }) {
+  if (!waiting) return null
+  return (
+    <div className="update-pill">
+      <button className="update-pill-main" title="See what changed in YARC, on a canvas" onClick={() => dispatch({ type: 'command', id: 'whatsNew' })}>
+        <Icon name="canvas" size={13} />
+        <span>What’s New</span>
+      </button>
+      <button className="icon-btn update-pill-close" title="Hide until the next update" onClick={() => dispatch({ type: 'hideWhatsNew' })}>
         <Icon name="x" size={12} />
       </button>
     </div>

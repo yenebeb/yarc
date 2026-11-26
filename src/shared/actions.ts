@@ -99,6 +99,7 @@ export type Action =
   | { type: 'sitePermission'; profileId: ID; origin: string; key: string; setting: 'allow' | 'block' | 'reset' }
   | { type: 'renameCanvas'; id: ID; name: string }
   | { type: 'canvasMenu'; id: ID }
+  | { type: 'hideWhatsNew' }
   /** `rect` is in overlay page coordinates. */
   | { type: 'capture'; rect: Rect; to: CaptureTo; whole?: boolean }
 

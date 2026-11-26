@@ -1,0 +1,255 @@
+{
+  "items": [
+    {
+      "id": "title",
+      "kind": "text",
+      "x": 0,
+      "y": 0,
+      "width": 382,
+      "height": 45,
+      "text": "Take notes on a canvas",
+      "size": "title",
+      "color": "ink",
+      "title": true
+    },
+    {
+      "id": "underline",
+      "kind": "draw",
+      "color": "purple",
+      "x": 2,
+      "y": 50,
+      "width": 396,
+      "height": 12,
+      "drawnWidth": 396,
+      "drawnHeight": 12,
+      "points": [
+        0,
+        7,
+        36,
+        2,
+        74,
+        9,
+        112,
+        3,
+        150,
+        10,
+        190,
+        3,
+        228,
+        9,
+        268,
+        3,
+        306,
+        10,
+        346,
+        4,
+        396,
+        7
+      ]
+    },
+    {
+      "id": "subtitle",
+      "kind": "text",
+      "x": 0,
+      "y": 78,
+      "width": 515,
+      "height": 20,
+      "text": "New in YARC. This board is yours: move, tick and rewrite anything on it.",
+      "size": "body",
+      "color": "grey"
+    },
+    {
+      "id": "start-zone",
+      "kind": "rect",
+      "color": "yellow",
+      "fill": true,
+      "x": -18,
+      "y": 134,
+      "width": 396,
+      "height": 212
+    },
+    {
+      "id": "start",
+      "kind": "text",
+      "x": 0,
+      "y": 152,
+      "width": 360,
+      "height": 154,
+      "text": "# Start here\n[x] Open this board\n[ ] Tick this box\n[ ] Press N, click anywhere and write\n[ ] Drag my right edge to make me narrower\n[ ] Double-click me to change what I say",
+      "size": "body",
+      "color": "ink",
+      "card": true,
+      "wrapWidth": 360
+    },
+    {
+      "id": "to-lists",
+      "kind": "arrow",
+      "color": "purple",
+      "x": 388,
+      "y": 200,
+      "width": 64,
+      "height": 0,
+      "flipX": false,
+      "flipY": false
+    },
+    {
+      "id": "lists",
+      "kind": "text",
+      "x": 470,
+      "y": 152,
+      "width": 330,
+      "height": 134,
+      "text": "# Lists write themselves\n- Start a line with a dash\n- Enter gives you the next one\n  - Tab moves a line in\n- Enter on an empty line ends the list",
+      "size": "body",
+      "color": "ink",
+      "card": true,
+      "wrapWidth": 330
+    },
+    {
+      "id": "marks-hint",
+      "kind": "text",
+      "x": 470,
+      "y": 312,
+      "width": 281,
+      "height": 30,
+      "text": "Start a line with  -  [ ]  or  #",
+      "size": "heading",
+      "color": "orange"
+    },
+    {
+      "id": "marks-hint-2",
+      "kind": "text",
+      "x": 470,
+      "y": 348,
+      "width": 261,
+      "height": 20,
+      "text": "and that is all the formatting there is",
+      "size": "body",
+      "color": "grey"
+    },
+    {
+      "id": "quote",
+      "kind": "text",
+      "x": 0,
+      "y": 392,
+      "width": 360,
+      "height": 129,
+      "text": "“Select text on any page, right-click it and choose Add Selection to Canvas. It lands here as a note that remembers its page.”",
+      "size": "body",
+      "color": "ink",
+      "card": true,
+      "wrapWidth": 360,
+      "source": {
+        "url": "https://github.com/yenebeb/yarc#readme",
+        "title": "YARC on GitHub"
+      }
+    },
+    {
+      "id": "link",
+      "kind": "text",
+      "x": 470,
+      "y": 420,
+      "width": 330,
+      "height": 84,
+      "text": "Links are links: ⌘-click https://github.com/yenebeb/yarc to peek at it without leaving the board.",
+      "size": "body",
+      "color": "ink",
+      "card": true,
+      "wrapWidth": 330
+    },
+    {
+      "id": "key",
+      "kind": "rect",
+      "color": "grey",
+      "fill": false,
+      "x": 0,
+      "y": 560,
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "key-letter",
+      "kind": "text",
+      "x": 19,
+      "y": 568,
+      "width": 26,
+      "height": 45,
+      "text": "N",
+      "size": "title",
+      "color": "ink"
+    },
+    {
+      "id": "key-hint",
+      "kind": "text",
+      "x": 82,
+      "y": 580,
+      "width": 200,
+      "height": 20,
+      "text": "is the only key to remember",
+      "size": "body",
+      "color": "grey"
+    },
+    {
+      "id": "live-title",
+      "kind": "text",
+      "x": 880,
+      "y": 104,
+      "width": 319,
+      "height": 30,
+      "text": "Everything else in this update",
+      "size": "heading",
+      "color": "ink"
+    },
+    {
+      "id": "releases",
+      "kind": "capture",
+      "fileId": "releases-still",
+      "source": {
+        "url": "https://github.com/yenebeb/yarc/releases",
+        "title": "YARC releases on GitHub"
+      },
+      "capture": {
+        "viewport": {
+          "width": 1100,
+          "height": 900
+        },
+        "rect": {
+          "x": 304,
+          "y": 180,
+          "width": 788,
+          "height": 640
+        },
+        "scroll": {
+          "x": 0,
+          "y": 0
+        }
+      },
+      "x": 880,
+      "y": 152,
+      "width": 400,
+      "height": 325
+    },
+    {
+      "id": "to-card",
+      "kind": "arrow",
+      "color": "blue",
+      "x": 1010,
+      "y": 540,
+      "width": 36,
+      "height": 44,
+      "flipX": true,
+      "flipY": true
+    },
+    {
+      "id": "play-hint",
+      "kind": "text",
+      "x": 1056,
+      "y": 560,
+      "width": 216,
+      "height": 40,
+      "text": "Point at the card and press ▶:\nit becomes the real page",
+      "size": "body",
+      "color": "blue"
+    }
+  ]
+}

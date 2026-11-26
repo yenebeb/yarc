@@ -1,10 +1,11 @@
 import { BrowserWindow, clipboard, ClipboardItem, dialog, nativeImage, View, WebContentsView, type Event, type Input, type IpcMainEvent, type WebContents } from 'electron'
-import { existsSync, mkdirSync, renameSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { FILE_ID, IMAGE_TYPES, isBoardAppearance, MAX_QUOTE_LENGTH, type CanvasImage, type CanvasLoad, type CanvasScene, type CaptureGeometry, type CaptureSource, type LiveCard, type QueuedInboxItem } from '../shared/canvas'
 import { IPC } from '../shared/ipc'
 import { bindingLabel, commandForInput, type CommandId } from '../shared/keymap'
-import { findCanvas } from '../shared/tree'
+import { findCanvas, spaceCanvases } from '../shared/tree'
+import { spotlight } from '../shared/spotlights'
 import type { CaptureTo } from '../shared/actions'
 import type { ID, PinnedCanvas, Rect, Space } from '../shared/types'
 import type { Browser } from './browser'
@@ -16,6 +17,8 @@ import { newId } from './store'
 import type { LiveTab } from './tab'
 import { handleUi, onUi } from './ui-origin'
 import { loadRenderer, uiWebPreferences } from './window'
+import { BOARDS, RELEASES_STILL } from './whats-new-boards'
+import releasesStill from './whats-new-releases.png?asset'
 
 const MAX_IMAGE_BYTES = 25 * 1024 * 1024
 /** YARC shortcuts a focused canvas keeps for itself: ⌘D duplicates, ⌘± and ⌘0 zoom the board. */
@@ -123,6 +126,38 @@ export class Canvases {
     const canvas: PinnedCanvas = { kind: 'canvas', id: newId(), name, lastActive: Date.now() }
     space.pinned.push(canvas)
     return canvas
+  }
+
+  /** One at a time: a new board replaces the one still open. */
+  createWhatsNew(space: Space, spotlightId: string): PinnedCanvas {
+    this.discardTemporary()
+    const canvas = this.create(space, spotlight(spotlightId)?.title)
+    canvas.temporary = true
+    const files = new CanvasFiles(this.root(space.profileId), canvas.id)
+    files.writeImage(RELEASES_STILL, readFileSync(releasesStill), 'image/png')
+    files.writeScene(BOARDS[spotlightId])
+    return canvas
+  }
+
+  keep(id: ID): void {
+    const hit = findCanvas(this.browser.state, id)
+    if (hit) delete hit.canvas.temporary
+  }
+
+  discard(id: ID): void {
+    const hit = findCanvas(this.browser.state, id)
+    if (!hit) return
+    this.dropPage(id)
+    try {
+      new CanvasFiles(this.root(hit.space.profileId), id).remove()
+    } catch (err) {
+      logError('canvas: discard', err)
+    }
+    hit.list.splice(hit.index, 1)
+  }
+
+  discardTemporary(): void {
+    for (const space of this.browser.state.spaces) for (const canvas of spaceCanvases(space)) if (canvas.temporary) this.discard(canvas.id)
   }
 
   rename(id: ID, name: string): void {

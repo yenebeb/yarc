@@ -1,9 +1,11 @@
 import { useLayoutEffect, useRef, type CSSProperties, type ReactNode } from 'react'
 import { arrowEnds, arrowHead, smoothPath, type ArrowItem, type BoardItem, type CanvasImage, type CaptureSource, type CardItem, type Color, type DrawItem, type ImageItem, type TextItem, type TextSize } from '../../shared/canvas'
 import { isListed, linkParts, noteLine, type NoteLine } from '../../shared/canvas-notes'
+import { spotlightOfFile } from '../../shared/whats-new-board'
 import { arc, cx } from './api'
 import { keepTypingOrFinish } from './canvas-text-keys'
 import { Icon } from './icons'
+import { SpotlightPicture } from './panels/spotlight-pictures'
 
 export const STROKE = 2.5
 export const DRAW_STROKE = 3
@@ -182,9 +184,10 @@ export function ItemView({
     )
   }
   if (item.kind === 'image') {
+    const spotlight = spotlightOfFile(item.fileId)
     return (
       <div className={classes} data-id={item.id} style={place}>
-        <img src={files.get(item.fileId)?.dataURL} alt="" draggable={false} />
+        {spotlight ? <SpotlightPicture id={spotlight} /> : <img src={files.get(item.fileId)?.dataURL} alt="" draggable={false} />}
       </div>
     )
   }

@@ -299,6 +299,15 @@ export function buildCanvasMenu(browser: Browser, id: string): Menu | undefined 
   if (!hit) return undefined
   const state = browser.store.state
   const items: MenuItemConstructorOptions[] = [{ label: 'Rename…', click: () => requestEdit(browser, { kind: 'renameCanvas', id }) }]
+  if (hit.canvas.temporary) {
+    items.unshift({
+      label: 'Keep This Canvas',
+      click: () => {
+        browser.canvases.keep(id)
+        browser.changed()
+      }
+    })
+  }
   if (state.spaces.length > 1) {
     items.push({
       label: 'Move to Space',

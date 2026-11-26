@@ -1,0 +1,274 @@
+{
+  "items": [
+    {
+      "id": "title",
+      "kind": "text",
+      "x": 0,
+      "y": 0,
+      "width": 448,
+      "height": 45,
+      "text": "Folders that fill themselves",
+      "size": "title",
+      "color": "ink",
+      "title": true
+    },
+    {
+      "id": "underline",
+      "kind": "draw",
+      "color": "green",
+      "x": 2,
+      "y": 50,
+      "width": 470,
+      "height": 12,
+      "drawnWidth": 470,
+      "drawnHeight": 12,
+      "points": [
+        0,
+        7,
+        42,
+        2,
+        88,
+        9,
+        132,
+        3,
+        178,
+        10,
+        224,
+        3,
+        270,
+        9,
+        316,
+        3,
+        362,
+        10,
+        410,
+        4,
+        470,
+        7
+      ]
+    },
+    {
+      "id": "subtitle",
+      "kind": "text",
+      "x": 0,
+      "y": 78,
+      "width": 532,
+      "height": 20,
+      "text": "New in YARC: a pinned folder that keeps up with GitHub, or with any feed.",
+      "size": "body",
+      "color": "grey"
+    },
+    {
+      "id": "picture",
+      "kind": "image",
+      "fileId": "spotlight-live-folders",
+      "x": 0,
+      "y": 140,
+      "width": 360,
+      "height": 220
+    },
+    {
+      "id": "how",
+      "kind": "text",
+      "x": 0,
+      "y": 392,
+      "width": 360,
+      "height": 134,
+      "text": "# Make one\n[ ] Open the command bar and type “live folder”\n[ ] Pick GitHub, or paste a feed’s address\n[ ] Watch it fill",
+      "size": "body",
+      "color": "ink",
+      "card": true,
+      "wrapWidth": 360
+    },
+    {
+      "id": "private",
+      "kind": "text",
+      "x": 0,
+      "y": 560,
+      "width": 332,
+      "height": 40,
+      "text": "YARC asks GitHub with the space’s own login.\nNothing passes through anyone else.",
+      "size": "body",
+      "color": "grey"
+    },
+    {
+      "id": "sources-title",
+      "kind": "text",
+      "x": 430,
+      "y": 140,
+      "width": 112,
+      "height": 30,
+      "text": "It watches",
+      "size": "heading",
+      "color": "green"
+    },
+    {
+      "id": "mine",
+      "kind": "text",
+      "x": 430,
+      "y": 186,
+      "width": 320,
+      "height": 74,
+      "text": "# Your pull requests\nis:pr is:open author:@me",
+      "size": "body",
+      "color": "ink",
+      "card": true,
+      "wrapWidth": 320
+    },
+    {
+      "id": "reviews",
+      "kind": "text",
+      "x": 430,
+      "y": 284,
+      "width": 320,
+      "height": 74,
+      "text": "# Waiting for your review\nis:pr is:open review-requested:@me",
+      "size": "body",
+      "color": "ink",
+      "card": true,
+      "wrapWidth": 320
+    },
+    {
+      "id": "feed",
+      "kind": "text",
+      "x": 430,
+      "y": 382,
+      "width": 320,
+      "height": 74,
+      "text": "# Any RSS or Atom feed\nA blog, a changelog, a release page",
+      "size": "body",
+      "color": "ink",
+      "card": true,
+      "wrapWidth": 320
+    },
+    {
+      "id": "from-mine",
+      "kind": "arrow",
+      "color": "green",
+      "x": 762,
+      "y": 222,
+      "width": 96,
+      "height": 56,
+      "flipX": false,
+      "flipY": false
+    },
+    {
+      "id": "from-reviews",
+      "kind": "arrow",
+      "color": "green",
+      "x": 762,
+      "y": 321,
+      "width": 96,
+      "height": 0,
+      "flipX": false,
+      "flipY": false
+    },
+    {
+      "id": "from-feed",
+      "kind": "arrow",
+      "color": "green",
+      "x": 762,
+      "y": 360,
+      "width": 96,
+      "height": 58,
+      "flipX": false,
+      "flipY": true
+    },
+    {
+      "id": "sidebar-zone",
+      "kind": "rect",
+      "color": "purple",
+      "fill": true,
+      "x": 870,
+      "y": 140,
+      "width": 350,
+      "height": 256
+    },
+    {
+      "id": "sidebar-title",
+      "kind": "text",
+      "x": 892,
+      "y": 158,
+      "width": 225,
+      "height": 30,
+      "text": "and fills your sidebar",
+      "size": "heading",
+      "color": "purple"
+    },
+    {
+      "id": "folder",
+      "kind": "text",
+      "x": 892,
+      "y": 206,
+      "width": 306,
+      "height": 114,
+      "text": "# Reviews\n- Open popups next to their button\n- Wait for a fresh command bar\n- Bump Electron to 45.5",
+      "size": "body",
+      "color": "ink",
+      "card": true,
+      "wrapWidth": 306
+    },
+    {
+      "id": "leaves",
+      "kind": "text",
+      "x": 892,
+      "y": 340,
+      "width": 259,
+      "height": 40,
+      "text": "Open one and it’s a tab.\nMerged or closed, it leaves by itself.",
+      "size": "body",
+      "color": "grey"
+    },
+    {
+      "id": "feed-hint",
+      "kind": "text",
+      "x": 470,
+      "y": 500,
+      "width": 242,
+      "height": 80,
+      "text": "This page has a feed: a live folder\nof it lists every YARC release.\nPoint at the card and press ▶\nand it’s the real page.",
+      "size": "body",
+      "color": "blue"
+    },
+    {
+      "id": "to-card",
+      "kind": "arrow",
+      "color": "blue",
+      "x": 760,
+      "y": 540,
+      "width": 140,
+      "height": 0,
+      "flipX": false,
+      "flipY": false
+    },
+    {
+      "id": "releases",
+      "kind": "capture",
+      "fileId": "releases-still",
+      "source": {
+        "url": "https://github.com/yenebeb/yarc/releases",
+        "title": "YARC releases on GitHub"
+      },
+      "capture": {
+        "viewport": {
+          "width": 1100,
+          "height": 900
+        },
+        "rect": {
+          "x": 304,
+          "y": 180,
+          "width": 788,
+          "height": 640
+        },
+        "scroll": {
+          "x": 0,
+          "y": 0
+        }
+      },
+      "x": 920,
+      "y": 420,
+      "width": 300,
+      "height": 244
+    }
+  ]
+}

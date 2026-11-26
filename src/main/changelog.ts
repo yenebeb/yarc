@@ -34,6 +34,19 @@ export function pendingReleases(changelog: Changelog, current: string, target: s
   return notes(changelog, (v) => compareVersions(v, current) > 0 && compareVersions(v, target) <= 0)
 }
 
+/** A build that isn't a release has no version of its own to compare with. */
+export function newestVersion(changelog: Changelog): string | undefined {
+  return notes(changelog, () => true)[0]?.version
+}
+
+export const WHATS_NEW_OPENS_EVERY = 86_400_000
+
+/** At the launch after an update: the board opens by itself for a big feature, at most once a day; other changes wait behind a pill. */
+export function whatsNewAtLaunch(waiting: { releases: number; spotlights: number }, shownAt: number | undefined, now: number): 'board' | 'pill' | 'none' {
+  if (!waiting.releases && !waiting.spotlights) return 'none'
+  return waiting.spotlights && now - (shownAt ?? 0) >= WHATS_NEW_OPENS_EVERY ? 'board' : 'pill'
+}
+
 function listsOfText(json: unknown): Record<string, string[]> {
   if (!json || typeof json !== 'object' || Array.isArray(json)) return {}
   return Object.fromEntries(Object.entries(json).filter(([, list]) => Array.isArray(list) && list.every((item) => typeof item === 'string')))

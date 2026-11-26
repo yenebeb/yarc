@@ -131,6 +131,10 @@ export class CanvasFiles {
     utimesSync(join(trash, this.id), now, now)
   }
 
+  remove(): void {
+    rmSync(this.dir, { recursive: true, force: true })
+  }
+
   restore(): void {
     const from = join(this.root, '.trash', this.id)
     if (existsSync(from) && !existsSync(this.dir)) renameSync(from, this.dir)

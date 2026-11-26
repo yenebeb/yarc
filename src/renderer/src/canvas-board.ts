@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, type RefObject } from 'react'
-import { isBoardItem, type BoardItem, type Box, type CanvasImage, type CanvasLoad, type Color, type TextItem, type TextSize } from '../../shared/canvas'
+import { boundsOf, isBoardItem, type BoardItem, type Box, type CanvasImage, type CanvasLoad, type Color, type TextItem, type TextSize } from '../../shared/canvas'
 import { useBoardHistory, useStateRef } from './canvas-hooks'
 import { toScreen, toWorld, type Point, type View } from './canvas-view'
 
@@ -34,6 +34,7 @@ export function useBoard(loaded: CanvasLoad, boardRef: RefObject<HTMLDivElement 
   const files = useRef(new Map<string, CanvasImage>(Object.entries(loaded.files))).current
   const textNodes = useRef(new Map<string, HTMLElement>()).current
   const centerTitle = useRef(!loaded.scene)
+  const fitBoard = useRef(!!loaded.scene && !loaded.scene.view)
 
   const undo = (redo = false) => {
     const restored = undoItems(redo)
@@ -94,6 +95,12 @@ export function useBoard(loaded: CanvasLoad, boardRef: RefObject<HTMLDivElement 
     centerTitle.current = false
     const { width, height } = viewSize()
     setView({ ...viewRef.current, x: Math.round(width / 2 - (title.width / 2) * viewRef.current.zoom), y: Math.round(height / 2 - (title.height / 2) * viewRef.current.zoom) })
+  })
+
+  useLayoutEffect(() => {
+    if (!fitBoard.current || itemsRef.current.some((item) => item.kind === 'text' && !item.width)) return
+    fitBoard.current = false
+    reveal(boundsOf(itemsRef.current))
   })
 
   return {

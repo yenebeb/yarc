@@ -44,6 +44,8 @@ export interface PinnedCanvas {
   id: ID
   name: string
   lastActive: number
+  /** The What's New board until the user keeps it: closing it deletes it. */
+  temporary?: boolean
 }
 
 export type PinnedNode = PinnedTab | PinnedFolder | PinnedCanvas
@@ -141,6 +143,10 @@ export interface PersistedState {
   /** So the next newer version shows What's New. */
   lastSeenVersion?: string
   seenSpotlights?: string[]
+  /** The newest version whose changes the What's New board showed, or its pill was hidden for. */
+  whatsNewSeenVersion?: string
+  /** When the board last opened by itself, in ms since the epoch. */
+  whatsNewShownAt?: number
   waitingUpdate?: WaitingUpdate
   /** The last focused one last. */
   windows: WindowView[]
@@ -245,6 +251,8 @@ export interface AppState extends PersistedState {
   /** `elsewhere`: live in another window, shown here as a still. `bar`: a split pane's bar above the page. */
   layout: { content: Rect; views: { id: ID; rect: Rect; bar?: Rect; elsewhere?: boolean }[]; splitId?: ID }
   update: UpdateStatus
+  /** Updates and big features the What's New board hasn't shown yet. */
+  whatsNewWaiting: number
   sitePermissions: Record<ID, SitePermissionRow[]>
   /** Only on the tour's import step; undefined while still looking. */
   importChoices?: ImportChoice[]
