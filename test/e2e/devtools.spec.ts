@@ -81,13 +81,14 @@ test('Inspect docks Developer Tools, and dragging their edge resizes them', asyn
       browser.inspect(browser.activeTab(), 20, 20)
     })
     await expect(ui.locator('.devtools-bar')).toBeVisible()
-    const before = (await dockedLayout())!.bar.width
+    await dispatch({ type: 'settings', patch: { devtoolsWidth: 300 } })
+    await expect.poll(async () => (await dockedLayout())?.bar.width).toBe(300)
     const edge = (await ui.locator('.devtools-resize').boundingBox())!
     await ui.mouse.move(edge.x + edge.width / 2, edge.y + 200)
     await ui.mouse.down()
-    await ui.mouse.move(edge.x + edge.width / 2 - 100, edge.y + 200, { steps: 5 })
+    await ui.mouse.move(edge.x + edge.width / 2 - 40, edge.y + 200, { steps: 5 })
     await ui.mouse.up()
-    await expect.poll(async () => (await dockedLayout())?.bar.width).toBe(before + 100)
+    await expect.poll(async () => (await dockedLayout())?.bar.width).toBe(340)
   } finally {
     await dispatch({ type: 'settings', patch: { devtoolsWidth: 480 } })
     await dispatch({ type: 'close', id: tabId })
