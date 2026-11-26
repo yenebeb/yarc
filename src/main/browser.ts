@@ -92,6 +92,7 @@ const HOUSEKEEPING_EVERY = 5 * 60_000
 // Slack past the revealed sidebar's edge: room to grab it to resize, and no enter/leave flicker at the screen's edge.
 const SIDEBAR_REVEAL_GRACE_PX = 32
 const SIDEBAR_REVEAL_HIDE_DELAY_MS = 300
+const plainWindowForTests = () => !!process.env.YARC_TEST && !process.env.YARC_STARTUP_SCREENS
 
 /** Find on a canvas goes to its own page, which searches the board's texts. */
 const CANVAS_FIND_OPS = { find: 'open', findNext: 'next', findPrev: 'previous' } as const
@@ -201,6 +202,7 @@ export class Browser implements TabHost {
     return [...this.littles].filter((little) => !little.win.isDestroyed())
   }
   private tour: TourStep | undefined
+  private startupScreenShown = false
   private readonly imports = new ImportScan(() => this.emitSoon())
   private legacyWindowFile: string | undefined
   private static readonly all = new Set<Browser>()
@@ -295,7 +297,8 @@ export class Browser implements TabHost {
     }
     state.lastSeenVersion = app.getVersion()
     this.changed()
-    if (!this.store.firstRun || (process.env.YARC_TEST && !process.env.YARC_STARTUP_SCREENS)) return
+    if (!this.store.firstRun || plainWindowForTests()) return
+    this.startupScreenShown = true
     const showTour = () => this.setOverlay({ kind: 'tour', step: 'welcome' })
     const win = this.window.win
     if (win.isVisible()) showTour()
@@ -347,6 +350,17 @@ export class Browser implements TabHost {
     if (this.incognito || !hasBoard(spotlightId)) return
     this.setOverlay({ kind: 'none' })
     this.activate(this.canvases.createWhatsNew(this.space, spotlightId).id)
+  }
+
+  /** At launch, a window with no page or canvas to show opens the command bar for a new tab. */
+  openCommandBarIfBlank(): void {
+    const activeId = this.space.activeItemId
+    const showsSomething = !!activeId && !!(findItem(this.state, activeId) || findCanvas(this.state, activeId))
+    if (showsSomething || this.startupScreenShown || plainWindowForTests()) return
+    const window = this.cur
+    const openCommandBar = () => this.inWin(window, () => this.runCommand('newTab'))
+    if (window.main.win.isVisible()) openCommandBar()
+    else window.main.win.once('show', openCommandBar)
   }
 
   private tourEvent(event: TourEvent): void {

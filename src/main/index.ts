@@ -136,6 +136,7 @@ if (!app.requestSingleInstanceLock()) {
     installJumpList()
     if (pendingUrls.length) for (const url of pendingUrls.splice(0)) browser.openExternalUrl(url)
     else if (pendingTask) runTask(browser, pendingTask)
+    else browser.openCommandBarIfBlank()
     pendingTask = undefined
 
     app.on('activate', () => {

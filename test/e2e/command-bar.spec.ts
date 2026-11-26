@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { app, base, dispatch, mod, openCommandBar, overlayKind, pageWithUrl, pressInActiveTab, space, state, useApp } from './app'
+import { app, base, dispatch, mod, openCommandBar, overlayKind, pageWithUrl, pressInActiveTab, restart, space, state, useApp } from './app'
 
 useApp()
 
@@ -122,4 +122,18 @@ test('Tab to Search: a site name, Tab, then a query searches that site, like Arc
   } finally {
     await app.evaluate(({ session }, partitionName) => session.fromPartition(partitionName).protocol.unhandle('https'), partition)
   }
+})
+
+test('launching to an empty window opens the command bar for a new tab, and launching to a page does not', async () => {
+  const withStartupScreens = { YARC_STARTUP_SCREENS: '1' }
+  const windowShown = () => app.evaluate(() => (globalThis as any).arcBrowser.window.win.isVisible())
+  for (let closed = 0; (await space()).activeItemId && closed < 50; closed++) await dispatch({ type: 'close', id: (await space()).activeItemId! })
+  expect((await space()).activeItemId).toBeUndefined()
+  await restart(withStartupScreens)
+  await expect.poll(overlayKind).toBe('command')
+  await dispatch({ type: 'overlay', mode: { kind: 'none' } })
+  await dispatch({ type: 'open', url: `${base}/launch-page`, where: 'tab' })
+  await restart(withStartupScreens)
+  await expect.poll(windowShown).toBe(true)
+  expect(await overlayKind()).toBe('none')
 })

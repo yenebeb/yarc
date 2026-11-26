@@ -66,14 +66,14 @@ function newUserData(): string {
   return dir
 }
 
-async function launch(): Promise<ElectronApplication> {
+async function launch(env: Record<string, string> = {}): Promise<ElectronApplication> {
   // YARC_EXE runs the suite against a packaged app (e.g. release/win-unpacked/YARC.exe).
   const exe = process.env.YARC_EXE
   const launched = await electron.launch({
     ...(exe ? { executablePath: exe, args: [] } : { args: ['out/main/index.js'] }),
     // Playwright otherwise adds --no-sandbox on Linux, and service-worker preloads (extension APIs) don't run without the sandbox.
     chromiumSandbox: true,
-    env: { ...process.env, YARC_USER_DATA: userData, YARC_TEST: '1' }
+    env: { ...process.env, YARC_USER_DATA: userData, YARC_TEST: '1', ...env }
   })
   await launched.firstWindow()
   await expect.poll(() => launched.evaluate(() => !!(globalThis as { arcBrowser?: unknown }).arcBrowser)).toBe(true)
@@ -97,9 +97,9 @@ export function useApp(): void {
 }
 
 /** Quits and starts the app again on the same profile. */
-export async function restart(): Promise<void> {
+export async function restart(env: Record<string, string> = {}): Promise<void> {
   await app.close()
-  app = await launch()
+  app = await launch(env)
 }
 
 export const state = (): Promise<AppState> => app.evaluate(() => (globalThis as any).arcBrowser.snapshot())
