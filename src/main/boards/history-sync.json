@@ -56,7 +56,7 @@
       "height": 20,
       "text": "New in YARC: history syncs between your computers, encrypted, through a place you choose.",
       "size": "body",
-      "color": "grey"
+      "color": "ink"
     },
     {
       "id": "picture",
@@ -64,88 +64,19 @@
       "fileId": "spotlight-history-sync",
       "x": 0,
       "y": 132,
-      "width": 1020,
-      "height": 340
+      "width": 1002,
+      "height": 366
     },
     {
-      "id": "hint-watch",
+      "id": "hint-releases",
       "kind": "text",
-      "x": 734,
-      "y": 76,
-      "width": 118,
-      "height": 20,
-      "text": "Watch it happen",
+      "x": 1032,
+      "y": 78,
+      "width": 300,
+      "height": 40,
+      "text": "What else shipped: this is the real page.\nPoint at it and press ▶",
       "size": "body",
-      "color": "purple"
-    },
-    {
-      "id": "next-places",
-      "kind": "arrow",
-      "color": "purple",
-      "x": 324,
-      "y": 607,
-      "width": 22,
-      "height": 0,
-      "flipX": false,
-      "flipY": false
-    },
-    {
-      "id": "next-nobody",
-      "kind": "arrow",
-      "color": "purple",
-      "x": 674,
-      "y": 607,
-      "width": 22,
-      "height": 0,
-      "flipX": false,
-      "flipY": false
-    },
-    {
-      "id": "how",
-      "kind": "image",
-      "fileId": "spotlight-history-sync-turn-it-on",
-      "x": 0,
-      "y": 496,
-      "width": 320,
-      "height": 222
-    },
-    {
-      "id": "places",
-      "kind": "image",
-      "fileId": "spotlight-history-sync-places",
-      "x": 350,
-      "y": 496,
-      "width": 320,
-      "height": 222
-    },
-    {
-      "id": "nobody-else",
-      "kind": "image",
-      "fileId": "spotlight-history-sync-nobody-else",
-      "x": 700,
-      "y": 496,
-      "width": 320,
-      "height": 222
-    },
-    {
-      "id": "to-card",
-      "kind": "arrow",
-      "color": "purple",
-      "x": 716,
-      "y": 52,
-      "width": 0,
-      "height": 70,
-      "flipX": false,
-      "flipY": false
-    },
-    {
-      "id": "try-it",
-      "kind": "image",
-      "fileId": "spotlight-history-sync-try-it",
-      "x": 336,
-      "y": 742,
-      "width": 348,
-      "height": 68
+      "color": "ink"
     },
     {
       "id": "releases",
@@ -171,21 +102,37 @@
           "y": 0
         }
       },
-      "x": 1054,
-      "y": 132,
-      "width": 430,
-      "height": 349
+      "x": 1038,
+      "y": 138,
+      "width": 436,
+      "height": 354
     },
     {
-      "id": "hint-releases",
-      "kind": "text",
-      "x": 1054,
-      "y": 80,
-      "width": 243,
-      "height": 40,
-      "text": "What else shipped: this is the real\npage. Point at it and press ▶",
-      "size": "body",
-      "color": "purple"
+      "id": "how",
+      "kind": "image",
+      "fileId": "spotlight-history-sync-turn-it-on",
+      "x": 0,
+      "y": 528,
+      "width": 560,
+      "height": 232
+    },
+    {
+      "id": "places",
+      "kind": "image",
+      "fileId": "spotlight-history-sync-places",
+      "x": 590,
+      "y": 528,
+      "width": 412,
+      "height": 232
+    },
+    {
+      "id": "who-can-read-it",
+      "kind": "image",
+      "fileId": "spotlight-history-sync-who-can-read-it",
+      "x": 1032,
+      "y": 528,
+      "width": 448,
+      "height": 232
     }
   ],
   "background": "purple"

@@ -2,6 +2,7 @@
 import type { ReactNode } from 'react'
 import logo from '../../../../build/icon.svg'
 import { arc } from '../api'
+import { Icon, type IconName } from '../icons'
 import './spotlights.css'
 
 export function MiniWindow({ tabs = 4, active = 0, children }: { tabs?: number; active?: number; children?: ReactNode }) {
@@ -143,55 +144,91 @@ function LiveFolders() {
 
 const SYNCED_PAGES = ['github.com/yenebeb/yarc', 'en.wikipedia.org/wiki/WebDAV', 'news.ycombinator.com']
 const SEALED_FILES = ['9f2c41d07ab35e88c1f6', '04be7719e3c2a6f05d2b', 'c7a0153b9e48d2f61a70']
-const SYNC_STEPS = ['Picked a place', 'Chose a sync password', 'Visited three pages', 'Unlocked the other computer']
 
 function HistoryList({ rows }: { rows: string[] }) {
   return (
     <ul>
       {rows.map((row) => (
-        <li key={row}>{row}</li>
+        <li key={row}>
+          <span>{row}</span>
+        </li>
       ))}
     </ul>
+  )
+}
+
+function PasswordGate({ icon, children }: { icon: IconName; children: ReactNode }) {
+  return (
+    <div className="hs-gate">
+      <header>
+        <b>
+          <Icon name={icon} size={18} stroke={2.2} />
+        </b>
+        {children}
+      </header>
+      <ul>
+        {SYNCED_PAGES.map((page) => (
+          <li key={page}>
+            <span className="hs-then" />
+          </li>
+        ))}
+      </ul>
+    </div>
   )
 }
 
 function HistorySyncFlow() {
   return (
     <div className="hs-flow">
-      <ol className="hs-steps">
-        {SYNC_STEPS.map((step) => (
-          <li key={step}>{step}</li>
-        ))}
-      </ol>
-      <div className="hs-stages">
-        <section className="hs-stage">
+      <section className="hs-stage">
+        <header>
+          <Icon name="screen" size={28} />
           <h4>This computer</h4>
-          <p>Encrypts your history with your password</p>
-          <HistoryList rows={SYNCED_PAGES} />
-        </section>
-        <span className="hs-then" />
-        <section className="hs-stage hs-sealed">
+          <p>Your history, as you browsed it</p>
+        </header>
+        <HistoryList rows={SYNCED_PAGES} />
+      </section>
+      <PasswordGate icon="lock">
+        Sealed with
+        <br />
+        your password
+      </PasswordGate>
+      <section className="hs-stage hs-sealed">
+        <header>
+          <Icon name="folder" size={28} />
           <h4>A place you own</h4>
-          <p>iCloud Drive, a folder, your own server. It only ever sees this</p>
-          <HistoryList rows={SEALED_FILES} />
-        </section>
-        <span className="hs-then" />
-        <section className="hs-stage">
+          <p>It only ever sees this</p>
+        </header>
+        <HistoryList rows={SEALED_FILES} />
+      </section>
+      <PasswordGate icon="unlock">
+        Opened with
+        <br />
+        the same one
+      </PasswordGate>
+      <section className="hs-stage">
+        <header>
+          <Icon name="screen" size={28} />
           <h4>Your other computer</h4>
           <p>Same password, same history</p>
-          <HistoryList rows={SYNCED_PAGES} />
-        </section>
-      </div>
+        </header>
+        <HistoryList rows={SYNCED_PAGES} />
+      </section>
     </div>
   )
 }
 
-const TURN_IT_ON = ['Open Settings and choose Sync', 'Pick where the encrypted files live', 'Choose a sync password', 'Repeat on your other computer']
-const PLACES = ['iCloud Drive', 'A synced folder', 'Your own server', 'Nearby computers']
-const NOBODY_ELSE = [
-  { count: '0', what: 'YARC accounts' },
-  { count: '0', what: 'YARC servers' },
-  { count: '1', what: 'password, known only to you' }
+const TURN_IT_ON = ['Open Settings and choose Sync', 'Pick where the files live', 'Choose a sync password', 'Repeat on your other computer']
+const PLACES: { icon: IconName; name: string }[] = [
+  { icon: 'cloud', name: 'iCloud Drive' },
+  { icon: 'folder', name: 'A synced folder' },
+  { icon: 'server', name: 'Your own server' },
+  { icon: 'nearby', name: 'Nearby computers' }
+]
+const WHO_CAN_READ_IT = [
+  { who: 'Not YARC: no account, no server', canRead: false },
+  { who: 'Not the place you store it', canRead: false },
+  { who: 'Only you, with your password', canRead: true }
 ]
 
 function HistorySyncTurnItOn() {
@@ -203,15 +240,10 @@ function HistorySyncTurnItOn() {
           <li key={step}>{step}</li>
         ))}
       </ol>
+      <button className="hs-try" onPointerDown={(event) => event.stopPropagation()} onClick={() => void arc.canvasSpotlightAction('historySync')}>
+        Set Up Sync
+      </button>
     </section>
-  )
-}
-
-function HistorySyncTryIt() {
-  return (
-    <button className="hs-try" onPointerDown={(event) => event.stopPropagation()} onClick={() => void arc.canvasSpotlightAction('historySync')}>
-      Try it now
-    </button>
   )
 }
 
@@ -220,27 +252,32 @@ function HistorySyncPlaces() {
     <section className="hs-fact">
       <h4>Where it can live</h4>
       <ul className="hs-places">
-        {PLACES.map((place) => (
-          <li key={place}>{place}</li>
+        {PLACES.map(({ icon, name }) => (
+          <li key={name}>
+            <Icon name={icon} size={18} stroke={2} />
+            {name}
+          </li>
         ))}
       </ul>
-      <p>Your own server is any WebDAV address.</p>
+      <p>Your own server is any WebDAV address. Nearby is experimental.</p>
     </section>
   )
 }
 
-function HistorySyncNobodyElse() {
+function HistorySyncWhoCanReadIt() {
   return (
     <section className="hs-fact">
-      <h4>Nobody else</h4>
-      <dl className="hs-counts">
-        {NOBODY_ELSE.map(({ count, what }) => (
-          <div key={what}>
-            <dt>{count}</dt>
-            <dd>{what}</dd>
-          </div>
+      <h4>Who can read it</h4>
+      <ul className="hs-readers">
+        {WHO_CAN_READ_IT.map(({ who, canRead }) => (
+          <li key={who} className={canRead ? 'hs-can-read' : undefined}>
+            <b>
+              <Icon name={canRead ? 'lock' : 'x'} size={canRead ? 17 : 14} stroke={2.2} />
+            </b>
+            {who}
+          </li>
         ))}
-      </dl>
+      </ul>
     </section>
   )
 }
@@ -283,9 +320,8 @@ function HistorySyncSmall() {
 const PICTURES: Record<string, () => ReactNode> = {
   'history-sync': HistorySync,
   'history-sync-turn-it-on': HistorySyncTurnItOn,
-  'history-sync-try-it': HistorySyncTryIt,
   'history-sync-places': HistorySyncPlaces,
-  'history-sync-nobody-else': HistorySyncNobodyElse,
+  'history-sync-who-can-read-it': HistorySyncWhoCanReadIt,
   'canvas-notes': CanvasNotes,
   'live-folders': LiveFolders,
   'traffic-control': TrafficControl,
