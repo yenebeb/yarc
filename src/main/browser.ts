@@ -202,7 +202,6 @@ export class Browser implements TabHost {
     return [...this.littles].filter((little) => !little.win.isDestroyed())
   }
   private tour: TourStep | undefined
-  private startupScreenShown = false
   private readonly imports = new ImportScan(() => this.emitSoon())
   private legacyWindowFile: string | undefined
   private static readonly all = new Set<Browser>()
@@ -298,7 +297,6 @@ export class Browser implements TabHost {
     state.lastSeenVersion = app.getVersion()
     this.changed()
     if (!this.store.firstRun || plainWindowForTests()) return
-    this.startupScreenShown = true
     const showTour = () => this.setOverlay({ kind: 'tour', step: 'welcome' })
     const win = this.window.win
     if (win.isVisible()) showTour()
@@ -352,11 +350,9 @@ export class Browser implements TabHost {
     this.activate(this.canvases.createWhatsNew(this.space, spotlightId).id)
   }
 
-  /** At launch, a window with no page or canvas to show opens the command bar for a new tab. */
   openCommandBarIfBlank(): void {
     const activeId = this.space.activeItemId
-    const showsSomething = !!activeId && !!(findItem(this.state, activeId) || findCanvas(this.state, activeId))
-    if (showsSomething || this.startupScreenShown || plainWindowForTests()) return
+    if ((activeId && this.hasItem(activeId)) || this.store.firstRun || plainWindowForTests()) return
     const window = this.cur
     const openCommandBar = () => this.inWin(window, () => this.runCommand('newTab'))
     if (window.main.win.isVisible()) openCommandBar()
