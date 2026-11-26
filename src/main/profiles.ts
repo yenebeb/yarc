@@ -7,7 +7,7 @@ import { PermissionQueue, type MediaType } from './permission-queue'
 import { SessionCookies, type Cipher } from './session-cookies'
 import { SiteDecisions } from './site-permissions'
 import { swipeToNavigate } from './swipe-nav'
-import { CHROME_UA_HOSTS, userAgentFor } from './useragent'
+import { CHROME_IDENTITY_URLS, clientHintsFor, userAgentFor } from './useragent'
 import { PERMISSION_KEYS, permissionOrigin } from '../shared/permissions'
 import type { ID } from '../shared/types'
 import { originOf } from '../shared/url'
@@ -239,11 +239,13 @@ export class Profiles {
 
 type HeaderRewrite = (details: OnBeforeSendHeadersListenerDetails, headers: Record<string, string>) => Record<string, string> | undefined
 
-/** A session has one onBeforeSendHeaders listener: Teams' UA, plus extensions' header rules while they have any (they cost every request a trip to main). */
+/** A session has one onBeforeSendHeaders listener: Chrome's identity for the sites that want it, plus extensions' header rules while they have any (they cost every request a trip to main). */
 export function listenBeforeSendHeaders(ses: Session, extensions?: HeaderRewrite): void {
-  const urls = extensions ? ['<all_urls>'] : CHROME_UA_HOSTS.map((host) => `*://${host}/*`)
+  const urls = extensions ? ['<all_urls>'] : CHROME_IDENTITY_URLS
   ses.webRequest.onBeforeSendHeaders({ urls }, (details, callback) => {
-    const headers = { ...details.requestHeaders, 'User-Agent': userAgentFor(details.url, app.userAgentFallback) }
+    // Chrome sends its client hints before its other headers.
+    const hints = clientHintsFor(details.url, process.versions.chrome, process.platform)
+    const headers = { ...hints, ...details.requestHeaders, 'User-Agent': userAgentFor(details.url, app.userAgentFallback) }
     callback({ requestHeaders: extensions?.(details, headers) ?? headers })
   })
 }
