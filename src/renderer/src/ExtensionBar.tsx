@@ -30,9 +30,9 @@ export function useBrowserActions(partition: string, enabled = true): Set<string
     // Before the profile's extensions start, the library drops the subscription for good.
     if (!enabled) return
     const onUpdate = (state: ActionState) => {
-      setIds(new Set(state.actions.map((a) => a.id)))
+      setIds(new Set(state.actions.map((action) => action.id)))
       // A standalone button only redraws when one of its attributes changes.
-      for (const b of document.querySelectorAll<HTMLButtonElement & { update(): void }>('button[is="browser-action"]')) b.update()
+      for (const button of document.querySelectorAll<HTMLButtonElement & { update(): void }>('button[is="browser-action"]')) button.update()
     }
     const api = browserAction()
     api.addEventListener('update', onUpdate)
@@ -55,20 +55,20 @@ export const actionAlignment = (state: AppState) => (state.settings.sidebarRight
 export function ExtensionBar({ state, profileId, tab }: { state: AppState; profileId: ID; tab?: number }) {
   const installed = state.extensions[profileId] ?? []
   const ready = useBrowserActions(partitionOf(profileId), installed.length > 0)
-  const profile = state.profiles.find((p) => p.id === profileId)
+  const profile = state.profiles.find((candidate) => candidate.id === profileId)
   if (!installed.length || !profile) return null
   return (
     <>
       {pinnedOf(profile, installed)
-        .filter((e) => ready.has(e.id))
-        .map((e) => (
-          <ExtensionButton key={e.id} id={e.id} profileId={profileId} tab={tab} alignment={actionAlignment(state)} />
+        .filter((extension) => ready.has(extension.id))
+        .map((extension) => (
+          <ExtensionButton key={extension.id} id={extension.id} profileId={profileId} tab={tab} alignment={actionAlignment(state)} />
         ))}
       <button
         className="icon-btn extensions-button"
         title="Extensions"
-        onClick={(e) => {
-          const { x, y, width, height } = e.currentTarget.getBoundingClientRect()
+        onClick={(event) => {
+          const { x, y, width, height } = event.currentTarget.getBoundingClientRect()
           dispatch({ type: 'extensionsPopover', profileId, anchor: { x, y, width, height } })
         }}
       >

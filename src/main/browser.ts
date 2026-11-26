@@ -635,9 +635,9 @@ export class Browser implements TabHost {
   }
 
   setExtensionPin(profileId: ID, extensionId: string, pinned: boolean): void {
-    const p = this.store.profile(profileId)
-    if (!p) return
-    p.pinnedExtensions = withPin(p.pinnedExtensions ?? [], extensionId, pinned)
+    const profile = this.store.profile(profileId)
+    if (!profile) return
+    profile.pinnedExtensions = withPin(profile.pinnedExtensions ?? [], extensionId, pinned)
     this.changed()
   }
 

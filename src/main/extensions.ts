@@ -126,7 +126,7 @@ export class Extensions {
     const profile = b.store.profile(rt.id)
     // Extensions installed before pins existed stay pinned; later installs start unpinned.
     if (profile && !profile.pinnedExtensions) {
-      profile.pinnedExtensions = b.extensionList[rt.id].map((e) => e.id)
+      profile.pinnedExtensions = b.extensionList[rt.id].map((extension) => extension.id)
       b.changed()
     }
     const update = () => updateExtensions(rt.session).catch((err: unknown) => console.warn('[extensions] update failed', err))

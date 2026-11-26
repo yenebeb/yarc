@@ -57,7 +57,7 @@ function App() {
         </>
       )
     case 'extensions':
-      return <ExtensionsPopover key={key} state={state} profileId={mode.profileId} anchor={mode.anchor} close={close} />
+      return <ExtensionsPopover key={freshOnEachOpen} state={state} profileId={mode.profileId} anchor={mode.anchor} close={close} />
     case 'settings':
       return (
         <>

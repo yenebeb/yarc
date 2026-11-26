@@ -9,7 +9,7 @@ test('pinned extensions come in pin order, only those installed', () => {
     { id: 'c', name: 'C' }
   ]
   assert.deepEqual(
-    pinnedOf({ id: 'p', name: 'P', favorites: [], pinnedExtensions: ['c', 'gone', 'a'] }, installed).map((e) => e.id),
+    pinnedOf({ id: 'p', name: 'P', favorites: [], pinnedExtensions: ['c', 'gone', 'a'] }, installed).map((extension) => extension.id),
     ['c', 'a']
   )
   assert.deepEqual(pinnedOf({ id: 'p', name: 'P', favorites: [] }, installed), [])
