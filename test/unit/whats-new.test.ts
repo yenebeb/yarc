@@ -26,6 +26,21 @@ describe("The app shows a PR's What's New section, not its title", () => {
     assert.deepEqual(whatsNewLines(description('- Pages can share your screen')), ['Pages can share your screen'])
   })
 
+  test("a tool's footer under the section is not a change", () => {
+    const footers = [
+      '🤖 Generated with [Claude Code](https://claude.com/claude-code)',
+      '',
+      'https://claude.ai/code/session_0123',
+      'Co-Authored-By: Claude <noreply@anthropic.com>',
+      '',
+      '---',
+      'Anything under a horizontal rule'
+    ]
+    assert.deepEqual(whatsNewLines(["## What's New", '', '- Pages can share your screen', '', ...footers].join('\n')), ['Pages can share your screen'])
+    assert.deepEqual(whatsNewLines(["## What's New", '', 'none', '', ...footers].join('\n')), [])
+    assert.match(whatsNewProblem(["## What's New", '', ...footers].join('\n')) ?? '', /is empty/)
+  })
+
   test("the heading's apostrophe and case don't matter", () => {
     assert.deepEqual(whatsNewLines('### what’s new\n- Teams meeting links open properly'), ['Teams meeting links open properly'])
   })

@@ -1,12 +1,13 @@
-// The "## What's New" section of a PR description: what YARC users see of the PR, one line per
-// change, in What's New and on the update card (scripts/changelog.mjs). The PR title stays for
-// GitHub. "none" keeps a PR out of the app (CI, tests, docs, refactors nobody notices).
+// The "## What's New" section of a PR description: what YARC users see of the PR, one short line
+// per thing they'll notice, in What's New and on the update card (scripts/changelog.mjs). The PR
+// title stays for GitHub. "none" keeps a PR out of the app (CI, tests, docs, refactors nobody notices).
 //
 //   PR_BODY=… node scripts/whats-new.mjs --check     (CI: fails without a filled-in section)
 
 /**
- * The section's lines, or `undefined` without a section. HTML comments (the template's hints) and
- * bullet markers are dropped; each remaining line is one change.
+ * The section's lines, or `undefined` without a section. It ends at the next heading or horizontal
+ * rule. HTML comments (the template's hints), bullet markers and the footers tools sign a
+ * description with are dropped; each remaining line is one change.
  * @param {string | null | undefined} body
  */
 function section(body) {
@@ -15,12 +16,16 @@ function section(body) {
   if (start < 0) return undefined
   const changes = []
   for (const line of lines.slice(start + 1)) {
-    if (/^#{1,6}\s/.test(line.trim())) break
+    if (endsSection(line.trim())) break
     const text = line.trim().replace(/^[-*+]\s+/, '').trim()
-    if (text) changes.push(text)
+    if (text && !isToolFooter(text)) changes.push(text)
   }
   return changes
 }
+
+const endsSection = (/** @type {string} */ line) => /^#{1,6}\s/.test(line) || /^([-*_])\1{2,}$/.test(line)
+
+const isToolFooter = (/** @type {string} */ text) => /generated (with|by) \[?claude code|^co-authored-by:|^https?:\/\/\S+$/i.test(text)
 
 const isNone = (/** @type {string[]} */ changes) => changes.length === 1 && /^none\.?$/i.test(changes[0])
 
@@ -44,7 +49,7 @@ export function whatsNewLines(body) {
 export function whatsNewProblem(body) {
   const changes = section(body)
   if (!changes) return `The PR description needs a "## What's New" section (.github/pull_request_template.md).`
-  if (!changes.length) return `The "What's New" section is empty: one line per change, in words for YARC users, or "none" for changes they won't notice.`
+  if (!changes.length) return `The "What's New" section is empty: one short line, in words for YARC users, per thing they'll notice, or "none" when they won't notice anything.`
   return undefined
 }
 

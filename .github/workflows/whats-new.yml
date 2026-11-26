@@ -1,7 +1,7 @@
 name: whats-new
 
-# Every PR says what YARC users see of it: a "## What's New" section in its description, with one
-# line per change or "none" (.github/pull_request_template.md, scripts/whats-new.mjs). The release
+# Every PR says what YARC users see of it: a "## What's New" section in its description, with a
+# short line per thing they'll notice or "none" (.github/pull_request_template.md, scripts/whats-new.mjs). The release
 # builds the app's What's New and the update card from it; the title stays on GitHub.
 # Its own workflow, so editing the description re-runs only this check, not the build and tests.
 on:
