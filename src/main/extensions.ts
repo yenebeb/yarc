@@ -2,6 +2,7 @@ import { MenuItem, session, type BaseWindow, type ContextMenuParams, type Menu, 
 import { ElectronChromeExtensions } from 'electron-chrome-extensions'
 import { installChromeWebStore, uninstallExtension, updateExtensions } from 'electron-chrome-web-store'
 import { join } from 'node:path'
+import { everyInstalledPinned } from '../shared/extension-pins'
 import type { ID } from '../shared/types'
 import type { Browser } from './browser'
 import { NetRules } from './declarative-net-request'
@@ -38,6 +39,7 @@ export class Extensions {
 
   async setup(rt: ProfileRuntime): Promise<void> {
     const b = this.browser
+    const firstStartWithPins = !b.store.profile(rt.id)?.pinnedExtensions
     const folder = join(b.profiles.dir(rt.id), 'Extensions')
     const grants = new ExtensionGrants(join(b.profiles.dir(rt.id), 'extension-permissions.json'))
     const rules = new NetRules(
@@ -93,7 +95,7 @@ export class Extensions {
       const pinned = b.store.profile(rt.id)?.pinnedExtensions?.includes(extensionId) ?? false
       menu.append(new MenuItem({ type: 'separator' }))
       menu.append(new MenuItem({ label: pinned ? 'Unpin' : 'Pin', click: () => b.setExtensionPin(rt.id, extensionId, !pinned) }))
-      const origin = clickedWindow.sidebarOrigin()
+      const origin = b.sidebarOrigin(clickedWindow.win) ?? { x: 0, y: 0 }
       menu.popup({ window: clickedWindow.win, x: Math.floor(anchorRect.x + origin.x), y: Math.floor(anchorRect.y + anchorRect.height + origin.y) })
     })
     this.byProfile.set(rt.id, { library: ext, session: rt.session, folder, grants, rules })
@@ -124,9 +126,8 @@ export class Extensions {
     }
     refresh()
     const profile = b.store.profile(rt.id)
-    // Extensions installed before pins existed stay pinned; later installs start unpinned.
-    if (profile && !profile.pinnedExtensions) {
-      profile.pinnedExtensions = b.extensionList[rt.id].map((extension) => extension.id)
+    if (profile && firstStartWithPins) {
+      profile.pinnedExtensions = everyInstalledPinned(profile.pinnedExtensions, b.extensionList[rt.id])
       b.changed()
     }
     const update = () => updateExtensions(rt.session).catch((err: unknown) => console.warn('[extensions] update failed', err))
@@ -138,6 +139,7 @@ export class Extensions {
     const profile = this.byProfile.get(profileId)
     if (!profile) return
     await uninstallExtension(extensionId, { session: profile.session, extensionsPath: profile.folder })
+    this.browser.setExtensionPin(profileId, extensionId, false)
     profile.grants.forget(extensionId)
     await profile.rules.forget(extensionId)
     await profile.session.clearStorageData({ origin: `chrome-extension://${extensionId}` })

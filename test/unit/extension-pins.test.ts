@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { pinnedOf, withPin } from '../../src/shared/extension-pins.ts'
+import { everyInstalledPinned, pinnedOf, withPin } from '../../src/shared/extension-pins.ts'
 
 test('pinned extensions come in pin order, only those installed', () => {
   const installed = [
@@ -19,4 +19,14 @@ test('pinning appends once and unpinning removes', () => {
   assert.deepEqual(withPin(['a'], 'b', true), ['a', 'b'])
   assert.deepEqual(withPin(['a', 'b'], 'a', true), ['a', 'b'])
   assert.deepEqual(withPin(['a', 'b'], 'a', false), ['b'])
+})
+
+test('the first start with pins pins every installed extension, keeping any pinned while they loaded', () => {
+  const installed = [
+    { id: 'a', name: 'A' },
+    { id: 'b', name: 'B' }
+  ]
+  assert.deepEqual(everyInstalledPinned(undefined, installed), ['a', 'b'])
+  assert.deepEqual(everyInstalledPinned(['b'], installed), ['b', 'a'])
+  assert.deepEqual(everyInstalledPinned([], []), [])
 })

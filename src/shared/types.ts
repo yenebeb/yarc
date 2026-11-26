@@ -52,7 +52,6 @@ export interface Profile {
   id: ID
   name: string
   favorites: TabItem[]
-  /** Unset until the profile first loads its extensions; then in pin order. */
   pinnedExtensions?: string[]
 }
 

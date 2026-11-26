@@ -1762,7 +1762,7 @@ export class Browser implements TabHost {
       case 'extensionPin':
         return this.setExtensionPin(action.profileId, action.extensionId, action.pinned)
       case 'extensionsPopover': {
-        const origin = this.window.sidebarOrigin()
+        const origin = this.sidebarOrigin(this.window.win) ?? { x: 0, y: 0 }
         return this.setOverlay({ kind: 'extensions', profileId: action.profileId, anchor: { ...action.anchor, x: action.anchor.x + origin.x, y: action.anchor.y + origin.y } })
       }
       case 'itemMenu':

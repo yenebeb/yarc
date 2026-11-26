@@ -354,6 +354,65 @@ test("an extension's right-click menu opens in the window it was clicked in", as
   }
 })
 
+test("an extension's right-click menu opens under its button, from the sidebar shown or hidden, on either side", async () => {
+  const extId = await loadExtension(popupExtensionDir('menu place'))
+  const { profileId } = await space()
+  await dispatch({ type: 'extensionPin', profileId, extensionId: extId, pinned: true })
+  const ui = app.windows().find((page) => page.url().endsWith('index.html'))!
+  const overlay = await pageWithUrl('overlay.html')
+  const menuUnderButton = async (page: Page) => {
+    await app.evaluate(({ Menu }) => {
+      const globals = globalThis as any
+      globals.realPopup = Menu.prototype.popup
+      Menu.prototype.popup = function (options?: Electron.PopupOptions) {
+        globals.menuAt = { x: options?.x, y: options?.y }
+        Menu.prototype.popup = globals.realPopup
+      }
+    })
+    const button = page.locator(`button[is="browser-action"][id="${extId}"]`)
+    await button.click({ button: 'right' })
+    await expect.poll(() => app.evaluate(() => !!(globalThis as any).menuAt)).toBe(true)
+    const menuAt: { x: number; y: number } = await app.evaluate(() => {
+      const globals = globalThis as any
+      const at = globals.menuAt
+      globals.menuAt = undefined
+      return at
+    })
+    const view = page === overlay ? await app.evaluate(() => (globalThis as any).arcBrowser.window.overlay.getBounds()) : { x: 0, y: 0 }
+    const box = (await button.boundingBox())!
+    expect(menuAt.x).toBeGreaterThanOrEqual(Math.floor(view.x + box.x))
+    expect(menuAt.x).toBeLessThanOrEqual(view.x + box.x + box.width)
+    expect(Math.abs(menuAt.y - (view.y + box.y + box.height))).toBeLessThanOrEqual(8)
+  }
+  // The hidden sidebar slides away once the real pointer leaves it; keep it out while its button is clicked.
+  await app.evaluate(() => {
+    const browser = (globalThis as any).arcBrowser
+    browser.realWatchSidebarReveal = browser.watchSidebarReveal
+    browser.watchSidebarReveal = () => {}
+  })
+  try {
+    for (const sidebarRight of [false, true]) {
+      await dispatch({ type: 'settings', patch: { sidebarVisible: true, sidebarRight } })
+      await expect(ui.locator(`button[is="browser-action"][id="${extId}"]`)).toHaveAttribute('alignment', sidebarRight ? 'bottom left' : 'bottom right')
+      await menuUnderButton(ui)
+      await dispatch({ type: 'settings', patch: { sidebarVisible: false } })
+      await dispatch({ type: 'sidebarReveal', show: true })
+      await expect(overlay.locator(`button[is="browser-action"][id="${extId}"]`)).toHaveAttribute('alignment', sidebarRight ? 'bottom left' : 'bottom right')
+      await menuUnderButton(overlay)
+    }
+  } finally {
+    await app.evaluate(({ Menu }) => {
+      const globals = globalThis as any
+      const browser = globals.arcBrowser
+      browser.watchSidebarReveal = browser.realWatchSidebarReveal
+      if (globals.realPopup) Menu.prototype.popup = globals.realPopup
+    })
+    await dispatch({ type: 'settings', patch: { sidebarVisible: true, sidebarRight: false } })
+    await dispatch({ type: 'extensionPin', profileId, extensionId: extId, pinned: false })
+    await removeExtension(extId)
+  }
+})
+
 test('an extension popup opens next to its button, from the sidebar shown or hidden, on either side', async () => {
   const dir = extensionDir({
     'manifest.json': { manifest_version: 3, name: 'popup side', version: '1.0', action: { default_popup: 'popup.html' } },
@@ -460,12 +519,12 @@ test('an extension whose native messaging host stops reading gets a disconnect, 
   }
 })
 
-test('Remove in Settings uninstalls an extension once the question is confirmed', async () => {
+test('Remove in Settings uninstalls an extension once the question is confirmed, and drops its pin', async () => {
   const dir = extensionDir({ 'manifest.json': { manifest_version: 3, name: 'removable', version: '1.0' } })
-  const extId = await app.evaluate(async (_electron, extDir) => {
-    const browser = (globalThis as any).arcBrowser
-    return (await browser.profiles.get(browser.store.activeSpace.profileId).session.extensions.loadExtension(extDir)).id
-  }, dir)
+  const extId = await loadExtension(dir)
+  const { profileId } = await space()
+  const pins = async () => (await state()).profiles.find((profile) => profile.id === profileId)!.pinnedExtensions ?? []
+  await dispatch({ type: 'extensionPin', profileId, extensionId: extId, pinned: true })
   await dispatch({ type: 'overlay', mode: { kind: 'settings', section: 'extensions' } })
   const overlay = await pageWithUrl('overlay.html')
   const row = overlay.locator('.set-ext', { hasText: 'removable' })
@@ -474,6 +533,7 @@ test('Remove in Settings uninstalls an extension once the question is confirmed'
     await row.getByRole('button', { name: 'Remove' }).click()
     await expect(row).toHaveCount(0)
     expect(Object.values((await state()).extensions).flat().map((extension) => extension.id)).not.toContain(extId)
+    await expect.poll(pins).not.toContain(extId)
   } finally {
     await dispatch({ type: 'overlay', mode: { kind: 'none' } })
   }
