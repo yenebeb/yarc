@@ -87,12 +87,21 @@ export class HistorySync {
     const result = await (win ? dialog.showOpenDialog(win, options) : dialog.showOpenDialog(options))
     const picked = result.filePaths[0]
     if (result.canceled || !picked) return
-    this.setUpFolder(syncRoot(picked))
+    this.setUpFolderIn(picked)
   }
 
   useICloud(): void {
     const folder = icloudFolder()
-    if (folder) this.setUpFolder(syncRoot(folder))
+    if (folder) this.setUpFolderIn(folder)
+  }
+
+  // macOS guards iCloud Drive and other apps' folders: until the user allows YARC in, reading one fails.
+  private setUpFolderIn(picked: string): void {
+    try {
+      this.setUpFolder(syncRoot(picked))
+    } catch (error) {
+      this.setStatus(this.offStatus(failureMessage(error)))
+    }
   }
 
   setUpNearby(): void {
@@ -222,7 +231,7 @@ export class HistorySync {
         }
         await this.begin(header, master, keyring, password)
       } catch (error) {
-        const message = error instanceof SyncCryptoError && error.code === 'wrong-password' ? 'Wrong password. Nothing was synced.' : (error as Error).message
+        const message = error instanceof SyncCryptoError && error.code === 'wrong-password' ? 'Wrong password. Nothing was synced.' : failureMessage(error)
         this.setStatus(before.state === 'locked' ? { ...before, error: message } : { state: 'setup', location, existing, error: message })
       }
     }).then(() => this.passSoon())
@@ -637,6 +646,12 @@ export class HistorySync {
 /** fetch fails with a TypeError when the network is down, and times out with a TimeoutError. */
 function isOffline(error: unknown): boolean {
   return (error instanceof TypeError && error.message === 'fetch failed') || (error instanceof Error && error.name === 'TimeoutError')
+}
+
+function failureMessage(error: unknown): string {
+  const code = (error as NodeJS.ErrnoException).code
+  if (code !== 'EPERM' && code !== 'EACCES') return (error as Error).message
+  return 'YARC isn’t allowed to open that folder. On a Mac, allow it in System Settings → Privacy & Security → Files and Folders, then try again.'
 }
 
 function syncsHistory(profile: Profile): boolean {
