@@ -40,7 +40,6 @@ import type {
   Split,
   SplitAt,
   TabItem,
-  WhatsNewHint,
   WindowView
 } from '../shared/types'
 import { appendPaneIn, flipSplit, gatherSplit, layoutPanes, movePane, PANE_BAR, paneIds, placePaneIn, removeFromSplits, resizeGroup, splitOf, type Side } from '../shared/split'
@@ -52,7 +51,7 @@ import { AdBlock } from './adblock'
 import { bookmarksHtml } from './bookmarks-export'
 import { Canvases } from './canvas'
 import { hasBoard } from './whats-new-boards'
-import { recentSpotlights, spotlight, SPOTLIGHTS, unseenSpotlights } from '../shared/spotlights'
+import { recentSpotlights, SPOTLIGHTS, unseenSpotlights } from '../shared/spotlights'
 import { changesSince, newestVersion, parseChangelog, RECENT_VERSIONS, recentChanges } from './changelog'
 import { openInChrome } from './chrome'
 import { DownloadList } from './download-list'
@@ -302,13 +301,6 @@ export class Browser implements TabHost {
     else win.once('show', showTour)
   }
 
-  private whatsNewHint(): WhatsNewHint | undefined {
-    const { releases, spotlights } = this.waitingNews
-    if (!releases.length && !spotlights.length) return undefined
-    const featured = this.incognito ? undefined : spotlights.find(hasBoard)
-    return { feature: featured && spotlight(featured)?.title }
-  }
-
   private markSpotlightsSeen(): void {
     this.state.seenSpotlights = SPOTLIGHTS.map((known) => known.id)
     this.waitingNews.spotlights = []
@@ -320,18 +312,25 @@ export class Browser implements TabHost {
     this.markSpotlightsSeen()
   }
 
-  /** Only ever on the user's click: a big feature opens its board and leaves the other changes behind the pill; without one, the list of changes. */
+  /** Only ever on the user's click. What waits when there is something, else the latest changes and features. */
   private openWhatsNew(): void {
     const { releases, spotlights } = this.waitingNews
     const nothingWaits = !releases.length && !spotlights.length
-    const featured = this.incognito ? undefined : (nothingWaits ? recentSpotlights(SPOTLIGHTS) : spotlights).find(hasBoard)
-    if (featured) {
-      this.markSpotlightsSeen()
-      return this.activate(this.canvases.createWhatsNew(this.space, featured).id)
-    }
-    this.setOverlay({ kind: 'whats-new', releases: nothingWaits ? recentChanges(CHANGELOG, whatsNewVersion()) : releases.slice(0, RECENT_VERSIONS), spotlights: nothingWaits ? recentSpotlights(SPOTLIGHTS) : spotlights })
+    const shown = nothingWaits ? recentSpotlights(SPOTLIGHTS) : spotlights
+    this.setOverlay({
+      kind: 'whats-new',
+      releases: nothingWaits ? recentChanges(CHANGELOG, whatsNewVersion()) : releases.slice(0, RECENT_VERSIONS),
+      spotlights: shown,
+      boards: this.incognito ? [] : shown.filter(hasBoard)
+    })
     this.markWhatsNewSeen()
     this.changed()
+  }
+
+  private openBoard(spotlightId: string): void {
+    if (this.incognito || !hasBoard(spotlightId)) return
+    this.setOverlay({ kind: 'none' })
+    this.activate(this.canvases.createWhatsNew(this.space, spotlightId).id)
   }
 
   private tourEvent(event: TourEvent): void {
@@ -623,7 +622,7 @@ export class Browser implements TabHost {
       peek: window.peek && !window.peek.tab.destroyed ? window.peek.tab.info() : undefined,
       layout: window.layout,
       update: this.updater.status,
-      whatsNew: this.whatsNewHint(),
+      whatsNewWaiting: this.waitingNews.releases.length + this.waitingNews.spotlights.length > 0,
       archive: [],
       sitePermissions: {},
       media: this.media.snapshot()
@@ -1807,6 +1806,8 @@ export class Browser implements TabHost {
       case 'hideWhatsNew':
         this.markWhatsNewSeen()
         return this.changed()
+      case 'openBoard':
+        return this.openBoard(String(action.spotlight))
       case 'capture': {
         const mode = this.window.overlayMode
         this.setOverlay({ kind: 'none' }, false)

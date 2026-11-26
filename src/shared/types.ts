@@ -150,11 +150,6 @@ export interface PersistedState {
   windows: WindowView[]
 }
 
-export interface WhatsNewHint {
-  /** The title of the big feature whose board the pill opens; without it, the pill opens the list of changes. */
-  feature?: string
-}
-
 /** Survives a restart that didn't install the update; stale once a version other than `from` runs. */
 export interface WaitingUpdate {
   from: string
@@ -254,8 +249,8 @@ export interface AppState extends PersistedState {
   /** `elsewhere`: live in another window, shown here as a still. `bar`: a split pane's bar above the page. */
   layout: { content: Rect; views: { id: ID; rect: Rect; bar?: Rect; elsewhere?: boolean }[]; splitId?: ID }
   update: UpdateStatus
-  /** While changes wait that the user hasn't looked at: the sidebar's pill. Nothing opens by itself. */
-  whatsNew?: WhatsNewHint
+  /** Changes wait that the user hasn't looked at: the sidebar shows its What's New pill. Nothing opens by itself. */
+  whatsNewWaiting: boolean
   sitePermissions: Record<ID, SitePermissionRow[]>
   /** Only on the tour's import step; undefined while still looking. */
   importChoices?: ImportChoice[]
@@ -309,7 +304,7 @@ export type OverlayMode =
   | { kind: 'split-drop' }
   | { kind: 'tour'; step: TourStep }
   /** Spotlight cards first, then the releases since the user's last version, newest first. */
-  | { kind: 'whats-new'; releases: ReleaseNotes[]; spotlights: string[] }
+  | { kind: 'whats-new'; releases: ReleaseNotes[]; spotlights: string[]; /** The spotlights with a board to try the feature on (src/main/whats-new-boards.ts). */ boards: string[] }
   | { kind: 'update' }
   /** `page`: where the active page sits in the overlay, which covers the content area. */
   | { kind: 'capture'; page: Rect }

@@ -307,7 +307,7 @@ export function UpdateReady({ update, close }: { update: UpdateStatus; close: ()
   )
 }
 
-export function WhatsNew({ releases, spotlights, close }: { releases: ReleaseNotes[]; spotlights: string[]; close: () => void }) {
+export function WhatsNew({ releases, spotlights, boards, close }: { releases: ReleaseNotes[]; spotlights: string[]; boards: string[]; close: () => void }) {
   const cards = spotlights.flatMap((id) => spotlight(id) ?? [])
   const hasChangesPage = releases.length > 0 || cards.length === 0
   const pages = cards.length + (hasChangesPage ? 1 : 0)
@@ -327,7 +327,7 @@ export function WhatsNew({ releases, spotlights, close }: { releases: ReleaseNot
         else if (e.key === 'ArrowLeft') turn(page - 1)
       }}
     >
-      {card ? <SpotlightCard key={card.id} card={card} /> : <ReleaseList releases={releases} title={cards.length ? 'Also in this update' : "What's New"} />}
+      {card ? <SpotlightCard key={card.id} card={card} hasBoard={boards.includes(card.id)} /> : <ReleaseList releases={releases} title={cards.length ? 'Also in this update' : "What's New"} />}
       <footer className="intro-footer">
         {page > 0 ? (
           <button className="btn ghost" onClick={() => turn(page - 1)}>
@@ -351,7 +351,7 @@ export function WhatsNew({ releases, spotlights, close }: { releases: ReleaseNot
   )
 }
 
-function SpotlightCard({ card }: { card: Spotlight }) {
+function SpotlightCard({ card, hasBoard }: { card: Spotlight; hasBoard: boolean }) {
   return (
     <>
       <SpotlightPicture id={card.id} />
@@ -359,9 +359,14 @@ function SpotlightCard({ card }: { card: Spotlight }) {
         <span className="eyebrow">New in YARC</span>
         <h1>{card.title}</h1>
         <p>{card.text}</p>
-        {card.actions?.length ? (
+        {hasBoard || card.actions?.length ? (
           <div className="intro-buttons centered">
-            {card.actions.map((a) => (
+            {hasBoard ? (
+              <button className="btn" onClick={() => dispatch({ type: 'openBoard', spotlight: card.id })}>
+                Try It on a Canvas
+              </button>
+            ) : null}
+            {card.actions?.map((a) => (
               <button key={a.command} className="btn" onClick={() => dispatch({ type: 'command', id: a.command })}>
                 {a.label}
               </button>

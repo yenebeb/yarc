@@ -2,14 +2,13 @@
 
 **Decided 2026-11-26, after seeing a generated board (a wall of notes):** a board is made by hand, one per big feature, and changes without one stay a list. Sections 1, 3 and 4 below describe the generated board and are kept for the reasoning; what's built is this:
 - **A board per big feature** (`src/main/boards/<spotlight id>.json`, listed in `src/main/whats-new-boards.ts`): a saved canvas scene, shipped in the feature's PR next to its spotlight. `canvas-notes` has the first one. A card whose file id is `releases-still` shows GitHub's releases page and can be played (`src/main/whats-new-releases.png`, its geometry in the board's JSON); an image whose file id is `spotlight-<id>` is drawn from that spotlight's React scene.
-- **Nothing opens by itself** (decided 2026-11-26: being taken to a page on an update feels forced; the user always chooses). After an update a quiet pill sits in the sidebar, where *Restart to Update* sits. With an unseen spotlight that has a board it reads **New: <the feature's title>** and opens that board; otherwise **What's New**, and opens the existing list overlay. It can be hidden until the next update. Section 2 below, with its board that opens by itself, is superseded by this.
+- **Nothing opens by itself** (decided 2026-11-26: being taken to a page on an update feels forced; the user always chooses). After an update a quiet **What's New** pill sits in the sidebar, where *Restart to Update* sits; its x hides it until the next update. The pill, like the What's New menu item, opens the What's New card, and there a spotlight that has a board gets a **Try It on a Canvas** button (`openBoard`). Closing the card is the end of it until the user chooses What's New from the menu. Section 2 below, with its board that opens by itself, is superseded by this.
 - **The board is a real canvas marked `temporary`** (`PinnedCanvas`), a row among the pinned items. Closing it (⌘W) deletes it, the next launch deletes one that was left, and **Keep This Canvas** in its menu clears the mark.
-- The What's New command opens the newest board when nothing waits, else what waits.
 - A build that isn't a release shows the newest version of the changelog it was built with (`node scripts/changelog.mjs` writes one).
 
 Tried in the built app through `YARC_TEST` on a scratch profile (the board is drawn and its row selected); not with a real mouse, and ▶ on the releases card wasn't pressed.
 
-**Not built yet:** buttons for a spotlight's actions, a checklist that ticks itself, reaching the list of changes from the menu while a board exists, unit and e2e tests. `startupScreen` in `src/main/changelog.ts` is now only used by its tests.
+**Not built yet:** buttons for a spotlight's actions, a checklist that ticks itself, unit and e2e tests. `startupScreen` in `src/main/changelog.ts` is now only used by its tests.
 
 ## Making a board
 

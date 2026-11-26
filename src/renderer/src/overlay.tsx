@@ -115,7 +115,7 @@ function App() {
       return (
         <>
           <div className="scrim intro-scrim" onMouseDown={close} />
-          <WhatsNew key={freshOnEachOpen} releases={mode.releases} spotlights={mode.spotlights} close={close} />
+          <WhatsNew key={freshOnEachOpen} releases={mode.releases} spotlights={mode.spotlights} boards={mode.boards} close={close} />
         </>
       )
   }
