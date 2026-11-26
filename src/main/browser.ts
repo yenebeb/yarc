@@ -51,7 +51,7 @@ import { AdBlock } from './adblock'
 import { bookmarksHtml } from './bookmarks-export'
 import { Canvases } from './canvas'
 import { hasBoard } from './whats-new-boards'
-import { recentSpotlights, SPOTLIGHTS, unseenSpotlights } from '../shared/spotlights'
+import { recentSpotlights, spotlight, SPOTLIGHTS, unseenSpotlights } from '../shared/spotlights'
 import { changesSince, newestVersion, parseChangelog, RECENT_VERSIONS, recentChanges } from './changelog'
 import { openInChrome } from './chrome'
 import { DownloadList } from './download-list'
@@ -312,16 +312,31 @@ export class Browser implements TabHost {
     this.markSpotlightsSeen()
   }
 
+  private newsWaits(): boolean {
+    return this.waitingNews.releases.length + this.waitingNews.spotlights.length > 0
+  }
+
+  private spotlightsToShow(): string[] {
+    return this.newsWaits() ? this.waitingNews.spotlights : recentSpotlights(SPOTLIGHTS)
+  }
+
+  private boardsToOffer(): string[] {
+    return this.incognito ? [] : this.spotlightsToShow().filter(hasBoard)
+  }
+
+  private whatsNewPill(): AppState['whatsNew'] {
+    if (!this.newsWaits()) return undefined
+    return { boards: this.boardsToOffer().map((id) => ({ spotlight: id, title: spotlight(id)?.title ?? id })) }
+  }
+
   /** Only ever on the user's click. What waits when there is something, else the latest changes and features. */
   private openWhatsNew(): void {
-    const { releases, spotlights } = this.waitingNews
-    const nothingWaits = !releases.length && !spotlights.length
-    const shown = nothingWaits ? recentSpotlights(SPOTLIGHTS) : spotlights
+    const { releases } = this.waitingNews
     this.setOverlay({
       kind: 'whats-new',
-      releases: nothingWaits ? recentChanges(CHANGELOG, whatsNewVersion()) : releases.slice(0, RECENT_VERSIONS),
-      spotlights: shown,
-      boards: this.incognito ? [] : shown.filter(hasBoard)
+      releases: this.newsWaits() ? releases.slice(0, RECENT_VERSIONS) : recentChanges(CHANGELOG, whatsNewVersion()),
+      spotlights: this.spotlightsToShow(),
+      boards: this.boardsToOffer()
     })
     this.markWhatsNewSeen()
     this.changed()
@@ -622,7 +637,7 @@ export class Browser implements TabHost {
       peek: window.peek && !window.peek.tab.destroyed ? window.peek.tab.info() : undefined,
       layout: window.layout,
       update: this.updater.status,
-      whatsNewWaiting: this.waitingNews.releases.length + this.waitingNews.spotlights.length > 0,
+      whatsNew: this.whatsNewPill(),
       archive: [],
       sitePermissions: {},
       media: this.media.snapshot()

@@ -150,6 +150,12 @@ export interface PersistedState {
   windows: WindowView[]
 }
 
+/** The canvas made for a big feature (docs/whats-new-canvas.md), as the What's New pill lists it. */
+export interface FeatureBoard {
+  spotlight: string
+  title: string
+}
+
 /** Survives a restart that didn't install the update; stale once a version other than `from` runs. */
 export interface WaitingUpdate {
   from: string
@@ -249,8 +255,8 @@ export interface AppState extends PersistedState {
   /** `elsewhere`: live in another window, shown here as a still. `bar`: a split pane's bar above the page. */
   layout: { content: Rect; views: { id: ID; rect: Rect; bar?: Rect; elsewhere?: boolean }[]; splitId?: ID }
   update: UpdateStatus
-  /** Changes wait that the user hasn't looked at: the sidebar shows its What's New pill. Nothing opens by itself. */
-  whatsNewWaiting: boolean
+  /** While changes wait that the user hasn't looked at: the sidebar's What's New pill. Nothing opens by itself. */
+  whatsNew?: { boards: FeatureBoard[] }
   sitePermissions: Record<ID, SitePermissionRow[]>
   /** Only on the tour's import step; undefined while still looking. */
   importChoices?: ImportChoice[]

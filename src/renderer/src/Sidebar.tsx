@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type DragEvent } from 'react'
 import type { DropTarget } from '../../shared/actions'
 import type { EditRequest } from '../../shared/ipc'
-import { SIDEBAR_WIDTH, type AppState, type ID, type UpdateStatus } from '../../shared/types'
+import { SIDEBAR_WIDTH, type AppState, type ID, type FeatureBoard, type UpdateStatus } from '../../shared/types'
 import { activeSpace, arc, cx, dispatch, displayHost, isMac } from './api'
 import { Icon } from './icons'
 import { MediaCards } from './media-cards'
@@ -167,7 +167,7 @@ export function Sidebar({ state, floating }: { state: AppState; floating?: boole
 
       <MediaCards state={state} />
       <UpdatePill update={state.update} />
-      {state.whatsNewWaiting && (state.update.state === 'none' || state.update.state === 'downloading') ? <WhatsNewPill /> : null}
+      {state.whatsNew && (state.update.state === 'none' || state.update.state === 'downloading') ? <WhatsNewPill boards={state.whatsNew.boards} /> : null}
       <BottomBar ctx={ctx} />
     </div>
   )
@@ -196,16 +196,29 @@ function UpdatePill({ update }: { update: UpdateStatus }) {
   )
 }
 
-function WhatsNewPill() {
+function WhatsNewPill({ boards }: { boards: FeatureBoard[] }) {
   return (
-    <div className="update-pill">
-      <button className="update-pill-main" title="See what changed in YARC" onClick={() => dispatch({ type: 'command', id: 'whatsNew' })}>
-        <Icon name="bell" size={13} />
-        <span>What’s New</span>
-      </button>
-      <button className="icon-btn update-pill-close" title="Hide until the next update" onClick={() => dispatch({ type: 'hideWhatsNew' })}>
-        <Icon name="x" size={12} />
-      </button>
+    <div className="whats-new-hint">
+      {boards.length ? (
+        <div className="whats-new-boards">
+          <span className="whats-new-boards-title">Try it on a canvas</span>
+          {boards.map((board) => (
+            <button key={board.spotlight} className="whats-new-board" onClick={() => dispatch({ type: 'openBoard', spotlight: board.spotlight })}>
+              <Icon name="canvas" size={14} />
+              <span>{board.title}</span>
+            </button>
+          ))}
+        </div>
+      ) : null}
+      <div className="update-pill">
+        <button className="update-pill-main" title={boards.length ? undefined : 'See what changed in YARC'} onClick={() => dispatch({ type: 'command', id: 'whatsNew' })}>
+          <Icon name="bell" size={13} />
+          <span>What’s New</span>
+        </button>
+        <button className="icon-btn update-pill-close" title="Hide until the next update" onClick={() => dispatch({ type: 'hideWhatsNew' })}>
+          <Icon name="x" size={12} />
+        </button>
+      </div>
     </div>
   )
 }
