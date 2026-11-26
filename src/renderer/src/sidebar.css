@@ -197,6 +197,20 @@ browser-action-list::part(action):hover {
   color: var(--text);
 }
 
+.update-pill {
+  max-width: 100%;
+}
+
+.update-pill-main {
+  min-width: 0;
+}
+
+.update-pill-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .update-pill-close {
   width: 22px;
   height: 22px;

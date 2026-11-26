@@ -75,7 +75,6 @@ export function normalize(raw: Partial<PersistedState>): PersistedState {
     lastSeenVersion: raw.lastSeenVersion,
     seenSpotlights: Array.isArray(raw.seenSpotlights) ? raw.seenSpotlights.filter((id) => typeof id === 'string') : undefined,
     whatsNewSeenVersion: raw.whatsNewSeenVersion,
-    whatsNewShownAt: raw.whatsNewShownAt,
     waitingUpdate: raw.waitingUpdate,
     windows: (raw.windows ?? []).filter((w) => w && typeof w.id === 'string').map((w) => ({ ...w, selected: w.selected ?? {}, splits: w.splits ?? {} }))
   }

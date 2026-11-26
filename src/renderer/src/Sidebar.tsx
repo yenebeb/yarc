@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type DragEvent } from 'react'
 import type { DropTarget } from '../../shared/actions'
 import type { EditRequest } from '../../shared/ipc'
-import { SIDEBAR_WIDTH, type AppState, type ID, type UpdateStatus } from '../../shared/types'
+import { SIDEBAR_WIDTH, type AppState, type ID, type UpdateStatus, type WhatsNewHint } from '../../shared/types'
 import { activeSpace, arc, cx, dispatch, displayHost, isMac } from './api'
 import { Icon } from './icons'
 import { MediaCards } from './media-cards'
@@ -167,7 +167,7 @@ export function Sidebar({ state, floating }: { state: AppState; floating?: boole
 
       <MediaCards state={state} />
       <UpdatePill update={state.update} />
-      {state.update.state === 'none' || state.update.state === 'downloading' ? <WhatsNewPill waiting={state.whatsNewWaiting} /> : null}
+      {state.update.state === 'none' || state.update.state === 'downloading' ? <WhatsNewPill hint={state.whatsNew} /> : null}
       <BottomBar ctx={ctx} />
     </div>
   )
@@ -196,13 +196,17 @@ function UpdatePill({ update }: { update: UpdateStatus }) {
   )
 }
 
-function WhatsNewPill({ waiting }: { waiting: number }) {
-  if (!waiting) return null
+function WhatsNewPill({ hint }: { hint: WhatsNewHint | undefined }) {
+  if (!hint) return null
   return (
     <div className="update-pill">
-      <button className="update-pill-main" title="See what changed in YARC, on a canvas" onClick={() => dispatch({ type: 'command', id: 'whatsNew' })}>
-        <Icon name="canvas" size={13} />
-        <span>What’s New</span>
+      <button
+        className="update-pill-main"
+        title={hint.feature ? `New in YARC: ${hint.feature}. Opens a canvas to try it on.` : 'See what changed in YARC'}
+        onClick={() => dispatch({ type: 'command', id: 'whatsNew' })}
+      >
+        <Icon name={hint.feature ? 'canvas' : 'bell'} size={13} />
+        <span className="update-pill-label">{hint.feature ? `New: ${hint.feature}` : 'What’s New'}</span>
       </button>
       <button className="icon-btn update-pill-close" title="Hide until the next update" onClick={() => dispatch({ type: 'hideWhatsNew' })}>
         <Icon name="x" size={12} />

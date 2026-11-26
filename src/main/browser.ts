@@ -40,6 +40,7 @@ import type {
   Split,
   SplitAt,
   TabItem,
+  WhatsNewHint,
   WindowView
 } from '../shared/types'
 import { appendPaneIn, flipSplit, gatherSplit, layoutPanes, movePane, PANE_BAR, paneIds, placePaneIn, removeFromSplits, resizeGroup, splitOf, type Side } from '../shared/split'
@@ -51,8 +52,8 @@ import { AdBlock } from './adblock'
 import { bookmarksHtml } from './bookmarks-export'
 import { Canvases } from './canvas'
 import { hasBoard } from './whats-new-boards'
-import { recentSpotlights, SPOTLIGHTS, unseenSpotlights } from '../shared/spotlights'
-import { changesSince, newestVersion, parseChangelog, RECENT_VERSIONS, recentChanges, whatsNewAtLaunch } from './changelog'
+import { recentSpotlights, spotlight, SPOTLIGHTS, unseenSpotlights } from '../shared/spotlights'
+import { changesSince, newestVersion, parseChangelog, RECENT_VERSIONS, recentChanges } from './changelog'
 import { openInChrome } from './chrome'
 import { DownloadList } from './download-list'
 import { Extensions } from './extensions'
@@ -294,14 +295,18 @@ export class Browser implements TabHost {
     }
     state.lastSeenVersion = app.getVersion()
     this.changed()
-    if (process.env.YARC_TEST && !process.env.YARC_STARTUP_SCREENS) return
-    const waiting = { releases: this.waitingNews.releases.length, spotlights: this.waitingNews.spotlights.filter(hasBoard).length }
-    const opensBoard = !this.incognito && whatsNewAtLaunch(waiting, state.whatsNewShownAt, Date.now()) === 'board'
-    if (!this.store.firstRun && !opensBoard) return
-    const show = () => (this.store.firstRun ? this.setOverlay({ kind: 'tour', step: 'welcome' }) : this.openWhatsNew(true))
+    if (!this.store.firstRun || (process.env.YARC_TEST && !process.env.YARC_STARTUP_SCREENS)) return
+    const showTour = () => this.setOverlay({ kind: 'tour', step: 'welcome' })
     const win = this.window.win
-    if (win.isVisible()) show()
-    else win.once('show', show)
+    if (win.isVisible()) showTour()
+    else win.once('show', showTour)
+  }
+
+  private whatsNewHint(): WhatsNewHint | undefined {
+    const { releases, spotlights } = this.waitingNews
+    if (!releases.length && !spotlights.length) return undefined
+    const featured = this.incognito ? undefined : spotlights.find(hasBoard)
+    return { feature: featured && spotlight(featured)?.title }
   }
 
   private markSpotlightsSeen(): void {
@@ -315,14 +320,13 @@ export class Browser implements TabHost {
     this.markSpotlightsSeen()
   }
 
-  /** A big feature opens its board and leaves the other changes behind the pill; without one, the list of changes. */
-  private openWhatsNew(byItself = false): void {
+  /** Only ever on the user's click: a big feature opens its board and leaves the other changes behind the pill; without one, the list of changes. */
+  private openWhatsNew(): void {
     const { releases, spotlights } = this.waitingNews
     const nothingWaits = !releases.length && !spotlights.length
     const featured = this.incognito ? undefined : (nothingWaits ? recentSpotlights(SPOTLIGHTS) : spotlights).find(hasBoard)
     if (featured) {
       this.markSpotlightsSeen()
-      if (byItself) this.state.whatsNewShownAt = Date.now()
       return this.activate(this.canvases.createWhatsNew(this.space, featured).id)
     }
     this.setOverlay({ kind: 'whats-new', releases: nothingWaits ? recentChanges(CHANGELOG, whatsNewVersion()) : releases.slice(0, RECENT_VERSIONS), spotlights: nothingWaits ? recentSpotlights(SPOTLIGHTS) : spotlights })
@@ -619,7 +623,7 @@ export class Browser implements TabHost {
       peek: window.peek && !window.peek.tab.destroyed ? window.peek.tab.info() : undefined,
       layout: window.layout,
       update: this.updater.status,
-      whatsNewWaiting: this.waitingNews.releases.length + this.waitingNews.spotlights.length,
+      whatsNew: this.whatsNewHint(),
       archive: [],
       sitePermissions: {},
       media: this.media.snapshot()

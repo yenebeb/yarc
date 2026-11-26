@@ -145,11 +145,14 @@ export interface PersistedState {
   seenSpotlights?: string[]
   /** The newest version whose changes the What's New board showed, or its pill was hidden for. */
   whatsNewSeenVersion?: string
-  /** When the board last opened by itself, in ms since the epoch. */
-  whatsNewShownAt?: number
   waitingUpdate?: WaitingUpdate
   /** The last focused one last. */
   windows: WindowView[]
+}
+
+export interface WhatsNewHint {
+  /** The title of the big feature whose board the pill opens; without it, the pill opens the list of changes. */
+  feature?: string
 }
 
 /** Survives a restart that didn't install the update; stale once a version other than `from` runs. */
@@ -251,8 +254,8 @@ export interface AppState extends PersistedState {
   /** `elsewhere`: live in another window, shown here as a still. `bar`: a split pane's bar above the page. */
   layout: { content: Rect; views: { id: ID; rect: Rect; bar?: Rect; elsewhere?: boolean }[]; splitId?: ID }
   update: UpdateStatus
-  /** Updates and big features the What's New board hasn't shown yet. */
-  whatsNewWaiting: number
+  /** While changes wait that the user hasn't looked at: the sidebar's pill. Nothing opens by itself. */
+  whatsNew?: WhatsNewHint
   sitePermissions: Record<ID, SitePermissionRow[]>
   /** Only on the tour's import step; undefined while still looking. */
   importChoices?: ImportChoice[]
