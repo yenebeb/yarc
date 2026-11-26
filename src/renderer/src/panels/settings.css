@@ -643,3 +643,34 @@
   color: var(--text-2);
   line-height: 1.55;
 }
+
+/* Sync */
+.settings .set-note.warn {
+  color: color-mix(in oklab, #d97706 80%, var(--text));
+}
+
+.settings .set-note ul {
+  margin: 6px 0;
+  padding-left: 20px;
+}
+
+.settings .set-sync-folder {
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: rtl;
+  text-align: left;
+  font-size: 11.5px;
+}
+
+.settings .set-actions {
+  justify-content: flex-end;
+}
+
+.settings .set-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin: 12px 4px 0;
+}

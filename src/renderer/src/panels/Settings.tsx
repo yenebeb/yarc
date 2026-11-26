@@ -8,6 +8,7 @@ import { activeSpace, dispatch } from '../api'
 import { Icon, type IconName } from '../icons'
 import { Group, HoursSelect, patch, Row, Select, ToggleRow, type HoursOption } from './settings-controls'
 import { ShortcutSettings } from './ShortcutSettings'
+import { SyncSettings } from './SyncSettings'
 import './panels.css'
 import './settings.css'
 
@@ -15,6 +16,7 @@ const SECTIONS: { id: Section; label: string; icon?: IconName }[] = [
   { id: 'general', label: 'General', icon: 'settings' },
   { id: 'traffic', label: 'Traffic Control', icon: 'link' },
   { id: 'profiles', label: 'Profiles', icon: 'profile' },
+  { id: 'sync', label: 'Sync', icon: 'reload' },
   { id: 'sites', label: 'Site Permissions', icon: 'lock' },
   { id: 'import', label: 'Import & Export', icon: 'download' },
   { id: 'extensions', label: 'Extensions', icon: 'puzzle' },
@@ -84,6 +86,7 @@ export function Settings({ state, section: initial = 'general', close }: { state
           {section === 'general' && <General state={state} />}
           {section === 'traffic' && <TrafficControl state={state} />}
           {section === 'profiles' && <Profiles state={state} />}
+          {section === 'sync' && <SyncSettings state={state} />}
           {section === 'sites' && <SitePermissions state={state} />}
           {section === 'import' && <Import />}
           {section === 'extensions' && <Extensions state={state} />}

@@ -42,6 +42,8 @@ export class Profiles {
   private siteDecisions = new Map<ID, SiteDecisions>()
   private watched = new WeakSet<WebContents>()
   private sessionCookies = new Map<ID, SessionCookies>()
+  /** Opened on their own too: history sync reads every profile's history without starting its session. */
+  private histories = new Map<ID, History>()
 
   constructor(
     private onCreated: (rt: ProfileRuntime) => void,
@@ -123,10 +125,19 @@ export class Profiles {
     swipeToNavigate(ses)
     ses.setSpellCheckerLanguages(app.getPreferredSystemLanguages().slice(0, 3).filter((l) => ses.availableSpellCheckerLanguages.includes(l)))
     this.permissions(ses, id)
-    rt = { id, session: ses, history: new History(this.incognito ? undefined : this.dir(id)) }
+    rt = { id, session: ses, history: this.history(id) }
     this.runtimes.set(id, rt)
     this.onCreated(rt)
     return rt
+  }
+
+  history(id: ID): History {
+    let opened = this.histories.get(id)
+    if (!opened) {
+      opened = new History(this.incognito ? undefined : this.dir(id))
+      this.histories.set(id, opened)
+    }
+    return opened
   }
 
   all(): ProfileRuntime[] {
@@ -136,8 +147,9 @@ export class Profiles {
   /** Its folders go at the next launch (purgeDeleted), when no session has them open. */
   async remove(id: ID): Promise<void> {
     this.siteDecisions.delete(id)
+    this.histories.get(id)?.close()
+    this.histories.delete(id)
     const rt = this.runtimes.get(id)
-    rt?.history.close()
     this.runtimes.delete(id)
     if (this.incognito) return void (await rt?.session.clearData())
     rmSync(this.permissionsFile(id), { force: true })
@@ -185,7 +197,7 @@ export class Profiles {
   }
 
   closeAll(): void {
-    for (const rt of this.runtimes.values()) rt.history.close()
+    for (const history of this.histories.values()) history.close()
     for (const kept of this.sessionCookies.values()) kept.save()
   }
 

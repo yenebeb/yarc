@@ -40,6 +40,7 @@ export type CommandId =
   | 'forward'
   | 'settings'
   | 'trafficControl'
+  | 'historySync'
   | 'newSpace'
   | 'newFolder'
   | 'newLiveFolder'
@@ -119,6 +120,7 @@ export const BINDINGS: Binding[] = [
   { id: 'forward', title: 'Forward', mac: ['Cmd+BracketRight'], other: ['Alt+Right', 'Ctrl+BracketRight'] },
   { id: 'settings', title: 'Settings', ...both('Mod+Comma'), palette: true },
   { id: 'trafficControl', title: 'Traffic Control Settings', mac: [], other: [], palette: true },
+  { id: 'historySync', title: 'History Sync Settings', mac: [], other: [], palette: true },
   { id: 'newSpace', title: 'New Space', mac: [], other: [], palette: true },
   { id: 'newFolder', title: 'New Folder', ...both('Mod+Alt+Shift+N'), palette: true },
   { id: 'newLiveFolder', title: 'New Live Folder (GitHub Pull Requests or a Feed)', mac: [], other: [], palette: true },
