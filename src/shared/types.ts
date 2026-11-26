@@ -138,6 +138,8 @@ export interface Settings {
   /** History sync through `syncLocation` (see src/main/sync). */
   syncHistory: boolean
   syncLocation?: SyncLocation
+  /** Settings → Sync no longer says how to add the other computer. */
+  syncReminderHidden: boolean
 }
 
 export interface PersistedState {

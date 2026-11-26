@@ -15,7 +15,7 @@ import {
 } from '../../src/main/sync/crypto.ts'
 import { HEADER_FILE, newSyncId, readHeader, SyncEngine, writeHeader } from '../../src/main/sync/engine.ts'
 import { chunkContext, encodeChunk } from '../../src/main/sync/log.ts'
-import { syncExposure, type SyncRecord } from '../../src/shared/sync.ts'
+import { locationName, syncExposure, type SyncRecord } from '../../src/shared/sync.ts'
 
 /** Cheap key derivation, so tests stay fast; real folders use DEFAULT_KDF_COST. */
 const FAST = { N: 2 ** 10, r: 8, p: 1 }
@@ -103,6 +103,12 @@ describe('the sync password', () => {
       'When history was cleared',
       'The names of synced profiles'
     ])
+  })
+
+  test('a folder in iCloud Drive is called iCloud Drive, on a Mac and with iCloud for Windows', () => {
+    assert.equal(locationName({ kind: 'folder', path: '/Users/you/Library/Mobile Documents/com~apple~CloudDocs/YARC Sync' }), 'iCloud Drive')
+    assert.equal(locationName({ kind: 'folder', path: 'C:\\Users\\you\\iCloudDrive\\YARC Sync' }), 'iCloud Drive')
+    assert.equal(locationName({ kind: 'folder', path: '/Users/you/Syncthing/iCloudDrive notes' }), 'the sync folder')
   })
 })
 

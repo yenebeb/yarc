@@ -199,7 +199,8 @@ const paths: Record<string, ReactNode> = {
       <path d="M8 7.5h.01M8 16.5h.01" />
     </>
   ),
-  nearby: <path d="M5 12.5a10 10 0 0 1 14 0M8 15.5a6 6 0 0 1 8 0M12 19h.01" />
+  nearby: <path d="M5 12.5a10 10 0 0 1 14 0M8 15.5a6 6 0 0 1 8 0M12 19h.01" />,
+  check: <path d="M5 12.5l4.5 4.5L19 7.5" />
 ,
   play: <path d="M8 5.5v13a.6.6 0 0 0 .9.5l10.4-6.5a.6.6 0 0 0 0-1L8.9 5a.6.6 0 0 0-.9.5z" fill="currentColor" />,
   pause: (

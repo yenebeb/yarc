@@ -67,10 +67,13 @@ export type HistorySyncStatus =
   /** Sync is on but can't run until the password is typed again, or the cloud drive or server is signed in to again. */
   | { state: 'locked'; location: SyncLocation; reason: 'password-changed' | 'no-saved-key' | 'missing-folder' | 'signed-out'; error?: string }
 
+/** A folder inside iCloud Drive, as macOS and iCloud for Windows name it (src/main/sync/locations.ts). */
+export const isICloudDrive = (path: string): boolean => /[\\/](com~apple~CloudDocs|iCloudDrive)([\\/]|$)/.test(path)
+
 /** How messages name the location: "Couldn’t reach Google Drive". */
 export function locationName(location: SyncLocation): string {
   if (location.kind === 'cloud') return CLOUD_DRIVE_NAME[location.drive]
   if (location.kind === 'server') return 'your server'
   if (location.kind === 'nearby') return 'your other computers'
-  return 'the sync folder'
+  return isICloudDrive(location.path) ? 'iCloud Drive' : 'the sync folder'
 }

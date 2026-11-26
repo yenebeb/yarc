@@ -133,9 +133,18 @@ reach the sync code; `History(undefined)` lives in memory), and anything but his
 
 ## Cloud drives and your own server
 
-Settings → Sync offers, in order: the cloud drives this build has an app registration for
-(`availableDrives()`), iCloud Drive when its folder is on this computer (one click: its
-`YARC Sync` folder), your own server, any other folder, and nearby computers.
+Settings → Sync asks for a place first and recommends one (`SyncOff` in
+`src/renderer/src/panels/SyncSettings.tsx`). On a Mac with iCloud Drive it asks which computers
+will sync: only Macs recommends iCloud Drive (one click: its `YARC Sync` folder); a Mac with
+Windows or Linux, like any Windows or Linux computer, recommends the cloud drives this build has
+an app registration for (`availableDrives()`), or a synced folder while it has none. The other
+places follow under "Or keep it in", and your own server and nearby computers under "Or with no
+external service".
+
+After the place, the next step depends on what is found there (`existing` in the status): no sync
+yet asks for a new password, typed twice, and an empty one only after choosing *Sync without a
+password*; a sync that is found asks whether to use it, with its password, or to keep this
+computer separate, which goes back to the places because a place holds one sync.
 
 For a cloud drive or a server, YARC keeps a copy of the sync folder in `<userData>/Sync/Remote`
 and the engine works on the copy; `remote.ts` moves the encrypted files between the copy and the

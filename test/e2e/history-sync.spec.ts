@@ -119,7 +119,7 @@ async function recordsIn(syncFolder: string): Promise<SyncRecord[]> {
 async function fillServerForm(overlay: Awaited<ReturnType<typeof pageWithUrl>>, serverPassword: string): Promise<void> {
   // A refused password is answered so fast that the form may never leave the screen.
   const formIsOpen = (await overlay.getByLabel('Server address').count()) > 0
-  if (!formIsOpen) await overlay.locator('.set-row', { hasText: 'Your own server' }).locator('button').click()
+  if (!formIsOpen) await overlay.locator('.set-row', { hasText: 'Your own server' }).click()
   await overlay.getByLabel('Server address').fill(serverUrl)
   await overlay.getByLabel('Server user name').fill(SERVER_USER)
   await overlay.getByLabel('Server password').fill(serverPassword)
@@ -130,19 +130,20 @@ test('your own server: set up in Settings, and only encrypted files reach it', a
   await dispatch({ type: 'overlay', mode: { kind: 'settings', section: 'sync' } })
   const overlay = await pageWithUrl('overlay.html')
   await expect(overlay.locator('.set-row', { hasText: 'Your own server' })).toHaveCount(1)
-  await expect(overlay.locator('.set-row', { hasText: 'Google Drive' })).toHaveCount(0)
+  await expect(overlay.locator('.set-row-title', { hasText: 'Google Drive' }), 'a drive this build can’t sign in to isn’t offered').toHaveCount(0)
 
   await fillServerForm(overlay, 'not the server password')
   await expect(overlay.locator('.set-note.warn')).toContainText('refused the user name or password')
   expect(await syncState()).toBe('off')
 
   await fillServerForm(overlay, SERVER_PASSWORD)
-  await expect(overlay.locator('.set-note', { hasText: 'have a YARC sync yet' })).toHaveCount(1)
+  await expect(overlay.getByText('No YARC sync there yet')).toHaveCount(1)
+  await expect(overlay.locator('button', { hasText: 'Turn On Sync' }), 'an empty password has to be asked for').toBeDisabled()
   await overlay.getByLabel('Sync password', { exact: true }).fill(SYNC_PASSWORD)
   await overlay.getByLabel('Sync password again').fill(SYNC_PASSWORD)
   await overlay.locator('button', { hasText: 'Turn On Sync' }).click()
   await expect.poll(syncState).toBe('on')
-  await expect(overlay.locator('.set-row', { hasText: 'Sync history' })).toHaveCount(1)
+  await expect(overlay.locator('.set-status.ok', { hasText: 'History is syncing' })).toHaveCount(1)
   await dispatch({ type: 'overlay', mode: { kind: 'none' } })
 
   await dispatch({ type: 'open', url: `${base}/secret-recipe`, where: 'tab' })
@@ -203,7 +204,7 @@ test('a synced folder: a wrong password joins nothing, and a sync.json that goes
   await expect.poll(sync).toMatchObject({ state: 'locked', reason: 'missing-folder' })
   await dispatch({ type: 'overlay', mode: { kind: 'settings', section: 'sync' } })
   const overlay = await pageWithUrl('overlay.html')
-  await expect(overlay.locator('.set-note.warn')).toContainText('Sync resumes once it’s back')
+  await expect(overlay.locator('.set-status.paused')).toContainText('Sync resumes once it’s back')
   await expect(overlay.getByLabel('Sync password', { exact: true })).toHaveCount(0)
   await dispatch({ type: 'overlay', mode: { kind: 'none' } })
 
@@ -219,7 +220,8 @@ test('a forgotten password: starting over replaces the sync kept in the folder, 
   await app.evaluate((_electron, folder) => (globalThis as any).arcBrowser.historySync.setUpFolder(folder), localSyncFolder)
   await dispatch({ type: 'overlay', mode: { kind: 'settings', section: 'sync' } })
   const overlay = await pageWithUrl('overlay.html')
-  await overlay.locator('button', { hasText: 'Forgot the Password?' }).click()
+  await expect(overlay.locator('.set-callout')).toContainText('A sync was found in the sync folder')
+  await overlay.locator('button', { hasText: 'Forgot the password?' }).click()
   const startOver = overlay.locator('form', { has: overlay.locator('button', { hasText: 'Start Over Here' }) })
   await startOver.getByLabel('Sync password', { exact: true }).fill('a brand new password')
   await startOver.getByLabel('Sync password again').fill('a brand new password')
