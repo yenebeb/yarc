@@ -17,6 +17,15 @@ export interface Spotlight {
 /** Newest first. */
 export const SPOTLIGHTS: Spotlight[] = [
   {
+    id: 'history-sync',
+    title: 'Your history syncs, and stays yours',
+    text:
+      'History now syncs between your computers, encrypted with a password only you know before it leaves this one. ' +
+      'Keep the files in iCloud Drive, in a folder you already sync, or bring your own server: any WebDAV address works, ' +
+      'such as Nextcloud or a NAS. There is no YARC account and no YARC server.',
+    actions: [{ label: 'Set Up Sync', command: 'historySync' }]
+  },
+  {
     id: 'canvas-notes',
     title: 'Take notes on a canvas',
     text:

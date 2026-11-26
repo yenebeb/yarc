@@ -8,22 +8,26 @@
 
 Tried in the built app through `YARC_TEST` on a scratch profile (the board is drawn and its row selected); not with a real mouse, and ▶ on the releases card wasn't pressed.
 
-**Not built yet:** buttons for a spotlight's actions, a checklist that ticks itself, unit and e2e tests. `startupScreen` in `src/main/changelog.ts` is now only used by its tests.
+**Built since (2026-11-27, with the `history-sync` board):** a board's own background colour, several pictures per feature, and a button that runs a spotlight's command. **Not built yet:** a checklist that ticks itself, e2e tests. `startupScreen` in `src/main/changelog.ts` is now only used by its tests.
 
 ## Making a board
 
-Boards are written by an AI session, as JSON, and checked by looking at them (decided 2026-11-26: nobody designs them by hand in the app). `canvas-notes.json` and `live-folders.json` are the examples.
+Boards are written by an AI session, as JSON and React scenes, and checked by looking at them (decided 2026-11-26: nobody designs them by hand in the app). `history-sync` is the example for a big feature (2026-11-27, after five rounds with the maintainer); `canvas-notes` and `live-folders` are the earlier, plainer ones.
 
-1. **Decide whether the feature has a board in it.** It needs something to show (a diagram of how it works) or to try (the board is the feature). A feature that is only a statement ("YARC collects nothing") keeps its spotlight card and gets no board.
-2. **One idea per board.** `canvas-notes` is the feature itself: notes to tick, edit and drag. `live-folders` is a diagram: sources, arrows, the sidebar they fill. Don't repeat the spotlight's text as a wall of notes; that is what the generated board was.
-3. **Write `src/main/boards/<spotlight id>.json`** (`CanvasScene`, `src/shared/canvas.ts`) and add it to `BOARDS` in `src/main/whats-new-boards.ts`. What a board can hold:
-   - texts and notes (`card: true`), with `- `, `[ ] `, `# ` at the start of a line (so a plain text can't start with those), links, and a `source` footer for a quote;
-   - rectangles, ellipses, arrows and drawings, for zones, flow and emphasis;
-   - the feature's own picture: an image with file id `spotlight-<id>`;
-   - one card of GitHub's releases page that can be played: a capture with file id `releases-still` and the `source` and `capture` the examples have. Give it a reason to be on the board.
-4. **Look at it:** `pnpm build`, then `node scripts/board-preview.mjs <spotlight id> --save-sizes`. It draws the board in the real app, prints where the picture is, says which items weren't drawn, and writes each text's drawn size into the JSON (a text's size is only known once it's drawn). Open the picture. Fix what's off and run it again until nothing overlaps and its outline is one tidy block: a board has no `view`, so it opens scaled to the window and centred, and a ragged outline shows as empty corners.
-5. **`pnpm test`** (`test/unit/whats-new-boards.test.ts`): every item can be drawn, texts, cards and pictures don't overlap, the board fits one screen, its pictures exist.
-6. **Put the picture in the PR**, so the maintainer judges a picture, not JSON.
+1. **Decide whether the feature has a board in it.** It needs something to show (how it works) or to try (the board is the feature). A feature that is only a statement ("YARC collects nothing") keeps its spotlight card and gets no board.
+2. **One idea per board, and show it happening.** A diagram of boxes and arrows read as a wall of notes; what worked is the feature played out once, with every step done. Don't repeat the spotlight's text.
+3. **Build it from these parts**, top to bottom (`src/main/boards/<spotlight id>.json`, a `CanvasScene`, listed in `BOARDS` in `src/main/whats-new-boards.ts`):
+   - **Title, a drawn underline, one grey line** saying what is new.
+   - **The big card: the feature's picture, drawn wide.** The spotlight's scene (`spotlight-pictures.tsx`) gets a second layout for a box of 640px or more (`@container` in `spotlights.css`), so the What's New card keeps its small picture and the board gets the full width. It has real words in it, the steps along its top, and plays them in one loop of about 12 seconds (`hs-done-at-*`). **Only this card moves**; with reduced motion it shows the finished state.
+   - **Up to three separate cards under it**, each its own item and its own scene, `spotlight-<id>-<part>` in `PICTURES`: how to turn it on (numbered), the choices (pills), the promise (big numbers). Static, in the big card's colours, so the board reads as one thing but the cards can still be moved apart.
+   - **A big Try it now button, as its own item** under the cards: a scene that is one `<button>` calling `arc.canvasSpotlightAction(<command>)`. Main only runs a command some spotlight's own button offers (`runSpotlightAction` in `src/main/canvas.ts`), because a canvas can hold anything pasted into it.
+   - **The card of GitHub's releases page, always** (file id `releases-still`, with the `source` and `capture` the examples have), and a line next to it saying it is the real page and can be played. The board check fails without it.
+   - **Plain arrows** for the reading order. No hand-drawn loops or flourishes: they were tried and looked messy.
+   - **A background colour** for the whole board (`"background": "purple"`, one of the canvas colours), so it doesn't open on the plain canvas.
+   - Plain texts and notes (`card: true`, with `- `, `[ ] `, `# ` at the start of a line) are for a board whose point is the notes themselves, like `canvas-notes`. A big feature's cards are scenes: notes can't be styled, and three white notes under a designed card looked unfinished.
+4. **Look at it, twice:** `pnpm build`, then `node scripts/board-preview.mjs <spotlight id> --save-sizes` for the start of the loop and `--wait=9300` for its end. It draws the board in the real app, prints where the picture is, says which items weren't drawn, and writes each text's drawn size into the JSON (a text's size is only known once it's drawn). Open both pictures. Fix what's off and run it again until nothing overlaps or is cut off, and its outline is one tidy block: a board has no `view`, so it opens scaled to the window and centred, and a ragged outline shows as empty corners.
+5. **`pnpm test`** (`test/unit/whats-new-boards.test.ts`): every item can be drawn, texts, cards and pictures don't overlap, the board fits one screen, its pictures exist, it has the releases card.
+6. **Put both pictures in the PR**, so the maintainer judges pictures, not JSON.
 
 Today a new version shows What's New as a small overlay card at startup (`WhatsNew` in `src/renderer/src/panels/Intro.tsx`): spotlight cards, then a plain list of changes. This design replaces that overlay with a canvas: a board YARC builds from the changelog, with the changes as notes, a picture per big feature and one capture the user can play. The board is the demo: whoever reads the release notes has dragged a note, ticked a checkbox and played a live capture before reading a word of instructions.
 

@@ -1,0 +1,192 @@
+{
+  "items": [
+    {
+      "id": "title",
+      "kind": "text",
+      "x": 0,
+      "y": 0,
+      "width": 583,
+      "height": 45,
+      "text": "Your history syncs, and stays yours",
+      "size": "title",
+      "color": "ink",
+      "title": true
+    },
+    {
+      "id": "underline",
+      "kind": "draw",
+      "color": "purple",
+      "x": 2,
+      "y": 50,
+      "width": 600,
+      "height": 12,
+      "drawnWidth": 600,
+      "drawnHeight": 12,
+      "points": [
+        0,
+        7,
+        54,
+        2,
+        112,
+        9,
+        168,
+        3,
+        228,
+        10,
+        286,
+        3,
+        346,
+        9,
+        404,
+        3,
+        464,
+        10,
+        524,
+        4,
+        600,
+        7
+      ]
+    },
+    {
+      "id": "subtitle",
+      "kind": "text",
+      "x": 0,
+      "y": 78,
+      "width": 679,
+      "height": 20,
+      "text": "New in YARC: history syncs between your computers, encrypted, through a place you choose.",
+      "size": "body",
+      "color": "grey"
+    },
+    {
+      "id": "picture",
+      "kind": "image",
+      "fileId": "spotlight-history-sync",
+      "x": 0,
+      "y": 132,
+      "width": 1020,
+      "height": 340
+    },
+    {
+      "id": "hint-watch",
+      "kind": "text",
+      "x": 734,
+      "y": 76,
+      "width": 118,
+      "height": 20,
+      "text": "Watch it happen",
+      "size": "body",
+      "color": "purple"
+    },
+    {
+      "id": "next-places",
+      "kind": "arrow",
+      "color": "purple",
+      "x": 324,
+      "y": 607,
+      "width": 22,
+      "height": 0,
+      "flipX": false,
+      "flipY": false
+    },
+    {
+      "id": "next-nobody",
+      "kind": "arrow",
+      "color": "purple",
+      "x": 674,
+      "y": 607,
+      "width": 22,
+      "height": 0,
+      "flipX": false,
+      "flipY": false
+    },
+    {
+      "id": "how",
+      "kind": "image",
+      "fileId": "spotlight-history-sync-turn-it-on",
+      "x": 0,
+      "y": 496,
+      "width": 320,
+      "height": 222
+    },
+    {
+      "id": "places",
+      "kind": "image",
+      "fileId": "spotlight-history-sync-places",
+      "x": 350,
+      "y": 496,
+      "width": 320,
+      "height": 222
+    },
+    {
+      "id": "nobody-else",
+      "kind": "image",
+      "fileId": "spotlight-history-sync-nobody-else",
+      "x": 700,
+      "y": 496,
+      "width": 320,
+      "height": 222
+    },
+    {
+      "id": "to-card",
+      "kind": "arrow",
+      "color": "purple",
+      "x": 716,
+      "y": 52,
+      "width": 0,
+      "height": 70,
+      "flipX": false,
+      "flipY": false
+    },
+    {
+      "id": "try-it",
+      "kind": "image",
+      "fileId": "spotlight-history-sync-try-it",
+      "x": 336,
+      "y": 742,
+      "width": 348,
+      "height": 68
+    },
+    {
+      "id": "releases",
+      "kind": "capture",
+      "fileId": "releases-still",
+      "source": {
+        "url": "https://github.com/yenebeb/yarc/releases",
+        "title": "YARC releases on GitHub"
+      },
+      "capture": {
+        "viewport": {
+          "width": 1100,
+          "height": 900
+        },
+        "rect": {
+          "x": 304,
+          "y": 180,
+          "width": 788,
+          "height": 640
+        },
+        "scroll": {
+          "x": 0,
+          "y": 0
+        }
+      },
+      "x": 1054,
+      "y": 132,
+      "width": 430,
+      "height": 349
+    },
+    {
+      "id": "hint-releases",
+      "kind": "text",
+      "x": 1054,
+      "y": 80,
+      "width": 243,
+      "height": 40,
+      "text": "What else shipped: this is the real\npage. Point at it and press ▶",
+      "size": "body",
+      "color": "purple"
+    }
+  ],
+  "background": "purple"
+}

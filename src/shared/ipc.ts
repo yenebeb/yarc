@@ -36,6 +36,7 @@ export const IPC = {
   canvasRenamed: 'arc:canvas-renamed',
   canvasFind: 'arc:canvas-find',
   canvasOpenUrl: 'arc:canvas-open-url',
+  canvasSpotlightAction: 'arc:canvas-spotlight-action',
   canvasExport: 'arc:canvas-export',
   canvasLive: 'arc:canvas-live',
   canvasShown: 'arc:canvas-shown',
@@ -135,6 +136,7 @@ export interface ArcApi {
   onCanvasFind(cb: (op: CanvasFindOp) => void): () => void
   onCanvasRenamed(cb: (r: { from: string; to: string }) => void): () => void
   canvasOpenUrl(url: string): Promise<void>
+  canvasSpotlightAction(command: string): Promise<void>
   canvasExport(png: Uint8Array, to: 'file' | 'clipboard'): Promise<void>
   /** Every live card, each time one moves, resizes or is hidden; none while the page isn't shown. */
   canvasLive(cards: LiveCard[]): void

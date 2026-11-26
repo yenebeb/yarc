@@ -137,7 +137,11 @@ export interface CanvasScene {
   snapping?: boolean
   /** The board's own look; without it the board follows its space. */
   appearance?: BoardAppearance
+  /** The board is tinted with this colour; without it the board is plain. */
+  background?: Color
 }
+
+export const isBoardBackground = (value: unknown): value is Color => COLORS.includes(value as Color)
 
 export type BoardAppearance = 'light' | 'dark'
 export const isBoardAppearance = (value: unknown): value is BoardAppearance => value === 'light' || value === 'dark'

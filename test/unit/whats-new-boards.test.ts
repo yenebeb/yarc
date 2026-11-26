@@ -25,6 +25,7 @@ const boards: SavedBoard[] = readdirSync(BOARDS_FOLDER).map((fileName) => {
 })
 
 const bigFeatures = SPOTLIGHTS.map((spotlight) => spotlight.id)
+const isPictureOfBigFeature = (picture: string) => bigFeatures.some((feature) => picture === feature || picture.startsWith(`${feature}-`))
 const takesRoom = (item: BoardItem) => item.kind === 'text' || item.kind === 'capture' || item.kind === 'image'
 const overlap = (first: Box, second: Box) =>
   first.x < second.x + second.width && second.x < first.x + first.width && first.y < second.y + second.height && second.y < first.y + first.height
@@ -54,11 +55,18 @@ describe('A What’s New board: the canvas a big feature opens after an update',
     }
   })
 
-  test('shows only pictures the app has: the still of the releases page, or a big feature’s own picture', () => {
+  test('has the card of the releases page to play, so every board shows what else shipped', () => {
+    for (const board of boards) {
+      const releasesCards = board.drawable.filter((item) => item.kind === 'capture' && item.fileId === RELEASES_PAGE_STILL)
+      assert.equal(releasesCards.length, 1, board.feature)
+    }
+  })
+
+  test('shows only pictures the app has: the still of the releases page, or one of a big feature’s own pictures', () => {
     for (const board of boards) {
       for (const item of board.drawable) {
         if (item.kind === 'capture') assert.equal(item.fileId, RELEASES_PAGE_STILL, `${board.feature}: ${item.id}`)
-        if (item.kind === 'image') assert.ok(bigFeatures.includes(SPOTLIGHT_PICTURE.exec(item.fileId)?.[1] ?? ''), `${board.feature}: ${item.id}`)
+        if (item.kind === 'image') assert.ok(isPictureOfBigFeature(SPOTLIGHT_PICTURE.exec(item.fileId)?.[1] ?? ''), `${board.feature}: ${item.id}`)
       }
     }
   })

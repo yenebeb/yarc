@@ -1,6 +1,7 @@
 // Draws a What's New board (src/main/boards/<spotlight id>.json, docs/whats-new-canvas.md) in the real app and saves a picture,
 // so whoever made the board, a person or an AI session, can look at it before it ships.
-// `pnpm build`, then `node scripts/board-preview.mjs <spotlight id> [--save-sizes]`.
+// `pnpm build`, then `node scripts/board-preview.mjs <spotlight id> [--save-sizes] [--wait=<ms>]`.
+// `--wait` takes the picture that long after the board is drawn: a board whose picture plays a loop is looked at once near its start and once near its end.
 // It lists the texts whose saved size differs from the drawn one; `--save-sizes` writes the drawn sizes into the JSON, which the
 // board check (test/unit/whats-new-boards.test.ts) uses to see that nothing overlaps.
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
@@ -13,6 +14,7 @@ const ROOT = join(import.meta.dirname, '..')
 const spotlightId = process.argv.slice(2).find((argument) => !argument.startsWith('--'))
 if (!spotlightId) throw new Error('usage: node scripts/board-preview.mjs <spotlight id> [--save-sizes]')
 const saveSizes = process.argv.includes('--save-sizes')
+const wait = Number(process.argv.find((argument) => argument.startsWith('--wait='))?.slice('--wait='.length) ?? 800)
 const out = join(tmpdir(), 'yarc-board-preview', `${spotlightId}.png`)
 const boardFile = join(ROOT, 'src/main/boards', `${spotlightId}.json`)
 const saved = JSON.parse(readFileSync(boardFile, 'utf8'))
@@ -33,7 +35,7 @@ try {
   }, spotlightId)
   const inPage = (code) => app.evaluate((_electron, script) => [...globalThis.arcBrowser.canvases.pages.values()][0].wc.executeJavaScript(script), code)
   while (!(await inPage('document.querySelectorAll(".item").length'))) await sleep(100)
-  await sleep(800)
+  await sleep(wait)
 
   const drawn = await inPage('[...document.querySelectorAll(".item[data-id]")].map((node) => ({ id: node.dataset.id, width: node.offsetWidth, height: node.offsetHeight }))')
   const drawnById = new Map(drawn.map((item) => [item.id, item]))

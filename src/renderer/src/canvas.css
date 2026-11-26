@@ -29,6 +29,10 @@ body {
   -webkit-user-select: none;
 }
 
+.canvas-page.tinted {
+  background: color-mix(in oklab, var(--board-tint) 12%, var(--board));
+}
+
 .canvas-page.dark {
   --board: #18171b;
   --card: #2a2930;

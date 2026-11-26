@@ -1,11 +1,11 @@
 import { BrowserWindow, clipboard, ClipboardItem, dialog, nativeImage, View, WebContentsView, type Event, type Input, type IpcMainEvent, type WebContents } from 'electron'
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { FILE_ID, IMAGE_TYPES, isBoardAppearance, MAX_QUOTE_LENGTH, type CanvasImage, type CanvasLoad, type CanvasScene, type CaptureGeometry, type CaptureSource, type LiveCard, type QueuedInboxItem } from '../shared/canvas'
+import { FILE_ID, IMAGE_TYPES, isBoardAppearance, isBoardBackground, MAX_QUOTE_LENGTH, type CanvasImage, type CanvasLoad, type CanvasScene, type CaptureGeometry, type CaptureSource, type LiveCard, type QueuedInboxItem } from '../shared/canvas'
 import { IPC } from '../shared/ipc'
 import { bindingLabel, commandForInput, type CommandId } from '../shared/keymap'
 import { findCanvas, spaceCanvases } from '../shared/tree'
-import { spotlight } from '../shared/spotlights'
+import { spotlight, SPOTLIGHTS } from '../shared/spotlights'
 import type { CaptureTo } from '../shared/actions'
 import type { ID, PinnedCanvas, Rect, Space } from '../shared/types'
 import type { Browser } from './browser'
@@ -344,6 +344,7 @@ export class Canvases {
     })
     handleUi(IPC.canvasTakeInbox, (e) => of(e).canvases.files(of(e).page.id)?.takeInbox() ?? [])
     handleUi(IPC.canvasOpenUrl, (e, url: string) => of(e).canvases.openUrl(of(e).page.id, String(url)))
+    handleUi(IPC.canvasSpotlightAction, (e, command: string) => of(e).canvases.runSpotlightAction(String(command)))
     onUi(IPC.canvasLive, (e: IpcMainEvent, cards: LiveCard[]) => {
       const hit = find(e.sender)
       if (hit && Array.isArray(cards)) hit.canvases.play(hit.page, cards.filter(isLiveCard))
@@ -367,7 +368,7 @@ export class Canvases {
       if (!m || !FILE_ID.test(fileId) || !IMAGE_TYPES[m[1]]) continue
       files.writeImage(fileId, Buffer.from(m[2], 'base64'), m[1])
     }
-    files.writeScene({ items: scene.items, view: scene.view, snapping: scene.snapping, appearance: isBoardAppearance(scene.appearance) ? scene.appearance : undefined })
+    files.writeScene({ items: scene.items, view: scene.view, snapping: scene.snapping, appearance: isBoardAppearance(scene.appearance) ? scene.appearance : undefined, background: isBoardBackground(scene.background) ? scene.background : undefined })
   }
 
   private play(page: CanvasPage, cards: LiveCard[]): void {
@@ -384,6 +385,12 @@ export class Canvases {
         page.stage.addChildView(added.view)
       }
     }
+  }
+
+  // A canvas holds whatever was pasted into it, so its page may only run what a spotlight's own button runs.
+  private runSpotlightAction(command: string): void {
+    const offered = SPOTLIGHTS.some((feature) => feature.actions?.some((action) => action.command === command))
+    if (offered) this.browser.runCommand(command)
   }
 
   private openUrl(id: ID, url: string): void {

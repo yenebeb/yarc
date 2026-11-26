@@ -40,6 +40,7 @@ const api: ArcApi = {
   onCanvasFind: (cb) => listen(IPC.canvasFind, cb),
   onCanvasRenamed: (cb) => listen(IPC.canvasRenamed, cb),
   canvasOpenUrl: (url) => ipcRenderer.invoke(IPC.canvasOpenUrl, url),
+  canvasSpotlightAction: (command) => ipcRenderer.invoke(IPC.canvasSpotlightAction, command),
   canvasExport: (png, to) => ipcRenderer.invoke(IPC.canvasExport, png, to),
   canvasLive: (cards) => ipcRenderer.send(IPC.canvasLive, cards),
   onCanvasShown: (cb) => listen(IPC.canvasShown, cb),
