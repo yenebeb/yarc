@@ -32,6 +32,7 @@ export type Action =
   | { type: 'copyUrl'; markdown?: boolean; id?: ID }
   | { type: 'zoom'; delta: 1 | -1 | 0 }
   | { type: 'devtools' }
+  | { type: 'devtoolsPopOut' }
   | { type: 'newFolder'; name?: string }
   | { type: 'toggleFolder'; id: ID }
   | { type: 'renameFolder'; id: ID; name: string }
