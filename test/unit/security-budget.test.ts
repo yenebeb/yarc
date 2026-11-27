@@ -4,6 +4,9 @@ import { budgetFile, costUsd, monthlyBudgetUsd, readJson, readLedger, reserve, s
 import { loadPolicy, type Policy } from '../../.github/security/policy.ts'
 import { fakeGitHub } from './security-fixture.ts'
 
+// The pipeline only runs on Linux runners, and these tests build git repositories with POSIX symlinks and paths.
+if (process.platform === 'win32') process.exit(0)
+
 const base = loadPolicy()
 const policy: Policy = { ...base, budget: { ...base.budget, maxConcurrentReviews: 100, maxReviewsPerPrPerDay: 100, maxPrReviewsPerDay: 100 } }
 const worstCase = worstCaseUsd(policy.reviewer)

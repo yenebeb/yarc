@@ -7,6 +7,9 @@ import { COMMENT_MARKER, plain, renderReport, validateReport, type Report } from
 import { briefing, gitReader, runReview, TOOLS, type CallModel, type ModelRequest, type ModelTurn } from '../../.github/security/reviewer.ts'
 import { fakeGitHub } from './security-fixture.ts'
 
+// The pipeline only runs on Linux runners, and these tests build git repositories with POSIX symlinks and paths.
+if (process.platform === 'win32') process.exit(0)
+
 const policy = loadPolicy()
 const limits = policy.reviewer
 const usage = (inputTokens: number, outputTokens = 200): Usage => ({ ...NO_USAGE, inputTokens, outputTokens })

@@ -12,6 +12,9 @@ import { checkCommits } from '../../.github/security/release.ts'
 import type { Report } from '../../.github/security/report.ts'
 import { fakeGitHub, git, type PullState } from './security-fixture.ts'
 
+// The pipeline only runs on Linux runners, and these tests build git repositories with POSIX symlinks and paths.
+if (process.platform === 'win32') process.exit(0)
+
 const policy = loadPolicy()
 const [maintainer] = policy.maintainers
 const { review: reviewLabel, approve: approveLabel } = policy.labels

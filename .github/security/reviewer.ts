@@ -63,7 +63,7 @@ export const TOOLS = [
     start_line: { type: 'integer' },
     end_line: { type: 'integer' }
   }),
-  tool('search', 'Search the reviewed commit with an extended regular expression (git grep). `path` limits it to a file or folder; use "." for everything.', { pattern: text, path: text }),
+  tool('search', 'Search the reviewed commit with a Perl-compatible regular expression (git grep -P). `path` limits it to a file or folder; use "." for everything.', { pattern: text, path: text }),
   tool('list_files', 'List the files in a folder of the reviewed commit; use "." for the top level.', { path: text }),
   tool('file_diff', "Show the change's full diff for one file.", { path: text }),
   { name: 'submit_report', description: 'Hand in the security report. Call it exactly once, as your last action.', strict: true, input_schema: REPORT_SCHEMA }
@@ -94,7 +94,7 @@ export function gitReader(repo: string, base: string, head: string): RepoReader 
     search(pattern, path) {
       if (typeof pattern !== 'string' || pattern === '') throw new Error('pattern is empty')
       try {
-        const found = git(['grep', '-n', '-I', '-E', '--max-count', '30', '-e', pattern, head, '--', safePath(path)])
+        const found = git(['grep', '-n', '-I', '-P', '--max-count', '30', '-e', pattern, head, '--', safePath(path)])
         return found.replaceAll(`${head}:`, '').split('\n').slice(0, 200).join('\n')
       } catch (error) {
         if ((error as { status?: number }).status === 1) return 'No matches.'
