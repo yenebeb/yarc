@@ -1,0 +1,9 @@
+{
+  "reviews": [],
+  "exception": {
+    "sha": "5e0e1ccd07d579a5e92c3403b6bb44b83f22907c",
+    "by": "yenebeb",
+    "at": "2026-11-27T14:31:31.119Z",
+    "reason": "First release after the security gate: 8 contributor pull requests were merged and reviewed by hand before the ledger existed."
+  }
+}
