@@ -161,6 +161,15 @@ const badgeInMain = (extensionId: string): Promise<string | undefined> =>
     return browser.extensions.byProfile.get(browser.store.activeSpace.profileId).library.api.browserAction.actionMap.get(id)?.text
   }, extensionId)
 
+/** What the sidebar knows about an extension's button, for a failure message: main held the badge on the 1 in 15 Ubuntu runs where the button drew none. */
+const sidebarReport = (ui: Page, extensionId: string) =>
+  ui.evaluate(async (id) => {
+    const button = document.querySelector(`button[is="browser-action"][id="${id}"]`)
+    const paints = await Promise.race([new Promise((resolve) => requestAnimationFrame(() => resolve(true))), new Promise((resolve) => setTimeout(() => resolve(false), 1000))])
+    const cached = (globalThis as any).browserAction.getAction(id)
+    return JSON.stringify({ button: button?.outerHTML ?? null, cachedText: cached ? (cached.text ?? null) : 'no action', paints, visibility: document.visibilityState })
+  }, extensionId)
+
 test('only pinned extensions show in the address field, after the puzzle button opens the rest', async () => {
   const action = { default_popup: 'popup.html' }
   const first = await loadExtension(extensionDir({ 'manifest.json': { manifest_version: 3, name: 'pinned', version: '1.0', action }, 'popup.html': 'popup' }))
@@ -185,7 +194,11 @@ test('only pinned extensions show in the address field, after the puzzle button 
     await expect(ui.locator('.extensions-button')).toBeVisible()
     await expect.poll(() => badgeInMain(second), { timeout: 15_000 }).toBe('7')
     await pin(second, true)
-    await expect(button(second).locator('.badge')).toHaveText('7')
+    await expect(button(second).locator('.badge'))
+      .toHaveText('7')
+      .catch(async (error: Error) => {
+        throw new Error(`${error.message}\n${await sidebarReport(ui, second)}`)
+      })
     await removeExtension(second)
     await expect(button(second)).toHaveCount(0)
   } finally {
