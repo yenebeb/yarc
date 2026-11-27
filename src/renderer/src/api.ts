@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { Action } from '../../shared/actions'
-import type { ArcApi } from '../../shared/ipc'
+import { TOAST_MS, type ArcApi } from '../../shared/ipc'
 import { SIDEBAR_CSS_LENGTHS } from '../../shared/sidebar-geometry'
 import { bindingLabel, type CommandId, type Shortcuts } from '../../shared/keymap'
 import type { AppState, OverlayMode, Space } from '../../shared/types'
@@ -51,6 +51,21 @@ export function useOverlayMode(): { mode: OverlayMode; opened: number } {
     return arc.onOverlay(take)
   }, [])
   return current
+}
+
+export function useToast(): string | undefined {
+  const [text, setText] = useState<string>()
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined)
+  useEffect(
+    () =>
+      arc.onToast((text) => {
+        setText(text)
+        clearTimeout(timer.current)
+        timer.current = setTimeout(() => setText(undefined), TOAST_MS)
+      }),
+    []
+  )
+  return text
 }
 
 export function activeSpace(state: AppState): Space {

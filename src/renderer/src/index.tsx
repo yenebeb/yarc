@@ -2,9 +2,9 @@ import { useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { dividers, dragBorder, type Divider } from '../../shared/split'
 import { findItem } from '../../shared/tree'
-import { TOAST_MS, type SwipeHint } from '../../shared/ipc'
+import type { SwipeHint } from '../../shared/ipc'
 import type { AppState, Rect } from '../../shared/types'
-import { activeSpace, arc, cx, dispatch, displayHost, isMac, useAppState, useSpaceTheme } from './api'
+import { activeSpace, arc, cx, dispatch, displayHost, isMac, useAppState, useSpaceTheme, useToast } from './api'
 import { Icon } from './icons'
 import { Sidebar } from './Sidebar'
 import './styles.css'
@@ -82,21 +82,6 @@ function CaptionStrip({ state }: { state: AppState }) {
   const s = state.settings
   const left = s.sidebarVisible && !s.sidebarRight ? content.x : 0
   return <div className="caption-strip" style={{ left, right: 0, height: content.y }} />
-}
-
-function useToast(): string | undefined {
-  const [text, setText] = useState<string>()
-  const timer = useRef<ReturnType<typeof setTimeout>>(undefined)
-  useEffect(
-    () =>
-      arc.onToast((t) => {
-        setText(t)
-        clearTimeout(timer.current)
-        timer.current = setTimeout(() => setText(undefined), TOAST_MS)
-      }),
-    []
-  )
-  return text
 }
 
 function useStills(): Record<string, string> {

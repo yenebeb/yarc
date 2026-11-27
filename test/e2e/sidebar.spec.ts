@@ -341,7 +341,14 @@ test('a toast shows where it can be seen: in the sidebar on either side, and abo
     await expect.poll(overlayKind).toBe('notice')
     await expect(overlay.getByText('Copied URL')).toBeVisible()
     await expect.poll(overlayKind, { timeout: 5000 }).toBe('none')
+
+    await dispatch({ type: 'overlay', mode: { kind: 'library', tab: 'history' } })
+    await expect.poll(overlayKind).toBe('library')
+    await copyUrl()
+    await expect(overlay.locator('.overlay-notices .toast', { hasText: 'Copied URL' })).toBeVisible()
+    expect(await overlayKind()).toBe('library')
   } finally {
+    await dispatch({ type: 'overlay', mode: { kind: 'none' } })
     await dispatch({ type: 'settings', patch: { sidebarVisible: true, sidebarRight: false } })
     await dispatch({ type: 'close', id: tabId })
   }

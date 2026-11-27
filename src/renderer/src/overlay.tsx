@@ -4,7 +4,7 @@ import { MAX_PANES, paneIds, placePane, previewRect, sideAt, type Side } from '.
 import { isFloating } from '../../shared/tour'
 import { findItem, tabTitle } from '../../shared/tree'
 import type { AppState, ID, Rect } from '../../shared/types'
-import { activeSpace, arc, cx, dispatch, displayHost, isMac, useAppState, useOverlayMode, useSpaceTheme } from './api'
+import { activeSpace, arc, cx, dispatch, displayHost, isMac, useAppState, useOverlayMode, useSpaceTheme, useToast } from './api'
 import { Favicon, Icon } from './icons'
 import { ExtensionsPopover } from './panels/ExtensionsPopover'
 import { Tour, UpdateReady, WhatsNew } from './panels/Intro'
@@ -302,4 +302,20 @@ function Switcher({ state, order, index }: { state: AppState; order: string[]; i
   )
 }
 
-createRoot(document.getElementById('root')!).render(<App />)
+/** Only while the sidebar, which shows toasts otherwise, is hidden under an open panel. */
+function Toast() {
+  const toast = useToast()
+  if (!toast) return null
+  return (
+    <div className="notices overlay-notices">
+      <div className="toast">{toast}</div>
+    </div>
+  )
+}
+
+createRoot(document.getElementById('root')!).render(
+  <>
+    <App />
+    <Toast />
+  </>
+)

@@ -131,6 +131,15 @@
   align-items: flex-end;
 }
 
+.notices.overlay-notices {
+  bottom: 24px;
+  left: 50%;
+  max-width: 360px;
+  transform: translateX(-50%);
+  align-items: center;
+  z-index: 10;
+}
+
 .swipe-strip {
   position: fixed;
   overflow: hidden;

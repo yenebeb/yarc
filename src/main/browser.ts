@@ -716,7 +716,12 @@ export class Browser implements TabHost {
     const win = this.window?.win
     if (!win || win.isDestroyed()) return
     // The sidebar draws toasts under the page, which covers them while the sidebar is hidden.
-    if (!this.state.settings.sidebarVisible && this.window.overlayMode.kind === 'none') return this.showNotice(text, TOAST_MS)
+    if (!this.state.settings.sidebarVisible) {
+      const mode = this.window.overlayMode
+      if (mode.kind === 'none' || mode.kind === 'notice') return this.showNotice(text, TOAST_MS)
+      const overlay = overlayRect(mode, this.frame(), !!this.cur.tabDrag)
+      if (overlay && overlay.height >= this.frame().content.height) return this.window.sendToOverlay(IPC.toast, text)
+    }
     win.webContents.send(IPC.toast, text)
   }
 
