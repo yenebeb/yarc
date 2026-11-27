@@ -38,6 +38,11 @@ Open-source Arc-browser replacement (Electron 45 / Chromium 156, React 19, TypeS
 - A comment that seems necessary means a name is wrong: rename, or extract a function whose name says it. The only comments are a one-line *why* that comes from outside the code (an Electron/Chromium/OS/website behaviour, a security or ordering reason).
 - A file over 500 lines is a smell: check that it hasn't taken on more than one job.
 - Keep the main process cheap: high-frequency sources (blocked requests, download progress) use `emitSlowly()`, not `emitSoon()`; data only a panel shows (archive, site permissions) reaches the overlay only while that panel is open (`withPanelData`); UI webContents are created on first use, and a child view's webContents is closed with its window (Electron doesn't).
+- The theme is the tokens in `src/renderer/src/tokens.css` (`docs/design.md`):
+  - Colour, radius, type size, motion and shadow come from a token, never a literal.
+  - None fits: reuse the nearest; a really new value becomes a token there and a line in `docs/design.md`.
+  - `test/unit/design-tokens.test.ts` fails on a hex colour; don't add exceptions to it.
+  - Own values only in `panels/spotlights.css` and for what is drawn on a canvas (`canvas.css`).
 - Unit tests run under `node --experimental-strip-types`: no parameter properties, enums or namespaces in anything they import.
 - e2e tests reach `Browser` untyped (`globalThis.arcBrowser`), so after renaming a member grep `test/`. Wait for the page's DOM to show a change before measuring it; main's state alone races.
 
