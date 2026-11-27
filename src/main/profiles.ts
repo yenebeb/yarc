@@ -42,6 +42,7 @@ export class Profiles {
   private siteDecisions = new Map<ID, SiteDecisions>()
   private watched = new WeakSet<WebContents>()
   private sessionCookies = new Map<ID, SessionCookies>()
+  private spellChecked = new WeakSet<Session>()
   /** Opened on their own too: history sync reads every profile's history without starting its session. */
   private histories = new Map<ID, History>()
 
@@ -109,21 +110,30 @@ export class Profiles {
   private keepSessionCookies(id: ID): SessionCookies {
     let kept = this.sessionCookies.get(id)
     if (!kept) {
-      kept = new SessionCookies(session.fromPartition(Profiles.partition(id)), join(this.dir(id), 'session-cookies.json'), cookieCipher())
+      kept = new SessionCookies(this.sessionOf(id), join(this.dir(id), 'session-cookies.json'), cookieCipher())
       this.sessionCookies.set(id, kept)
     }
     return kept
   }
 
+  // The languages are chosen in the tick that makes the session: Chromium crashes when they change as a new profile's dictionary download ends.
+  private sessionOf(id: ID): Session {
+    const ses = session.fromPartition(this.incognito ? `incognito-${id}` : Profiles.partition(id))
+    if (!this.spellChecked.has(ses)) {
+      this.spellChecked.add(ses)
+      ses.setSpellCheckerLanguages(app.getPreferredSystemLanguages().slice(0, 3).filter((language) => ses.availableSpellCheckerLanguages.includes(language)))
+    }
+    return ses
+  }
+
   get(id: ID): ProfileRuntime {
     let rt = this.runtimes.get(id)
     if (rt) return rt
-    const ses = session.fromPartition(this.incognito ? `incognito-${id}` : Profiles.partition(id))
+    const ses = this.sessionOf(id)
     if (!this.incognito) this.keepSessionCookies(id)
     ses.setUserAgent(app.userAgentFallback)
     listenBeforeSendHeaders(ses)
     swipeToNavigate(ses)
-    ses.setSpellCheckerLanguages(app.getPreferredSystemLanguages().slice(0, 3).filter((l) => ses.availableSpellCheckerLanguages.includes(l)))
     this.permissions(ses, id)
     rt = { id, session: ses, history: this.history(id) }
     this.runtimes.set(id, rt)
