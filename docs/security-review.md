@@ -4,6 +4,52 @@ YARC updates itself on its users' computers, so a malicious change that reaches 
 
 Everything lives in `.github/security/` and the `security-*.yml` workflows. Tests: `test/unit/security-*.test.ts` (run by `pnpm test`).
 
+## The scheme
+
+A pull request. Teal is what this pipeline adds, amber is where a maintainer decides.
+
+```mermaid
+flowchart LR
+  pr[Pull request<br>open, push, label] --> gate[security-gate<br>runs main's code only<br>PR read as git objects]
+  gate -- "documentation only, or by a<br>maintainer or Dependabot" --> pass[Gate passes<br>may be merged]
+  gate -- "contributor's code:<br>maintainer adds review label" --> reserve
+  subgraph ai [AI security review, capped at 20 euros a month]
+    reserve[reserve<br>write token, no API key] --> review[review<br>API key, read-only token] --> settle[settle<br>write token, no API key]
+  end
+  settle -- report --> signoff[Sign-off<br>maintainer adds label]
+  signoff -- "for this exact commit" --> pass
+  reserve -- "reserves worst case" --> ledger[(security-ledger branch<br>budget, reviews,<br>sign-offs, exceptions)]
+  settle -- "books cost, files report" --> ledger
+  signoff -- "who, which commit" --> ledger
+  exception[Exception<br>maintainer workflow, with a reason] --> ledger
+  pr -. "new commit: labels removed,<br>gate closes" .-> gate
+
+  classDef added fill:#dcefec,stroke:#0a6c6a,color:#15202b
+  classDef human fill:#fbedd3,stroke:#8f5400,color:#15202b
+  class gate,reserve,review,settle,ledger added
+  class signoff,exception human
+```
+
+A release. If a commit did not pass the gate or the release review fails, the sign job never starts.
+
+```mermaid
+flowchart LR
+  main[main<br>merged PRs] -- daily --> version[version<br>tag and draft]
+  version --> build[build<br>Windows, macOS, Linux]
+  version --> verify[security-verify<br>did every commit<br>pass the gate?]
+  verify --> review[release AI review<br>everything since the<br>last published release]
+  build -- installers --> sign[sign<br>waits for a maintainer<br>to approve]
+  review -- "report on the run page" --> sign
+  sign --> publish[publish<br>users update]
+  ledger[(security-ledger branch)] -- "sign-offs, reviews" --> verify
+  review -- "reserves, books cost" --> ledger
+
+  classDef added fill:#dcefec,stroke:#0a6c6a,color:#15202b
+  classDef human fill:#fbedd3,stroke:#8f5400,color:#15202b
+  class verify,review,ledger added
+  class sign human
+```
+
 ## How it works
 
 1. **Every pull request gets a risk level**, decided by `classify.ts` from the changed files and added lines only (`policy.json` holds the lists). The author, the description and the AI reviewer have no say in it.
