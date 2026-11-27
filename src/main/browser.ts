@@ -1503,6 +1503,7 @@ export class Browser implements TabHost {
       emoji: action.emoji,
       color: action.color || SPACE_COLORS[this.state.spaces.length % SPACE_COLORS.length],
       color2: action.color2 || undefined,
+      appearance: action.appearance,
       profileId,
       pinned: [],
       today: [],
@@ -1974,14 +1975,14 @@ export class Browser implements TabHost {
     if (action.emoji !== undefined) space.emoji = action.emoji || undefined
     if (action.color) space.color = action.color
     if (action.color2 !== undefined) space.color2 = action.color2 || undefined
+    if (action.appearance !== undefined) space.appearance = action.appearance || undefined
     if (action.profileId && action.profileId !== space.profileId && this.store.profile(action.profileId)) {
       for (const item of spaceItems(this.state, space)) this.dropLive(item.id)
       space.profileId = action.profileId
       space.splits = []
       if (space.id === this.space.id && space.activeItemId) return this.activate(space.activeItemId)
-      this.layout()
     }
-    this.changed()
+    this.relayout()
   }
 
   private toggleSidebar(): void {

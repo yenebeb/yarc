@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import type { AppState } from '../../../shared/types'
+import type { AppState, Space } from '../../../shared/types'
 import { cx, dispatch, isMac } from '../api'
 import { Icon } from '../icons'
 import { CustomColor } from './ColorPicker'
@@ -16,6 +16,14 @@ const EMOJI = [
 
 const HEX = /^#[0-9a-f]{6}$/i
 
+type Appearance = NonNullable<Space['appearance']> | ''
+
+const APPEARANCES: { value: Appearance; label: string }[] = [
+  { value: '', label: 'Automatic' },
+  { value: 'light', label: 'Light' },
+  { value: 'dark', label: 'Dark' }
+]
+
 export function SpaceEditor({ state, close, spaceId }: { state: AppState; close: () => void; spaceId?: string }) {
   const space = spaceId ? state.spaces.find((s) => s.id === spaceId) : undefined
   const isNew = !space
@@ -26,6 +34,7 @@ export function SpaceEditor({ state, close, spaceId }: { state: AppState; close:
   const [custom, setCustom] = useState(space?.emoji && !EMOJI.includes(space.emoji) ? space.emoji : '')
   const [color, setColor] = useState(space?.color ?? SPACE_COLORS.find((c) => !used.has(c)) ?? SPACE_COLORS[0])
   const [color2, setColor2] = useState(space?.color2 ?? '')
+  const [appearance, setAppearance] = useState<Appearance>(space?.appearance ?? '')
   const [profileId, setProfileId] = useState<string>(space?.profileId ?? 'new')
   const [profileName, setProfileName] = useState('')
 
@@ -50,7 +59,7 @@ export function SpaceEditor({ state, close, spaceId }: { state: AppState; close:
     const c = HEX.test(color) ? color : (space?.color ?? SPACE_COLORS[0])
     const c2 = HEX.test(color2) ? color2 : ''
     if (space) {
-      dispatch({ type: 'updateSpace', id: space.id, name: n, emoji, color: c, color2: c2, profileId: profileChanged ? profileId : undefined })
+      dispatch({ type: 'updateSpace', id: space.id, name: n, emoji, color: c, color2: c2, appearance, profileId: profileChanged ? profileId : undefined })
     } else {
       dispatch({
         type: 'createSpace',
@@ -58,6 +67,7 @@ export function SpaceEditor({ state, close, spaceId }: { state: AppState; close:
         emoji: emoji || undefined,
         color: c,
         color2: c2 || undefined,
+        appearance: appearance || undefined,
         profileId: profileId === 'new' ? 'new' : profileId,
         profileName: profileId === 'new' ? profileName.trim() || n : undefined
       })
@@ -155,6 +165,17 @@ export function SpaceEditor({ state, close, spaceId }: { state: AppState; close:
                 <Icon name="plus" size={13} /> Second color
               </button>
             )}
+          </div>
+
+          <div className="field">
+            <span>Appearance</span>
+            <div className="segmented compact" role="radiogroup" aria-label="Appearance">
+              {APPEARANCES.map(({ value, label }) => (
+                <button type="button" role="radio" aria-checked={appearance === value} key={label} className={cx(appearance === value && 'on')} onClick={() => setAppearance(value)}>
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="field">

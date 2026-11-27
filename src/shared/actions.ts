@@ -1,6 +1,6 @@
 import type { Side } from './split'
 import type { CloudDrive } from './sync'
-import type { ID, LiveSource, OverlayMode, Rect, Settings, SplitAt } from './types'
+import type { ID, LiveSource, OverlayMode, Rect, Settings, Space, SplitAt } from './types'
 
 /** `index` is within the target list. */
 export type DropTarget =
@@ -42,9 +42,9 @@ export type Action =
   | { type: 'refreshLiveFolder'; id: ID }
   | { type: 'switchSpace'; id: ID }
   | { type: 'switchSpaceRelative'; delta: 1 | -1 }
-  | { type: 'createSpace'; name: string; emoji?: string; color: string; color2?: string; profileId?: ID | 'new'; profileName?: string }
-  /** `color2: ''` goes back to one color. */
-  | { type: 'updateSpace'; id: ID; name?: string; emoji?: string; color?: string; color2?: string; profileId?: ID }
+  | { type: 'createSpace'; name: string; emoji?: string; color: string; color2?: string; appearance?: Space['appearance']; profileId?: ID | 'new'; profileName?: string }
+  /** `color2: ''` goes back to one color, `appearance: ''` to following YARC's own. */
+  | { type: 'updateSpace'; id: ID; name?: string; emoji?: string; color?: string; color2?: string; appearance?: Space['appearance'] | ''; profileId?: ID }
   /** Shown until the space editor closes; saved only by `updateSpace`/`createSpace`. No `spaceId` = the space being created. */
   | { type: 'previewSpaceColors'; spaceId?: ID; color: string; color2?: string }
   | { type: 'deleteSpace'; id: ID }
