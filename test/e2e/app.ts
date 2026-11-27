@@ -66,11 +66,14 @@ function newUserData(): string {
   return dir
 }
 
+// Chromium fetches a spell-check dictionary into every fresh profile, and has crashed the app while saving one (SpellcheckHunspellDictionary, Linux CI).
+const NO_DICTIONARY_DOWNLOAD = '--host-resolver-rules=MAP *.gvt1.com ~NOTFOUND'
+
 async function launch(env: Record<string, string> = {}): Promise<ElectronApplication> {
   // YARC_EXE runs the suite against a packaged app (e.g. release/win-unpacked/YARC.exe).
   const exe = process.env.YARC_EXE
   const launched = await electron.launch({
-    ...(exe ? { executablePath: exe, args: [] } : { args: ['out/main/index.js'] }),
+    ...(exe ? { executablePath: exe, args: [NO_DICTIONARY_DOWNLOAD] } : { args: ['out/main/index.js', NO_DICTIONARY_DOWNLOAD] }),
     // Playwright otherwise adds --no-sandbox on Linux, and service-worker preloads (extension APIs) don't run without the sandbox.
     chromiumSandbox: true,
     env: { ...process.env, YARC_USER_DATA: userData, YARC_TEST: '1', ...env }
