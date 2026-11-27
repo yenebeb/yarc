@@ -7,6 +7,7 @@ from PIL import Image, ImageDraw, ImageFilter
 FRAMES = os.path.join(tempfile.gettempdir(), 'yarc-readme-media')
 OUT = os.path.join(os.path.dirname(__file__), '..', '..', 'docs', 'screenshots')
 GIFS = {'spaces': 'spaces.gif', 'command': 'command-bar.gif', 'split': 'split-view.gif', 'peek': 'peek.gif', 'canvases': 'canvases.gif'}
+STILLS = {'split': 'split-view.png', 'peek': 'peek.png'}
 WIDTH = 1088
 ARROW = [(0, 0), (0, 17), (4.5, 13), (7.5, 20), (10, 19), (7, 12.5), (12.5, 12.5)]
 
@@ -51,6 +52,11 @@ def png(im, out):
     im.save(out, optimize=True)
 
 
+def last_frame(name, out):
+    frames = json.load(open(os.path.join(FRAMES, name + '.json')))
+    png(Image.open(frames[-1]['file']).convert('RGB'), out)
+
+
 def floating_player(out):
     player = json.load(open(os.path.join(FRAMES, 'floating', 'player.json')))
     main = Image.open(os.path.join(FRAMES, 'floating', '000-main.png')).convert('RGBA')
@@ -71,6 +77,9 @@ def made(name):
 for name, file in GIFS.items():
     if made(name):
         gif(name, os.path.join(OUT, file))
+for name, file in STILLS.items():
+    if made(name):
+        last_frame(name, os.path.join(OUT, file))
 if made('hero'):
     png(Image.open(os.path.join(FRAMES, 'hero', '000-hero.png')).convert('RGB'), os.path.join(OUT, 'sidebar.png'))
 if made('little'):

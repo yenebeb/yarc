@@ -1,74 +1,73 @@
-<p align="center"><img src="build/icon.svg" width="128" alt="YARC's icon: a purple A in a pirate hat, bandana and eyepatch"></p>
+<p align="center"><img src="build/icon.svg" width="112" alt="YARC's icon: a purple A in a pirate hat, bandana and eyepatch"></p>
 
 <h1 align="center">YARC: an open-source Arc browser alternative</h1>
 
 <p align="center"><b>A free, open-source, Chromium-based browser for people who loved Arc.</b><br>
-Arc shuts down on 22 December 2026. YARC keeps its vertical-tab sidebar, Spaces, the command bar and split view, runs your Chrome extensions, and brings your Arc tabs along in one step.</p>
+Arc shuts down on 22 December 2026. YARC keeps its vertical-tab sidebar, Spaces, the command bar and split view,
+runs your Chrome extensions, and brings your Arc tabs along in one step.</p>
 
-<p align="center"><a href="https://github.com/yenebeb/yarc/releases/latest"><b>Download</b></a> · <a href="https://yenebeb.nl/yarc">Website</a> · <a href="#moving-from-arc">Moving from Arc</a><br>
-macOS · Windows · Linux (experimental)<br>
-<sub>An independent project, not affiliated with The Browser Company.</sub></p>
+<p align="center">
+<a href="https://github.com/yenebeb/yarc/releases/latest"><b>Download for macOS, Windows or Linux</b></a><br>
+<a href="https://yenebeb.nl/yarc">Website</a> · <a href="#moving-from-arc">Moving from Arc</a> · <a href="#features">Features</a> · <a href="#how-yarc-is-built">How it's built</a> · <a href="#contributing">Contributing</a>
+</p>
 
 ![YARC browser: the sidebar with favorites, a pinned tab, a canvas and Today tabs, next to a Wikipedia page](docs/screenshots/sidebar.png)
 
-## Contents
+<table>
+<tr>
+<td width="33%" align="center"><b>No telemetry</b><br>Nothing is counted, logged or reported. Not even crashes.</td>
+<td width="33%" align="center"><b>No account</b><br>Nothing to sign up for, and no YARC server to sign in to.</td>
+<td width="33%" align="center"><b>Open source</b><br>GPL-3.0. Read it, build it, change it.</td>
+</tr>
+</table>
 
-[Features](#features) · [Install](#install) · [Moving from Arc](#moving-from-arc) · [Shortcuts](#keyboard-shortcuts) · [FAQ](#faq) · [Contributing](#contributing) · [Report a bug](https://github.com/yenebeb/yarc/issues/new?template=bug.yml) · [Request a feature](https://github.com/yenebeb/yarc/issues/new?template=feature.yml)
+<p align="center"><sub>YARC only goes online by itself to check for updates and to refresh its ad-blocking lists.<br>
+An independent project, not affiliated with The Browser Company.</sub></p>
 
 ## Features
 
-### Nothing collected
-
-- **no telemetry**
-- **no account**
-- **no servers**
-
-The only thing YARC needs is a ping to check for updates and to refresh its ad-blocking lists.
-
-### Spaces
-
-![Switching from the Personal space to the Work space](docs/screenshots/spaces.gif)
-
-Each space has its own color, and its own profile with separate logins, history and extensions. Swipe on the sidebar, or press `Ctrl+1–9` (`Alt+1–9` on Windows), to switch.
-
-### Command bar
-
-![Typing in the command bar to switch to an open tab](docs/screenshots/command-bar.gif)
-
-`⌘T` opens a tab, searches, switches to an open tab or runs a command.
-
-### Split view
-
-![Dragging a tab onto the page to split it](docs/screenshots/split-view.gif)
-
-Drag a tab onto the page. Up to four tabs, side by side or stacked.
-
-### Peek
-
-![A link from a favorite opening in Peek](docs/screenshots/peek.gif)
-
-Links from pinned tabs and favorites to other sites open in a card over the page. Shift-click any link, or right-click it and choose *Open Link in Peek*, to peek it too. `Esc` closes it, `⌘O` keeps it as a tab.
-
-### Canvases, an alternative to Arc's Easels
-
-![Capturing part of a page to a canvas, then pressing play to see it live](docs/screenshots/canvases.gif)
-
-`⌘⇧2` captures part of a page onto a board in your sidebar; ▶ shows a capture live. Unlike Easels, canvases work on Windows and Linux too.
-
-### Floating player
-
-![A video floating over the page after leaving its tab](docs/screenshots/floating-player.png)
-
+<table>
+<tr>
+<td width="50%" valign="top">
+<img src="docs/screenshots/spaces.gif" alt="Switching from the Personal space to the Work space">
+<h3>Spaces</h3>
+Each space has its own color, and its own profile with separate logins, history and extensions. Swipe on the sidebar, or press <code>Ctrl+1–9</code> (<code>Alt+1–9</code> on Windows), to switch.
+</td>
+<td width="50%" valign="top">
+<a href="docs/screenshots/split-view.gif"><img src="docs/screenshots/split-view.png" alt="Two tabs side by side in split view"></a>
+<h3>Split view</h3>
+Drag a tab onto the page. Up to four tabs, side by side or stacked. <a href="docs/screenshots/split-view.gif">Watch it ▸</a>
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+<a href="docs/screenshots/peek.gif"><img src="docs/screenshots/peek.png" alt="A link from a favorite open in Peek, a card over the page"></a>
+<h3>Peek</h3>
+Links from pinned tabs and favorites to other sites open in a card over the page. Shift-click any link to peek it too. <code>Esc</code> closes it, <code>⌘O</code> keeps it as a tab. <a href="docs/screenshots/peek.gif">Watch it ▸</a>
+</td>
+<td width="50%" valign="top">
+<img src="docs/screenshots/command-bar.gif" alt="Typing in the command bar to switch to an open tab">
+<h3>Command bar</h3>
+<code>⌘T</code> opens a tab, searches, switches to an open tab or runs a command.
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+<img src="docs/screenshots/canvases.gif" alt="Capturing part of a page to a canvas, then pressing play to see it live">
+<h3>Canvases</h3>
+<code>⌘⇧2</code> captures part of a page onto a board in your sidebar; ▶ shows a capture live. An alternative to Arc's Easels that works on Windows and Linux too.
+</td>
+<td width="50%" valign="top">
+<img src="docs/screenshots/floating-player.png" alt="A video floating over the page after leaving its tab">
+<h3>Floating player</h3>
 Leave a tab while its video plays and it keeps going in a small player in front of all your apps.
-
-### Little Window
-
-<img src="docs/screenshots/little-window.png" width="560" alt="A Little Window with a page and its Open in Personal button">
-
-Links from other apps open in a small window. Close it, or keep the page with **Open in** *your space*.
+</td>
+</tr>
+</table>
 
 ### And
 
+- **Little Window:** links from other apps open in a small window. Close it, or keep the page with **Open in** *your space*.
 - **Pinned tabs** remember their page; `⌘W` only unloads them.
 - **Live folders** fill themselves with your GitHub pull requests or any RSS feed, fetched with your own login.
 - **Today tabs** archive themselves after 12 hours (or 24 hours, 7 days, 30 days, never).
@@ -176,6 +175,66 @@ In a Little Window: `Mod+O` moves the page into the main window, `Mod+Shift+O` p
 
 </details>
 
+## How YARC is built
+
+### Why Electron
+
+YARC is [Electron](https://www.electronjs.org/): Chromium with an app around it. For a browser made by one person, that buys the things that matter most:
+
+- **Security updates out of the box.** Almost every browser zero-day is in Chromium or V8. Electron ships those fixes as patch releases, usually within a day or two of Chrome, and YARC merges and releases them automatically. A Chromium fork would mean rebasing on every Chrome release, with builds that take hours.
+- **Real Chromium.** Sites behave as in Chrome, Google sign-in and company SSO work, and extensions come from the Chrome Web Store.
+- **One codebase** for macOS, Windows and Linux.
+
+It costs less than its reputation says. With the same 8 pages open, Chrome used 746 MB and YARC 844 MB; the difference is YARC's sidebar, panels and ad blocker. What it does cost: no Netflix, Disney+ or Spotify web (no Widevine), and new Chromium features arrive a few weeks later.
+
+[Why Electron, what it costs, and how we measured](docs/why-electron.md)
+
+### AI writes code here. People decide what ships.
+
+Much of YARC is written with an AI coding assistant, and the commits made that way say so in a `Co-Authored-By` line.
+
+**Why.** We think this is how software will be built, and it is fast: Arc's shutdown date doesn't move, and one person in their spare time would not have had a browser ready for it otherwise.
+
+**How.** Fast only helps if what comes out is good, so AI-written code gets no shortcut:
+
+- **Every change is a pull request**, read by a maintainer before it merges. `main` accepts nothing else, from anyone.
+- **The tests have to pass:** type checks, unit tests, and end-to-end tests that drive the real app on Windows and Linux.
+- **A contributor's change needs a maintainer's sign-off** for that exact commit. A new commit removes it.
+- **A release waits for a maintainer's approval** before it is signed and published. An automated review can add a report to that decision; it can never make it.
+- **The AI's instructions are public:** [CLAUDE.md](CLAUDE.md) holds the code rules and the decisions it must not undo.
+
+The whole pipeline is in [docs/security-review.md](docs/security-review.md).
+
+Contributing with an AI assistant is welcome on the same terms. You answer for what you submit: understand it, run it, and expect it to be reviewed like any other code.
+
+## Contributing
+
+YARC is one person's spare-time project, so help counts. Ways to help, smallest first:
+
+- **Report a bug:** [open a bug report](https://github.com/yenebeb/yarc/issues/new?template=bug.yml).
+- **Ask for something:** missing a thing from Arc, or have an idea? [Request a feature](https://github.com/yenebeb/yarc/issues/new?template=feature.yml).
+- **Correct the notes:** [docs/arc-reference.md](docs/arc-reference.md) collects what we know about how Arc behaves. If it's wrong, say so.
+- **Send a pull request.** For anything bigger than a fix, open an issue first so the work isn't wasted.
+
+Found a vulnerability? Report it privately, as [SECURITY.md](SECURITY.md) says.
+
+### Your first pull request
+
+```bash
+pnpm install
+pnpm dev
+```
+
+1. Make the change on a branch, with signed commits (`main` only takes verified signatures).
+2. Run `pnpm typecheck && pnpm test && pnpm test:e2e`.
+3. Open the pull request. Its description needs a `## What's New` section: one line, in a user's words, about what they can now do. Write `none` if they won't notice.
+4. CI runs and the security gate classifies the change. A maintainer reviews it and signs off on the commit.
+5. It is squash-merged, and ships in the next daily release.
+
+Where things are: building, releasing and how the code fits together in [docs/development.md](docs/development.md), the look in [docs/design.md](docs/design.md).
+
+**Planned, and open for help:** Boosts, Notes, syncing spaces and pinned tabs between your own devices, and code signing to remove the install warnings.
+
 ## FAQ
 
 **What happens when Arc shuts down?**
@@ -196,8 +255,8 @@ Yes, including company SSO. Only sites that demand *managed* Google Chrome won't
 **Does it sync with my Google account, or between my computers?**
 Google only lets Chrome use Chrome Sync, so use *Import from Chrome* once instead. Your history can sync between your own computers, encrypted, through iCloud Drive, a folder you already sync or your own server: **Settings → Sync**. Spaces and pinned tabs don't sync yet.
 
-**Why Electron?**
-It's real Chromium, so sites and Chrome extensions work as in Chrome, and Chromium's security fixes reach you within days, without a one-person project maintaining a fork. Per page it uses the same memory as Chrome: with 8 pages open, Chrome used 746 MB and YARC 844 MB, the difference being YARC's sidebar, panels and ad blocker. [Why Electron, and how we measured](docs/why-electron.md).
+**Why Electron? Is it written by AI?**
+Both are answered in [How YARC is built](#how-yarc-is-built).
 
 **Do I need an ad-blocker extension?**
 No, blocking is built in. If you'd rather use your own, Manifest V3 blockers like uBlock Origin Lite block too.
@@ -221,14 +280,6 @@ One person, in their spare time. YARC is independent and not affiliated with The
 | Error log | `logs\main.log` | `~/Library/Logs/YARC/main.log` |
 
 </details>
-
-## Contributing
-
-Found a bug? [Report it](https://github.com/yenebeb/yarc/issues/new?template=bug.yml). Missing something from Arc, or have an idea? [Request a feature](https://github.com/yenebeb/yarc/issues/new?template=feature.yml). Pull requests are welcome too.
-
-To build it yourself: `pnpm install && pnpm dev`. Building, releasing and how the code fits together are in [docs/development.md](docs/development.md).
-
-Planned: Boosts, Notes, syncing spaces and pinned tabs between your own devices, and code signing to remove the install warnings.
 
 ## License
 
