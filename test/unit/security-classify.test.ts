@@ -2,11 +2,12 @@ import assert from 'node:assert/strict'
 import { describe, test } from 'node:test'
 import { changedFiles, classify, globToRegExp, type ChangedFile } from '../../.github/security/classify.ts'
 import { loadPolicy } from '../../.github/security/policy.ts'
-import { fakeGitHub, git } from './security-fixture.ts'
+import { fakeGitHub, git, usePolicy } from './security-fixture.ts'
 
 // The pipeline only runs on Linux runners, and these tests build git repositories with POSIX symlinks and paths.
 if (process.platform === 'win32') process.exit(0)
 
+usePolicy(true)
 const policy = loadPolicy()
 const file = (path: string, addedLines: string[] = ['A line.'], extra: Partial<ChangedFile> = {}): ChangedFile => ({ path, status: 'M', mode: '100644', binary: false, addedLines, ...extra })
 const risk = (...files: ChangedFile[]) => classify(policy, files).risk

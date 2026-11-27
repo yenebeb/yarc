@@ -86,7 +86,7 @@ export function decide(policy: Policy, pullRequest: PullRequest, ledger: PullReq
   const exempted = validSignatures(policy, ledger.exceptions, pullRequest)
   const approvers = new Set([...validSignatures(policy, ledger.signoffs, pullRequest), ...exempted])
   const approvalsNeeded = Math.min(policy.approvals[risk], policy.maintainers.filter((login) => login !== author).length)
-  const reviewed = exempted.length > 0 || completedReview(ledger, pullRequest, version, exactBase) !== undefined
+  const reviewed = !policy.reviewer.enabled || exempted.length > 0 || completedReview(ledger, pullRequest, version, exactBase) !== undefined
 
   const missing: string[] = []
   if (!reviewed) missing.push('AI security review')

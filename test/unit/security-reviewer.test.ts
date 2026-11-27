@@ -5,11 +5,12 @@ import { NO_USAGE, type Usage } from '../../.github/security/ledger.ts'
 import { loadPolicy, reviewerPrompt } from '../../.github/security/policy.ts'
 import { COMMENT_MARKER, plain, renderReport, validateReport, type Report } from '../../.github/security/report.ts'
 import { briefing, gitReader, runReview, TOOLS, type CallModel, type ModelRequest, type ModelTurn } from '../../.github/security/reviewer.ts'
-import { fakeGitHub } from './security-fixture.ts'
+import { fakeGitHub, usePolicy } from './security-fixture.ts'
 
 // The pipeline only runs on Linux runners, and these tests build git repositories with POSIX symlinks and paths.
 if (process.platform === 'win32') process.exit(0)
 
+usePolicy(true)
 const policy = loadPolicy()
 const limits = policy.reviewer
 const usage = (inputTokens: number, outputTokens = 200): Usage => ({ ...NO_USAGE, inputTokens, outputTokens })

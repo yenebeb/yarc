@@ -1,7 +1,15 @@
 import { execFileSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
+
+/** The shipped policy with the AI reviewer on or off, as a file the scripts load instead of their own. */
+export function usePolicy(reviewerEnabled: boolean): void {
+  const shipped = JSON.parse(readFileSync(new URL('../../.github/security/policy.json', import.meta.url), 'utf8'))
+  const file = join(mkdtempSync(join(tmpdir(), 'security-policy-')), 'policy.json')
+  writeFileSync(file, JSON.stringify({ ...shipped, reviewer: { ...shipped.reviewer, enabled: reviewerEnabled } }))
+  process.env.SECURITY_POLICY_FILE = file
+}
 
 export const git = (dir: string, ...args: string[]): string => execFileSync('git', ['-C', dir, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
 

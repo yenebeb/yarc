@@ -99,6 +99,9 @@ export async function gate(event: Event): Promise<void> {
   if ((label === reviewLabel || label === approveLabel) && !byMaintainer) {
     await removeLabel(number, label)
     notes.push(`\`${label}\` was removed: only a maintainer listed in the security policy can add it.`)
+  } else if (label === reviewLabel && !policy.reviewer.enabled) {
+    await removeLabel(number, reviewLabel)
+    notes.push('The AI review is switched off (`reviewer.enabled` in `.github/security/policy.json`), so this change is checked by hand.')
   } else if (label === reviewLabel) {
     if (completedReview(readPrLedger(number), pullRequest, policyVersion())) {
       await removeLabel(number, reviewLabel)

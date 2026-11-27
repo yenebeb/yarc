@@ -2,11 +2,12 @@ import assert from 'node:assert/strict'
 import { describe, test } from 'node:test'
 import { budgetFile, costUsd, monthlyBudgetUsd, readJson, readLedger, reserve, settle, updateLedger, worstCaseUsd, writeJson, type BudgetEntry } from '../../.github/security/ledger.ts'
 import { loadPolicy, type Policy } from '../../.github/security/policy.ts'
-import { fakeGitHub } from './security-fixture.ts'
+import { fakeGitHub, usePolicy } from './security-fixture.ts'
 
 // The pipeline only runs on Linux runners, and these tests build git repositories with POSIX symlinks and paths.
 if (process.platform === 'win32') process.exit(0)
 
+usePolicy(true)
 const base = loadPolicy()
 const policy: Policy = { ...base, budget: { ...base.budget, maxConcurrentReviews: 100, maxReviewsPerPrPerDay: 100, maxPrReviewsPerDay: 100 } }
 const worstCase = worstCaseUsd(policy.reviewer)

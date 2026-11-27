@@ -148,7 +148,7 @@ export function renderReport(policy: Policy, input: ReportInput): string {
   if (decision?.state === 'pending') {
     const steps = []
     if (decision.needsAiReview) steps.push(`A maintainer adds the label ${code(policy.labels.review)} to start the AI review of this commit.`)
-    steps.push(`After reading the report, a maintainer adds ${code(policy.labels.approve)} to sign off this exact commit. A new commit removes both labels.`)
+    steps.push(`After ${policy.reviewer.enabled ? 'reading the report' : 'checking the change by hand'}, a maintainer adds ${code(policy.labels.approve)} to sign off this exact commit. A new commit removes the label.`)
     sections.push(`**Next**\n${steps.map((step, index) => `${index + 1}. ${step}`).join('\n')}`)
   }
   return sections.join('\n\n')

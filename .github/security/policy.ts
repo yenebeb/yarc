@@ -17,6 +17,8 @@ export interface Prices {
 }
 
 export interface ReviewerPolicy {
+  /** Off: a maintainer's sign-off alone opens the gate, and nothing is spent. */
+  enabled: boolean
   provider: string
   model: string
   fallbackModel: string
@@ -50,7 +52,8 @@ export interface Policy {
 }
 
 const here = dirname(fileURLToPath(import.meta.url))
-const policyText = (): string => readFileSync(join(here, 'policy.json'), 'utf8')
+/** SECURITY_POLICY_FILE is for the tests; the workflows never set it. */
+const policyText = (): string => readFileSync(process.env.SECURITY_POLICY_FILE ?? join(here, 'policy.json'), 'utf8')
 
 export const loadPolicy = (): Policy => JSON.parse(policyText())
 export const reviewerPrompt = (): string => readFileSync(join(here, 'reviewer-prompt.md'), 'utf8')

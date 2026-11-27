@@ -4,7 +4,19 @@ YARC updates itself on its users' computers, so a malicious change that reaches 
 
 Everything lives in `.github/security/` and the `security-*.yml` workflows. Tests: `test/unit/security-*.test.ts` (run by `pnpm test`).
 
+## The AI reviewer is switched off
+
+`reviewer.enabled` in `.github/security/policy.json` is `false`. Until it is turned on:
+
+- A contributor's pull request needs only a maintainer's sign-off (`security-approved`) of the exact commit, after checking the change by hand. The gate comment lists why the change got its risk level, which is where to look first.
+- The label `ready-for-security-review` does nothing, and nothing is spent.
+- A release is still checked commit by commit and still waits for approval, but no automated review of it is made.
+
+To turn it on: create the `security-review` environment with `SECURITY_AI_API_KEY` (setup step 2), set `reviewer.enabled` to `true`, and merge that. Everything below about the AI review, its budget and its limits applies from then on.
+
 ## The scheme
+
+The diagrams show the pipeline with the reviewer on.
 
 A pull request. Teal is what this pipeline adds, amber is where a maintainer decides.
 
@@ -72,8 +84,8 @@ flowchart LR
 **A contributor's pull request**
 
 1. Read the gate comment: risk level and why.
-2. Add `ready-for-security-review`. A few minutes later the report replaces the comment.
-3. Do the "Check by hand" items. Add `security-approved`, then merge.
+2. With the reviewer on: add `ready-for-security-review`. A few minutes later the report replaces the comment. With it off: check the change yourself.
+3. Do the "Check by hand" items, if there is a report. Add `security-approved`, then merge.
 
 **The daily release**
 
@@ -124,14 +136,14 @@ Set a monthly spend limit on the API key's workspace as well, a little above the
 In this order; until step 4 the gate only informs.
 
 1. **Labels:** create `ready-for-security-review` and `security-approved`.
-2. **Environment `security-review`:** deployment branches `main` only, no reviewers, secret `SECURITY_AI_API_KEY` (an Anthropic API key from a workspace with a monthly spend limit).
+2. **Environment `security-review`** (only when turning the AI reviewer on)**:** deployment branches `main` only, no reviewers, secret `SECURITY_AI_API_KEY` (an Anthropic API key from a workspace with a monthly spend limit).
 3. **Environment `release-signing`:** add yourself as required reviewer; leave *Prevent self-review* off while there is one maintainer.
 4. **Ruleset `main`:** add the required status check `security-gate` (source: GitHub Actions), after seeing it pass on one Dependabot pull request and stay pending on one from a fork. Optionally `semgrep` too.
 5. **New ruleset for the `security-ledger` branch:** block deletion and force pushes, so the audit trail can only grow. The first review or sign-off creates the branch.
 6. **Settings > Actions > General:** *Require approval for all external contributors*; default workflow permissions read-only.
 7. **Settings > Code security:** CodeQL default setup, Dependabot alerts, secret scanning with push protection, private vulnerability reporting.
 8. **Install the CodeRabbit GitHub App** on this repository (free for public repositories; `.coderabbit.yaml` configures it). Its limits depend on the repository's popularity, and small repositories may need to ask for each review with a comment.
-9. **The first release afterwards** contains contributor pull requests merged before the ledger existed, so its check fails. Start it by hand once with a *security_exception* reason.
+9. **The first release afterwards** contains contributor pull requests merged before the ledger existed, so its check fails, with the reviewer on or off. Start it by hand once with a *security_exception* reason.
 
 ## What this does and doesn't stop
 

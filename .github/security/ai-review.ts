@@ -18,6 +18,7 @@ export interface ReviewTarget {
   base: string
 }
 
+export const REVIEWER_OFF = 'switched off'
 const git = (args: string[]): string => execFileSync('git', args, { encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 }).trim()
 const subject = (target: ReviewTarget): string => (target.kind === 'pr' ? `#${target.pr}` : 'release')
 
@@ -35,6 +36,7 @@ function alreadyReviewed(dir: string, target: ReviewTarget): boolean {
 /** Takes the review's worst-case cost out of the month's budget before any of it is spent. */
 export function reserveReview(target: ReviewTarget, now = new Date()): { proceed: boolean; id: string; reason: string } {
   const policy = loadPolicy()
+  if (!policy.reviewer.enabled) return { proceed: false, id: '', reason: REVIEWER_OFF }
   const id = `${target.kind}-${target.pr ?? 'candidate'}-${target.head.slice(0, 12)}-${now.getTime()}`
   return updateLedger(remote(), `${subject(target)}: reserve an AI review of ${target.head.slice(0, 12)}`, (dir) => {
     if (alreadyReviewed(dir, target)) return { proceed: false, id: '', reason: 'cached' }
@@ -120,7 +122,7 @@ function readResult(target: ReviewTarget, file: string, fallback: string): Revie
 /** Books what the review cost and files its result. Returns whether this commit now has a completed review. */
 export async function settleReview(target: ReviewTarget, id: string, resultFile: string, refusal: string, now = new Date()): Promise<boolean> {
   const policy = loadPolicy()
-  const cached = refusal === 'cached'
+  const cached = refusal === 'cached' || refusal === REVIEWER_OFF
   const record = cached ? undefined : readResult(target, resultFile, refusal || 'the review job produced no result')
   if (record) {
     updateLedger(remote(), `${subject(target)}: AI review of ${target.head.slice(0, 12)} ${record.outcome}`, (dir) => {
@@ -149,7 +151,10 @@ export async function settleReview(target: ReviewTarget, id: string, resultFile:
       base: target.base,
       classification: classify(policy, changedFiles('.', target.base, target.head)),
       review: latest,
-      notes: ledger.exception ? [`**Exception** by ${ledger.exception.by}: ${ledger.exception.reason}`] : [],
+      notes: [
+        ...(ledger.exception ? [`**Exception** by ${ledger.exception.by}: ${ledger.exception.reason}`] : []),
+        ...(policy.reviewer.enabled ? [] : ['The AI review is switched off: no automated review of this release was made. Read the changes yourself before approving.'])
+      ],
       knownLines: gitReader('.', target.base, target.head).lineCount
     })
   )

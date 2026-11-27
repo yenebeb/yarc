@@ -2,7 +2,9 @@ import assert from 'node:assert/strict'
 import { describe, test } from 'node:test'
 import { decide, EMPTY_PR_LEDGER, type PullRequest, type PullRequestLedger, type ReviewRecord, type Signature } from '../../.github/security/gate.ts'
 import { loadPolicy, type Policy } from '../../.github/security/policy.ts'
+import { usePolicy } from './security-fixture.ts'
 
+usePolicy(true)
 const policy: Policy = { ...loadPolicy(), maintainers: ['ana', 'ben'], trustedBots: ['dependabot[bot]'] }
 const solo: Policy = { ...policy, maintainers: ['ana'] }
 const VERSION = 'rules-1'

@@ -10,11 +10,12 @@ import { loadPolicy, policyVersion } from '../../.github/security/policy.ts'
 import { exception, gate } from '../../.github/security/pull-request.ts'
 import { checkCommits } from '../../.github/security/release.ts'
 import type { Report } from '../../.github/security/report.ts'
-import { fakeGitHub, git, type PullState } from './security-fixture.ts'
+import { fakeGitHub, git, type PullState, usePolicy } from './security-fixture.ts'
 
 // The pipeline only runs on Linux runners, and these tests build git repositories with POSIX symlinks and paths.
 if (process.platform === 'win32') process.exit(0)
 
+usePolicy(true)
 const policy = loadPolicy()
 const [maintainer] = policy.maintainers
 const { review: reviewLabel, approve: approveLabel } = policy.labels
