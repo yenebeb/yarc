@@ -4,7 +4,7 @@
   z-index: 1;
   background: var(--panel);
   padding: 12px 8px 4px;
-  font-size: 12px;
+  font-size: var(--type-sm);
   font-weight: 600;
   color: var(--text-2);
 }
@@ -64,10 +64,10 @@
 .space-emoji {
   width: 24px;
   height: 24px;
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   display: grid;
   place-items: center;
-  font-size: 15px;
+  font-size: var(--type-xl);
   flex: none;
 }
 

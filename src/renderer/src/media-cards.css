@@ -37,7 +37,7 @@
 
 .media-card {
   position: relative;
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   background: var(--panel);
   box-shadow: 0 1px 3px rgb(0 0 0 / 0.12);
   padding: 2px 4px;
@@ -48,7 +48,7 @@
   align-items: center;
   gap: 2px;
   padding: 2px 0 0 6px;
-  font-size: 12px;
+  font-size: var(--type-sm);
   font-weight: 500;
   color: var(--text);
 }

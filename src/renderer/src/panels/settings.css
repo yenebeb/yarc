@@ -16,7 +16,7 @@
   max-height: none;
   background: var(--set-bg);
   border-radius: 16px;
-  font-size: 13px;
+  font-size: var(--type-md);
 }
 
 :root[data-appearance='dark'] .panel.sheet.settings {
@@ -79,16 +79,16 @@
   flex: none;
   width: 26px;
   height: 26px;
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   display: grid;
   place-items: center;
   color: var(--accent);
   background: color-mix(in oklab, var(--space) 16%, transparent);
-  transition: background 0.12s, color 0.12s;
+  transition: background var(--duration-fade), color var(--duration-fade);
 }
 
 .settings .set-nav-item[aria-selected='true'] .set-nav-icon {
-  color: #fff;
+  color: var(--white);
   background: var(--set-fill);
   box-shadow: 0 1px 3px color-mix(in oklab, var(--space) 45%, transparent);
 }
@@ -113,7 +113,7 @@
 .settings .set-head h2 {
   flex: 1;
   margin: 0;
-  font-size: 20px;
+  font-size: var(--type-3xl);
   font-weight: 700;
   letter-spacing: -0.015em;
 }
@@ -149,7 +149,7 @@
 
 .settings .set-group h3 {
   margin: 0 0 7px 4px;
-  font-size: 12px;
+  font-size: var(--type-sm);
   font-weight: 600;
   color: var(--text-2);
 }
@@ -157,19 +157,19 @@
 .settings .set-card {
   background: var(--set-card);
   border: 1px solid var(--panel-line);
-  border-radius: 12px;
+  border-radius: var(--radius-xl);
   box-shadow: var(--set-card-shadow);
 }
 
 .settings .set-note {
   margin: 0 4px 14px;
   color: var(--text-2);
-  font-size: 13px;
+  font-size: var(--type-md);
   line-height: 1.55;
 }
 
 .settings .set-note code {
-  font-size: 12px;
+  font-size: var(--type-sm);
   padding: 1px 5px;
   border-radius: 5px;
   background: var(--set-input);
@@ -228,7 +228,7 @@
 }
 
 .settings .set-row-text small {
-  font-size: 12px;
+  font-size: var(--type-sm);
   line-height: 1.4;
   color: var(--text-3);
 }
@@ -242,9 +242,9 @@
 
 .settings .btn {
   padding: 6px 13px;
-  font-size: 13px;
+  font-size: var(--type-md);
   font-weight: 500;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: var(--set-input);
   border-color: var(--set-input-line);
 }
@@ -256,12 +256,12 @@
 .settings .btn.primary {
   background: var(--set-fill);
   border-color: transparent;
-  color: #fff;
+  color: var(--white);
   box-shadow: 0 1px 2px color-mix(in oklab, var(--space) 40%, transparent);
 }
 
 .settings .btn.primary:hover {
-  background: color-mix(in oklab, var(--set-fill) 88%, #000);
+  background: color-mix(in oklab, var(--set-fill) 88%, var(--black));
 }
 
 .settings .set-select {
@@ -275,8 +275,8 @@
   min-width: 180px;
   max-width: 260px;
   padding: 6px 30px 6px 11px;
-  font-size: 13px;
-  border-radius: 8px;
+  font-size: var(--type-md);
+  border-radius: var(--radius-md);
   background: var(--set-input);
   border: 1px solid var(--set-input-line);
   text-overflow: ellipsis;
@@ -319,10 +319,10 @@
 .settings .set-seg button {
   min-width: 64px;
   padding: 4px 12px;
-  border-radius: 7px;
-  font-size: 13px;
+  border-radius: var(--radius-sm);
+  font-size: var(--type-md);
   color: var(--text-2);
-  transition: background 0.12s, color 0.12s;
+  transition: background var(--duration-fade), color var(--duration-fade);
 }
 
 .settings .set-seg button:hover:not(.on) {
@@ -361,7 +361,7 @@
   height: 18px;
   margin-top: -7px;
   border-radius: 50%;
-  background: #fff;
+  background: var(--white);
   border: 0.5px solid rgb(0 0 0 / 0.12);
   box-shadow: 0 1px 3px rgb(0 0 0 / 0.3);
 }
@@ -375,7 +375,7 @@
   padding: 3px 0;
   border-radius: 6px;
   text-align: center;
-  font-size: 12px;
+  font-size: var(--type-sm);
   font-variant-numeric: tabular-nums;
   color: var(--text-2);
   background: var(--set-input);
@@ -391,7 +391,7 @@
   border-radius: 11px;
   background: var(--set-off);
   outline: none;
-  transition: background 0.16s;
+  transition: background var(--duration-slide);
 }
 
 .settings .switch::before {
@@ -402,9 +402,9 @@
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  background: #fff;
+  background: var(--white);
   box-shadow: 0 1px 3px rgb(0 0 0 / 0.28);
-  transition: transform 0.16s cubic-bezier(0.3, 0.7, 0.4, 1);
+  transition: transform var(--duration-slide) cubic-bezier(0.3, 0.7, 0.4, 1);
 }
 
 .settings .switch:checked {
@@ -431,10 +431,10 @@
   border-radius: 50%;
   display: grid;
   place-items: center;
-  font-size: 14px;
+  font-size: var(--type-lg);
   font-weight: 700;
-  color: #fff;
-  background: linear-gradient(145deg, color-mix(in oklab, var(--avatar) 80%, #fff), color-mix(in oklab, var(--avatar) 85%, #000));
+  color: var(--white);
+  background: linear-gradient(145deg, color-mix(in oklab, var(--avatar) 80%, var(--white)), color-mix(in oklab, var(--avatar) 85%, var(--black)));
   text-shadow: 0 1px 1px rgb(0 0 0 / 0.2);
 }
 
@@ -448,7 +448,7 @@
   color: var(--text);
   background: transparent;
   border: 1px solid transparent;
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   outline: none;
 }
 
@@ -470,7 +470,7 @@
   color: var(--text);
   background: var(--set-input);
   border: 1px solid var(--set-input-line);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   outline: none;
 }
 
@@ -494,10 +494,10 @@
   align-items: center;
   gap: 5px;
   padding: 3px 9px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--set-input);
   border: 1px solid var(--set-input-line);
-  font-size: 12px;
+  font-size: var(--type-sm);
   white-space: nowrap;
 }
 
@@ -524,7 +524,7 @@
 }
 
 .settings .set-ext-id {
-  font-size: 11px;
+  font-size: var(--type-xs);
   color: var(--text-3);
   font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
 }
@@ -559,7 +559,7 @@
   justify-content: flex-end;
   padding: 2px 6px;
   border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
 }
 
 .settings .set-shortcut-keys:hover {
@@ -572,7 +572,7 @@
 }
 
 .settings .set-shortcut-hint {
-  font-size: 12px;
+  font-size: var(--type-sm);
   color: var(--text-3);
 }
 
@@ -581,7 +581,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
+  font-size: var(--type-md);
   color: var(--text-2);
 }
 
@@ -602,7 +602,7 @@
   min-width: 22px;
   padding: 2px 6px;
   font-family: var(--font);
-  font-size: 12px;
+  font-size: var(--type-sm);
   text-align: center;
   color: var(--text-2);
   background: var(--set-input);
@@ -615,7 +615,7 @@
   margin-top: 4px;
   padding: 40px 32px 36px;
   text-align: center;
-  border-radius: 14px;
+  border-radius: var(--radius-2xl);
   border: 1px solid var(--panel-line);
   background:
     radial-gradient(120% 90% at 50% 0%, color-mix(in oklab, var(--space) 40%, transparent), transparent 70%),
@@ -632,7 +632,7 @@
 
 .settings .set-about h2 {
   margin: 0 0 6px;
-  font-size: 26px;
+  font-size: var(--type-4xl);
   font-weight: 700;
   letter-spacing: -0.02em;
 }
@@ -661,7 +661,7 @@
   white-space: nowrap;
   direction: rtl;
   text-align: left;
-  font-size: 12px;
+  font-size: var(--type-sm);
 }
 
 .settings .set-buttons {
@@ -693,7 +693,7 @@
   margin: 0 4px;
   padding: 0;
   list-style: none;
-  font-size: 13px;
+  font-size: var(--type-md);
   color: var(--text-2);
 }
 
@@ -723,7 +723,7 @@
   place-items: center;
   border: 1.5px solid color-mix(in oklab, var(--text) 30%, transparent);
   border-radius: 50%;
-  font-size: 12px;
+  font-size: var(--type-sm);
   font-weight: 700;
 }
 
@@ -735,7 +735,7 @@
 .settings .set-steps .now b {
   border-color: transparent;
   background: var(--set-fill);
-  color: #fff;
+  color: var(--white);
 }
 
 .settings .set-steps .done b {
@@ -791,10 +791,10 @@
 .settings .set-tag {
   margin-left: 8px;
   padding: 1px 7px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: color-mix(in oklab, var(--text) 7%, transparent);
   color: var(--text-2);
-  font-size: 11px;
+  font-size: var(--type-xs);
   font-weight: 600;
 }
 
@@ -812,7 +812,7 @@
 .settings .recommended .set-place-icon,
 .settings .set-callout .set-place-icon {
   background: var(--set-fill);
-  color: #fff;
+  color: var(--white);
 }
 
 .settings .recommended .set-place-go {
@@ -899,7 +899,7 @@
 .settings .set-link {
   margin-right: auto;
   padding: 6px 0;
-  font-size: 13px;
+  font-size: var(--type-md);
   color: var(--text-2);
   text-decoration: underline;
   text-underline-offset: 2px;
@@ -923,13 +923,13 @@
 }
 
 .settings .set-status-title {
-  font-size: 15px;
+  font-size: var(--type-xl);
   font-weight: 600;
   letter-spacing: -0.005em;
 }
 
 .settings .set-status .set-row-text small {
-  font-size: 13px;
+  font-size: var(--type-md);
 }
 
 .settings .set-status.ok .set-status-icon {
@@ -958,7 +958,7 @@
   height: 26px;
   display: grid;
   place-items: center;
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   color: var(--text-2);
 }
 

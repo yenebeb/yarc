@@ -6,7 +6,7 @@
 
 .content-empty {
   position: absolute;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: rgb(255 255 255 / 0.16);
   box-shadow: 0 0 0 0.5px rgb(0 0 0 / 0.08), 0 1px 3px rgb(0 0 0 / 0.06);
   display: grid;
@@ -24,7 +24,7 @@
   position: absolute;
   padding: 0;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   overflow: hidden;
   background: var(--panel);
   box-shadow: 0 0 0 0.5px rgb(0 0 0 / 0.08), 0 1px 3px rgb(0 0 0 / 0.06);
@@ -44,7 +44,7 @@
 .content-empty kbd,
 .kbd {
   font-family: var(--font);
-  font-size: 11px;
+  font-size: var(--type-xs);
   padding: 1px 6px;
   border-radius: 5px;
   background: var(--field);
@@ -92,7 +92,7 @@
 
 .focus-ring {
   position: absolute;
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   border: 2px solid var(--accent);
   pointer-events: none;
   opacity: 0.8;
@@ -157,8 +157,8 @@
   border-radius: 9px;
   background: var(--panel);
   box-shadow: var(--shadow-lg);
-  font-size: 13px;
-  animation: toast-in 0.18s ease-out;
+  font-size: var(--type-md);
+  animation: toast-in var(--duration-toast) var(--ease);
 }
 
 @keyframes toast-in {
@@ -172,7 +172,7 @@
   position: fixed;
   inset: 0;
   background: var(--scrim);
-  animation: fade 0.12s ease-out;
+  animation: fade var(--duration-fade) var(--ease);
 }
 
 @keyframes fade {
@@ -186,11 +186,11 @@
   left: 50%;
   transform: translateX(-50%);
   background: var(--panel);
-  border-radius: 14px;
+  border-radius: var(--radius-2xl);
   box-shadow: var(--shadow-lg);
   border: 1px solid var(--panel-line);
   overflow: hidden;
-  animation: pop 0.14s ease-out;
+  animation: pop var(--duration-pop) var(--ease);
 }
 
 @keyframes pop {
@@ -211,7 +211,7 @@
   flex-direction: column;
   align-items: center;
   gap: 10px;
-  animation: fade 0.12s ease-out;
+  animation: fade var(--duration-fade) var(--ease);
 }
 
 .peek-buttons button {
@@ -241,7 +241,7 @@
   background: var(--float);
   color: var(--float-text);
   border-radius: 22px;
-  font-size: 13px;
+  font-size: var(--type-md);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -256,7 +256,7 @@
   gap: 6px;
   padding: 0 8px 0 12px;
   background: var(--panel);
-  border-radius: 12px;
+  border-radius: var(--radius-xl);
   border: 1px solid var(--panel-line);
 }
 
@@ -265,13 +265,13 @@
   border: 0;
   outline: 0;
   background: none;
-  font-size: 14px;
+  font-size: var(--type-lg);
   min-width: 0;
 }
 
 .findbar .count {
   color: var(--text-3);
-  font-size: 12px;
+  font-size: var(--type-sm);
   font-variant-numeric: tabular-nums;
 }
 
@@ -288,7 +288,7 @@
 .switch-card {
   width: 132px;
   height: 92px;
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   background: var(--field);
   display: flex;
   flex-direction: column;
@@ -307,7 +307,7 @@
 }
 
 .switch-card .t {
-  font-size: 12px;
+  font-size: var(--type-sm);
   width: 100%;
   text-align: center;
   white-space: nowrap;
@@ -333,7 +333,7 @@
   align-items: center;
   gap: 10px;
   padding: 14px 16px 10px 20px;
-  font-size: 16px;
+  font-size: var(--type-2xl);
   font-weight: 600;
 }
 
@@ -354,7 +354,7 @@
 
 .tabs button {
   padding: 5px 12px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   color: var(--text-2);
 }
 
@@ -370,7 +370,7 @@ select {
   color: inherit;
   background: var(--field);
   border: 1px solid var(--panel-line);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   padding: 6px 10px;
   outline: none;
 }
@@ -392,7 +392,7 @@ select:focus {
   color: var(--text);
   background: var(--panel);
   border: 1px solid var(--panel-line);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg);
 }
 
@@ -409,7 +409,7 @@ select:focus {
 
 .btn {
   padding: 7px 14px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: var(--field);
   border: 1px solid var(--panel-line);
 }
@@ -421,7 +421,7 @@ select:focus {
 .btn.primary {
   background: var(--accent);
   border-color: transparent;
-  color: #fff;
+  color: var(--white);
 }
 
 .btn.danger {
@@ -433,7 +433,7 @@ select:focus {
   align-items: center;
   gap: 10px;
   padding: 7px 8px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
 }
 
 .list-row:hover {
@@ -450,7 +450,7 @@ select:focus {
 
 .list-row .s {
   color: var(--text-3);
-  font-size: 12px;
+  font-size: var(--type-sm);
   white-space: nowrap;
 }
 
@@ -468,7 +468,7 @@ select:focus {
   position: absolute;
   display: grid;
   place-items: center;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: color-mix(in oklab, var(--accent) 22%, rgb(255 255 255 / 0.35));
   border: 2px solid color-mix(in oklab, var(--accent) 70%, transparent);
   box-shadow: 0 8px 30px rgb(0 0 0 / 0.18);
@@ -488,8 +488,8 @@ select:focus {
   gap: 8px;
   max-width: 80%;
   padding: 8px 14px;
-  border-radius: 10px;
-  font-size: 13px;
+  border-radius: var(--radius-lg);
+  font-size: var(--type-md);
   background: var(--panel);
   color: var(--text);
   box-shadow: 0 4px 16px rgb(0 0 0 / 0.16);

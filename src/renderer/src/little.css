@@ -45,7 +45,7 @@ body.page-little::before {
   align-items: center;
   gap: 4px;
   padding: 0 4px;
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   background: rgb(255 255 255 / 0.1);
 }
 
@@ -59,7 +59,7 @@ body.page-little::before {
   padding: 0 8px 0 5px;
   border-radius: 5px;
   background: rgb(0 0 0 / 0.18);
-  font-size: 13px;
+  font-size: var(--type-md);
   font-weight: 600;
   white-space: nowrap;
 }
@@ -84,7 +84,7 @@ body.page-little::before {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-  font-size: 13px;
+  font-size: var(--type-md);
   font-weight: 500;
   pointer-events: none;
 }
@@ -101,9 +101,9 @@ body.page-little::before {
   height: 31px;
   display: flex;
   align-items: stretch;
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   border: 1px solid rgb(255 255 255 / 0.12);
-  background: color-mix(in oklab, var(--little-bar) 55%, #000);
+  background: color-mix(in oklab, var(--little-bar) 55%, var(--black));
   overflow: hidden;
 }
 
@@ -116,9 +116,9 @@ body.page-little::before {
   align-items: center;
   gap: 5px;
   padding: 0 6px 0 11px;
-  font-size: 13px;
+  font-size: var(--type-md);
   font-weight: 600;
-  color: #fff;
+  color: var(--white);
   white-space: nowrap;
 }
 
@@ -129,10 +129,10 @@ body.page-little::before {
 .little-open-main kbd {
   margin-left: 4px;
   padding: 1px 5px;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   background: rgb(255 255 255 / 0.1);
   font: inherit;
-  font-size: 12px;
+  font-size: var(--type-sm);
   font-weight: 600;
   color: rgb(255 255 255 / 0.5);
 }

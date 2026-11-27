@@ -14,7 +14,7 @@ YARC's look is designed here. It is not measured or traced from another app.
 
 ## Colour
 
-Tokens are CSS custom properties in `src/renderer/src/base.css`: light on `:root`, dark on `:root[data-appearance='dark']`.
+Tokens are CSS custom properties in `src/renderer/src/tokens.css`: light on `:root`, dark on `:root[data-appearance='dark']`. `base.css`, `canvas.css` and `float.css` import it, so every page has the same tokens.
 
 `useSpaceTheme` (`src/renderer/src/api.ts`) writes the space's colours to `--space` and `--space-2`. `applyAppearance` sets `data-appearance` from the space's `appearance`, or from the system when it has none.
 
@@ -37,7 +37,7 @@ Tokens are CSS custom properties in `src/renderer/src/base.css`: light on `:root
 
 The window background is `linear-gradient(160deg, --bg, --bg-2)`. On macOS it is `linear-gradient(170deg, --vibrant-1, --vibrant-2)` over native vibrancy. Both carry a noise layer at 22%.
 
-The same in light and dark: `--danger` `#d33`, `--warning` `#d97706`, `--success` `#30a46c`, `--disabled-opacity` 0.4, and `--float` / `--float-hover` / `--float-text` for dark round controls (Peek buttons, the notice).
+The same in light and dark: `--danger` `#d33`, `--warning` `#d97706`, `--success` `#30a46c`, `--disabled-opacity` 0.4, `--float` / `--float-hover` / `--float-text` for dark round controls (Peek buttons, the notice), and `--white` / `--black` for text on a coloured fill, knobs and mixing.
 
 The palette offered for a space is `SPACE_COLORS` in `src/shared/colors.ts`: `#7c6cf2` (default), `#e0607e`, `#3fa7d6`, `#3dbb8a`, `#f2a541`, `#c06cf2`, `#5b7bd6`, `#8a8a8a`, plus any colour from the HSV picker.
 
@@ -45,22 +45,22 @@ Three surfaces keep their own colours:
 
 - Settings adds `--set-*` tokens (`panels/settings.css`).
 - The permission prompt uses neutral `--perm-*` greys and ignores the space (`prompt.css`).
-- A canvas does not load `base.css`. Its tokens are its own (`--canvas-accent` `#6d5dfc`, dark `#8b7eff`, `--canvas-line`, `--canvas-hover`) and it has its own light/dark switch (`canvas.css`).
+- A canvas has the shared tokens but colours itself with its own (`--canvas-accent` `#6d5dfc`, dark `#8b7eff`, `--canvas-line`, `--canvas-hover`) and has its own light/dark switch (`canvas.css`).
 
 ## Type
 
 No font is shipped. `--font` is `-apple-system, BlinkMacSystemFont, 'Segoe UI Variable Text', 'Segoe UI', Inter, system-ui, sans-serif`, at a 13px base.
 
-| Size / weight | Used for |
-|---|---|
-| 26 / 700 | Tour and About titles |
-| 20 | Command bar input, Settings section title |
-| 16 / 600 | Sheet header |
-| 15 / 500 | Command bar result, permission prompt |
-| 14 | Sidebar tab row |
-| 13 | Base: space name, pane bar, notices |
-| 12 | Secondary lines, pills, small buttons |
-| 11 / 600 | Eyebrows, key caps, result hints |
+| Token | Size / weight | Used for |
+|---|---|---|
+| `--type-4xl` | 26 / 700 | Tour and About titles |
+| `--type-3xl` | 20 | Command bar input, Settings section title |
+| `--type-2xl` | 16 / 600 | Sheet header |
+| `--type-xl` | 15 / 500 | Command bar result, permission prompt |
+| `--type-lg` | 14 | Sidebar tab row |
+| `--type-md` | 13 | Base: space name, pane bar, notices |
+| `--type-sm` | 12 | Secondary lines, pills, small buttons |
+| `--type-xs` | 11 / 600 | Eyebrows, key caps, result hints |
 
 Sizes are whole pixels and weights are 400, 500, 600 or 700, which every system font has.
 
@@ -83,13 +83,23 @@ On a canvas: title 36/700, heading 24/600, body 16/400, line height 1.25.
 | Split panes | 6 apart, at most 4 |
 | Little Window bar | 47 |
 
-Corners: 3 favicon, 7 icon button, 8 page card and buttons and fields, 10 rows and tiles, 12 popovers, 14 panel, 16 Settings sheet, 20 tour panel, 999 pills.
+| Token | Radius | Used for |
+|---|---|---|
+| `--radius-xs` | 4 | Letter tile, key cap |
+| `--radius-sm` | 7 | Icon button |
+| `--radius-md` | 8 | Page card, buttons, fields |
+| `--radius-lg` | 10 | Rows and tiles |
+| `--radius-xl` | 12 | Popovers |
+| `--radius-2xl` | 14 | Panel |
+| `--radius-pill` | 999 | Pills |
+
+Without a token: 3 favicon, 16 Settings sheet, 20 tour panel.
 
 Shadows: `--active-shadow` for a selected row or tab, `--shadow-lg` for every floating panel, `0 1px 3px rgb(0 0 0 / 0.12)` for pills and media cards.
 
 ## Motion
 
-Short and eased out: 0.12s fades, 0.14s panel pop, 0.16s floating sidebar, 0.18s toast, 0.22s tour panel, 0.35s space colour cross-fade. A toast stays 2.2s (`TOAST_MS`).
+Short and eased out (`--ease`): `--duration-fade` 0.12s fades, `--duration-pop` 0.14s panel pop, `--duration-slide` 0.16s floating sidebar, `--duration-toast` 0.18s toast. Without a token: 0.22s tour panel, 0.35s space colour cross-fade. A toast stays 2.2s (`TOAST_MS`).
 
 With Reduce Motion on, every page stops animating except the loading spinner and the progress bar.
 
@@ -112,7 +122,9 @@ Native views, bottom to top: the window's UI (sidebar, pane bars, toasts), tab p
 
 ## Rules these values follow
 
-- A colour used for a state (danger, warning, success, disabled, scrim) is a token in `base.css`, not a literal.
+- A colour used for a state (danger, warning, success, disabled, scrim) is a token in `tokens.css`, not a literal.
+- No hex colour outside `tokens.css`, `canvas.css` and `panels/spotlights.css`; `test/unit/design-tokens.test.ts` fails on one and names the few exceptions.
+- A radius, type size or duration that is on a scale uses its token. Spotlight pictures and what is drawn on a canvas keep their own values.
 - A size the main process also needs lives in `src/shared/` and reaches the CSS as a custom property (`SIDEBAR_CSS_LENGTHS`, set in `src/renderer/src/api.ts`).
 - The canvas's tokens are prefixed `--canvas-`; a spotlight picture placed on a board gets `--accent`, `--line` and `--hover` mapped from them.
 - An inner corner is the outer one less the border between them (11 inside a 12 Settings card).

@@ -45,12 +45,12 @@
 }
 
 .sheet .btn.primary:hover {
-  background: color-mix(in oklab, var(--accent) 88%, #000);
+  background: color-mix(in oklab, var(--accent) 88%, var(--black));
 }
 
 .sheet .btn.small {
   padding: 4px 10px;
-  font-size: 12px;
+  font-size: var(--type-sm);
 }
 
 .sheet input[type='range'] {
@@ -69,7 +69,7 @@
 .sheet .list-row .t small {
   color: var(--text-3);
   margin-left: 8px;
-  font-size: 12px;
+  font-size: var(--type-sm);
 }
 
 .sheet .list-row .hover-x {
@@ -92,5 +92,5 @@
 
 .btn.small {
   padding: 4px 10px;
-  font-size: 12px;
+  font-size: var(--type-sm);
 }

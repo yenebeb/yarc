@@ -1,58 +1,11 @@
+@import './tokens.css';
+
 :root {
-  --space: #7c6cf2;
-  --space-2: var(--space);
-  --font: -apple-system, BlinkMacSystemFont, 'Segoe UI Variable Text', 'Segoe UI', Inter, system-ui, sans-serif;
-  --bg: color-mix(in oklab, var(--space) 26%, #f4f2fb);
-  --bg-2: color-mix(in oklab, var(--space-2) 40%, #e8e4f6);
-  --text: #1d1b22;
-  --text-2: rgb(29 27 34 / 0.62);
-  --text-3: rgb(29 27 34 / 0.52);
-  --hover: rgb(255 255 255 / 0.38);
-  --active: rgb(255 255 255 / 0.88);
-  --active-shadow: 0 1px 2px rgb(0 0 0 / 0.08), 0 0 0 0.5px rgb(0 0 0 / 0.05);
-  --line: rgb(29 27 34 / 0.1);
-  --panel: #fcfbff;
-  --panel-line: rgb(0 0 0 / 0.08);
-  --field: rgb(255 255 255 / 0.55);
-  --accent: color-mix(in oklab, var(--space) 85%, #000);
-  --shadow-lg: 0 24px 64px rgb(20 10 40 / 0.28), 0 2px 8px rgb(20 10 40 / 0.12);
-  --urlfield: rgb(0 0 0 / 0.07);
-  --danger: #d33;
-  --warning: #d97706;
-  --success: #30a46c;
-  --disabled-opacity: 0.4;
-  --scrim: rgb(10 5 25 / 0.28);
-  --float: rgb(20 20 24 / 0.92);
-  --float-hover: rgb(45 45 52 / 0.95);
-  --float-text: #f1eff6;
-  --tile: rgb(255 255 255 / 0.1);
-  --space-strong: oklch(from var(--space) calc(l * 0.67) c h);
-  --vibrant-1: color-mix(in srgb, var(--space) 74%, transparent);
-  --vibrant-2: color-mix(in srgb, var(--space-2) 62%, transparent);
   color-scheme: light;
 }
 
 :root[data-appearance='dark'] {
-  --bg: color-mix(in oklab, var(--space) 22%, #1b1a20);
-  --bg-2: color-mix(in oklab, var(--space-2) 34%, #16151a);
-  --text: #f1eff6;
-  --text-2: rgb(241 239 246 / 0.62);
-  --text-3: rgb(241 239 246 / 0.4);
-  --hover: rgb(255 255 255 / 0.07);
-  --active: rgb(255 255 255 / 0.15);
-  --active-shadow: 0 1px 2px rgb(0 0 0 / 0.25);
-  --line: rgb(255 255 255 / 0.1);
-  --panel: #26242c;
-  --panel-line: rgb(255 255 255 / 0.09);
-  --field: rgb(255 255 255 / 0.07);
-  --accent: color-mix(in oklab, var(--space) 70%, #fff);
-  --shadow-lg: 0 24px 64px rgb(0 0 0 / 0.55), 0 2px 8px rgb(0 0 0 / 0.3);
   color-scheme: dark;
-  --urlfield: rgb(0 0 0 / 0.18);
-  --scrim: rgb(0 0 0 / 0.35);
-  --tile: rgb(255 255 255 / 0.07);
-  --vibrant-1: color-mix(in srgb, color-mix(in oklab, var(--space) 32%, #17161b) 84%, transparent);
-  --vibrant-2: color-mix(in srgb, color-mix(in oklab, var(--space-2) 24%, #131217) 88%, transparent);
 }
 
 * {
@@ -66,7 +19,7 @@ body,
   height: 100%;
   overflow: hidden;
   font-family: var(--font);
-  font-size: 13px;
+  font-size: var(--type-md);
   color: var(--text);
   user-select: none;
   -webkit-font-smoothing: antialiased;
@@ -116,7 +69,7 @@ input {
 .icon-btn {
   width: 28px;
   height: 28px;
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   display: inline-grid;
   place-items: center;
   color: var(--text-2);
@@ -151,9 +104,9 @@ input {
   place-items: center;
   font-size: 10px;
   font-weight: 700;
-  color: #fff;
+  color: var(--white);
   background: var(--accent);
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   width: 16px;
   height: 16px;
   flex: none;

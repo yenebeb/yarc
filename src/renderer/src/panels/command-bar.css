@@ -1,7 +1,7 @@
 .panel.command {
   top: 30vh;
   width: min(766px, calc(100vw - 64px));
-  border-radius: 12px;
+  border-radius: var(--radius-xl);
   background: color-mix(in oklab, var(--space) 10%, var(--panel));
 }
 
@@ -17,7 +17,7 @@
   gap: 12px;
   height: 42px;
   padding: 0 12px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
 }
 
 .result.sel {
@@ -44,11 +44,11 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  font-size: 12px;
+  font-size: var(--type-sm);
 }
 
 .result .hint {
-  font-size: 11px;
+  font-size: var(--type-xs);
   color: var(--text-3);
   flex: none;
 }
@@ -91,7 +91,7 @@
   border: 0;
   outline: 0;
   background: none;
-  font-size: 20px;
+  font-size: var(--type-3xl);
 }
 
 .command .field input::selection {
@@ -106,8 +106,8 @@
 .command .result {
   height: 50px;
   padding: 0 14px;
-  border-radius: 8px;
-  font-size: 15px;
+  border-radius: var(--radius-md);
+  font-size: var(--type-xl);
 }
 
 .command .result .t {
@@ -122,11 +122,11 @@
 
 .command .result.sel {
   background: var(--space-strong);
-  color: #fff;
+  color: var(--white);
 }
 
 .command .result.sel .ico {
-  background: #fff;
+  background: var(--white);
   color: #1d1b22;
 }
 
@@ -136,7 +136,7 @@
 }
 
 .command .result .hint {
-  font-size: 14px;
+  font-size: var(--type-lg);
   font-weight: 500;
 }
 
@@ -151,12 +151,12 @@
 }
 
 .command .result.sel .go {
-  background: #fff;
+  background: var(--white);
   color: var(--space-strong);
 }
 
 .command .field .target {
-  font-size: 11px;
+  font-size: var(--type-xs);
   color: var(--text-3);
   padding: 2px 8px;
   border-radius: 6px;
@@ -170,10 +170,10 @@
   flex: none;
   height: 28px;
   padding: 0 10px 0 6px;
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   background: var(--space-strong);
-  color: #fff;
-  font-size: 15px;
+  color: var(--white);
+  font-size: var(--type-xl);
   font-weight: 500;
 }
 
@@ -181,8 +181,8 @@
   width: 16px;
   height: 16px;
   padding: 1px;
-  border-radius: 4px;
-  background: #fff;
+  border-radius: var(--radius-xs);
+  background: var(--white);
 }
 
 .command .field .tab-hint {
@@ -190,6 +190,6 @@
   align-items: center;
   gap: 8px;
   flex: none;
-  font-size: 13px;
+  font-size: var(--type-md);
   color: var(--text-3);
 }

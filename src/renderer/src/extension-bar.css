@@ -4,7 +4,7 @@
   height: 24px;
   padding: 0;
   border: none;
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   outline: none;
   background-color: transparent;
   background-position: center;
@@ -15,7 +15,7 @@
 .urlbar .extension-action {
   width: 28px;
   height: 28px;
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
 }
 
 .extension-action:hover {
@@ -29,7 +29,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   background: #757575;
   color: white;
   font-size: 0.7rem;
@@ -64,14 +64,14 @@
   padding: 6px;
   background: var(--panel);
   border: 1px solid var(--panel-line);
-  border-radius: 12px;
+  border-radius: var(--radius-xl);
   box-shadow: var(--shadow-lg);
-  animation: fade 0.12s ease-out;
+  animation: fade var(--duration-fade) var(--ease);
 }
 
 .extensions-title {
   padding: 4px 8px 6px;
-  font-size: 12px;
+  font-size: var(--type-sm);
   font-weight: 600;
   opacity: 0.7;
 }
@@ -83,7 +83,7 @@
   width: 100%;
   padding: 4px 6px;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: none;
   color: inherit;
   font: inherit;

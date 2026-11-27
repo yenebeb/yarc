@@ -43,7 +43,7 @@
 
 .intro-hero h1 {
   margin: 0;
-  font-size: 26px;
+  font-size: var(--type-4xl);
   font-weight: 700;
   letter-spacing: -0.02em;
 }
@@ -51,7 +51,7 @@
 .intro-hero p {
   margin: 6px 0 0;
   color: var(--text-2);
-  font-size: 14px;
+  font-size: var(--type-lg);
 }
 
 .intro-hero.compact {
@@ -76,7 +76,7 @@
 
 .intro h2 {
   margin: 0;
-  font-size: 14px;
+  font-size: var(--type-lg);
   font-weight: 600;
 }
 
@@ -96,7 +96,7 @@
   margin: 2px 0 12px;
   padding: 4px;
   border: 1px solid var(--panel-line);
-  border-radius: 12px;
+  border-radius: var(--radius-xl);
   background: var(--field);
 }
 
@@ -105,7 +105,7 @@
   align-items: center;
   gap: 12px;
   padding: 8px 10px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   cursor: default;
 }
 
@@ -130,29 +130,29 @@
   display: grid;
   place-items: center;
   flex: none;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: color-mix(in oklab, var(--space) 22%, var(--panel));
-  font-size: 13px;
+  font-size: var(--type-md);
   font-weight: 600;
 }
 
 .import-label {
   display: flex;
   flex-direction: column;
-  font-size: 14px;
+  font-size: var(--type-lg);
   font-weight: 500;
 }
 
 .import-label small {
   color: var(--text-2);
-  font-size: 12px;
+  font-size: var(--type-sm);
   font-weight: 400;
 }
 
 .import-empty {
   margin: 4px 0 10px;
   color: var(--text-2);
-  font-size: 13px;
+  font-size: var(--type-md);
   text-align: center;
 }
 
@@ -174,13 +174,13 @@
   align-items: center;
   gap: 10px;
   color: var(--text-2);
-  font-size: 13px;
+  font-size: var(--type-md);
 }
 
 .intro-shortcuts .kbd {
   min-width: 46px;
   text-align: center;
-  font-size: 12px;
+  font-size: var(--type-sm);
   color: var(--text);
 }
 
@@ -195,7 +195,7 @@
 }
 
 .intro .release h2 {
-  font-size: 11px;
+  font-size: var(--type-xs);
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -223,7 +223,7 @@
 }
 
 .spotlight-text .eyebrow {
-  font-size: 11px;
+  font-size: var(--type-xs);
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -241,7 +241,7 @@
   max-width: 420px;
   margin: 8px auto 0;
   color: var(--text-2);
-  font-size: 14px;
+  font-size: var(--type-lg);
   line-height: 1.5;
 }
 
@@ -263,7 +263,7 @@
 }
 
 .intro-footer .hint {
-  font-size: 12px;
+  font-size: var(--type-sm);
 }
 
 .intro-footer {
@@ -339,7 +339,7 @@
 
 .tour-float h2 {
   margin: 4px 0 4px;
-  font-size: 16px;
+  font-size: var(--type-2xl);
   font-weight: 700;
   letter-spacing: -0.01em;
 }
@@ -347,12 +347,12 @@
 .tour-float p {
   margin: 0;
   color: var(--text-2);
-  font-size: 13px;
+  font-size: var(--type-md);
   line-height: 1.5;
 }
 
 .tour-float .kbd {
-  font-size: 12px;
+  font-size: var(--type-sm);
   color: var(--text);
 }
 
@@ -373,7 +373,7 @@
   gap: 6px;
   padding: 5px 10px;
   border-radius: 99px;
-  font-size: 12px;
+  font-size: var(--type-sm);
   font-weight: 600;
   color: var(--accent);
   background: color-mix(in oklab, var(--accent) 14%, transparent);

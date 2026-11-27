@@ -22,7 +22,7 @@
 
 .favorite {
   height: 48px;
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   background: var(--tile);
   display: grid;
   place-items: center;
@@ -42,7 +42,7 @@
 .favorite .letter {
   width: 18px;
   height: 18px;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
 }
 
 .favorite.live::after {
@@ -61,23 +61,23 @@
 
 .favorites-drop {
   height: 46px;
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   border: 1.5px dashed var(--line);
   display: grid;
   place-items: center;
   color: var(--text-3);
-  font-size: 12px;
+  font-size: var(--type-sm);
   margin: 4px 0 6px;
 }
 
 .row {
   height: 40px;
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 0 4px 0 10px;
-  font-size: 14px;
+  font-size: var(--type-lg);
   position: relative;
   flex: none;
 }
@@ -101,7 +101,7 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  mask-image: linear-gradient(90deg, #000 85%, transparent);
+  mask-image: linear-gradient(90deg, var(--black) 85%, transparent);
 }
 
 .row .slash {
@@ -194,7 +194,7 @@
 
 .live-note {
   padding: 5px 10px;
-  font-size: 12px;
+  font-size: var(--type-sm);
   line-height: 1.35;
   color: var(--text-3);
   cursor: default;
@@ -211,7 +211,7 @@
   height: 26px;
   margin: 4px 2px;
   color: var(--text-3);
-  font-size: 12px;
+  font-size: var(--type-sm);
   flex: none;
 }
 
@@ -270,7 +270,7 @@
 
 .empty-hint {
   color: var(--text-3);
-  font-size: 12px;
+  font-size: var(--type-sm);
   padding: 6px 10px;
 }
 
@@ -288,7 +288,7 @@
   inset: 0;
   display: flex;
   align-items: center;
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   background: color-mix(in oklab, var(--panel) 70%, transparent);
   box-shadow: var(--active-shadow);
   pointer-events: none;

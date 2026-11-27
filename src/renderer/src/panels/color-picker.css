@@ -25,7 +25,7 @@
   color: var(--text);
   background: var(--panel);
   border: 1px solid var(--panel-line);
-  border-radius: 12px;
+  border-radius: var(--radius-xl);
   box-shadow: var(--shadow-lg);
 }
 
@@ -36,7 +36,7 @@
 .cp-area {
   position: relative;
   height: 140px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   touch-action: none;
   outline: none;
 }
@@ -51,7 +51,7 @@
   height: 14px;
   margin: -7px 0 0 -7px;
   border-radius: 50%;
-  border: 2px solid #fff;
+  border: 2px solid var(--white);
   box-shadow: 0 0 0 1px rgb(0 0 0 / 0.3), 0 1px 3px rgb(0 0 0 / 0.3);
   pointer-events: none;
 }
@@ -70,7 +70,7 @@
   width: 14px;
   height: 14px;
   border-radius: 50%;
-  border: 2px solid #fff;
+  border: 2px solid var(--white);
   box-shadow: 0 0 0 1px rgb(0 0 0 / 0.3), 0 1px 3px rgb(0 0 0 / 0.3);
 }
 

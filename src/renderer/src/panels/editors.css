@@ -19,13 +19,13 @@
 
 .space-editor .field > span,
 .live-folder-editor .field > span {
-  font-size: 12px;
+  font-size: var(--type-sm);
   font-weight: 600;
   color: var(--text-2);
 }
 
 .space-editor .name-input {
-  font-size: 15px;
+  font-size: var(--type-xl);
   padding: 9px 12px;
 }
 
@@ -55,7 +55,7 @@
 
 .emoji-grid button {
   height: 32px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-size: 17px;
   display: grid;
   place-items: center;
@@ -71,7 +71,7 @@
 }
 
 .emoji-grid button.none {
-  font-size: 11px;
+  font-size: var(--type-xs);
   color: var(--text-3);
 }
 
@@ -81,13 +81,13 @@
   gap: 8px;
   margin-top: 6px;
   color: var(--text-3);
-  font-size: 12px;
+  font-size: var(--type-sm);
 }
 
 .emoji-custom .text-input {
   width: 64px;
   text-align: center;
-  font-size: 15px;
+  font-size: var(--type-xl);
   padding: 4px 6px;
 }
 
@@ -116,7 +116,7 @@
 
 .color-row .hex {
   color: var(--text-3);
-  font-size: 12px;
+  font-size: var(--type-sm);
   font-variant-numeric: tabular-nums;
 }
 
@@ -125,7 +125,7 @@
   flex-wrap: wrap;
   gap: 2px;
   padding: 3px;
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   background: var(--field);
   border: 1px solid var(--panel-line);
 }
@@ -137,7 +137,7 @@
   align-items: flex-start;
   gap: 1px;
   padding: 7px 11px;
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   text-align: left;
   color: var(--text-2);
 }
@@ -159,11 +159,11 @@
 }
 
 .live-folder-editor .note code {
-  font-size: 12px;
+  font-size: var(--type-sm);
 }
 
 .segmented small {
-  font-size: 12px;
+  font-size: var(--type-sm);
   color: var(--text-3);
 }
 
@@ -176,7 +176,7 @@
   align-items: center;
   justify-content: space-between;
   margin-top: 6px;
-  font-size: 12px;
+  font-size: var(--type-sm);
   color: var(--text-2);
 }
 
