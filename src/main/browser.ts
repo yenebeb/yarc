@@ -180,7 +180,10 @@ export class Browser implements TabHost {
   private reportedLost: WindowSession | undefined
   readonly live = new Map<ID, LiveTab>()
   readonly canvases = new Canvases(this)
-  readonly devtools = new DockedDevtools((tab) => this.inWin(this.winOf(tab), () => this.relayout()))
+  readonly devtools = new DockedDevtools(
+    (tab) => this.inWin(this.winOf(tab), () => this.relayout()),
+    (tab, event, input) => this.onTabInput(tab, event, input)
+  )
   /** `since`: the version whose changes the user saw last. */
   private waitingNews: { since?: string; releases: ReleaseNotes[]; spotlights: string[] } = { releases: [], spotlights: [] }
   private readonly liveFolders = new LiveFolders(this)
@@ -926,7 +929,7 @@ export class Browser implements TabHost {
       }
     }
     this.cur.layout = { content: pageArea ?? content, views, splitId, devtools }
-    if (this.cur.peek) mainWindow.setTop(this.cur.peek.tab.view, peekRects(content).card)
+    if (this.cur.peek) mainWindow.setTop(this.cur.peek.tab.view, peekRects(pageArea ?? content).card)
     const mode = mainWindow.overlayMode.kind === 'peek' ? this.peekMode() : this.placed(mainWindow.overlayMode)
     if (mode.kind !== 'none') mainWindow.setOverlay(mode, overlayRect(mode, this.frame(), !!this.cur.tabDrag))
     this.syncPrompts()
@@ -2122,7 +2125,7 @@ export class Browser implements TabHost {
     if (split && paneIds(split.root).includes(space.activeItemId ?? '')) {
       space.activeItemId = tab.itemId
       this.mru = [tab.itemId, ...this.mru.filter((recent) => recent !== tab.itemId)]
-      this.changed()
+      this.relayout()
     }
   }
 

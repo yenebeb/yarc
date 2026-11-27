@@ -275,6 +275,8 @@ function DevtoolsBar({ state }: { state: AppState }) {
           if (width !== bar.width) dispatch({ type: 'settings', patch: { devtoolsWidth: width } })
         }}
         onPointerUp={() => (drag.current = undefined)}
+        onPointerCancel={() => (drag.current = undefined)}
+        onLostPointerCapture={() => (drag.current = undefined)}
       />
       <div className="pane-bar devtools-bar" style={{ left: bar.x, top: bar.y, width: bar.width, height: bar.height }}>
         <span className="devtools-title">Developer Tools</span>

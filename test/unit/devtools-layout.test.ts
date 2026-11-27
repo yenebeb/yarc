@@ -15,3 +15,9 @@ test('DevTools keep the page at least 320px wide, and are never narrower than th
   assert.equal(devtoolsWidthWithin(4000, 3000), DEVTOOLS_WIDTH.max)
   assert.equal(devtoolsWidthWithin(500, 480), DEVTOOLS_WIDTH.min)
 })
+
+test('in a content area too narrow for both, DevTools still end inside it', () => {
+  const layout = dockedDevtoolsLayout({ x: 480, y: 8, width: 100, height: 600 }, 480)
+  assert.equal(layout.page.width, 0)
+  assert.equal(layout.devtools.x + layout.devtools.width, 580)
+})

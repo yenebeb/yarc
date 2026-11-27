@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { app, base, dispatch, pageWithUrl, space, state, useApp } from './app'
+import { app, base, dispatch, mod, overlayKind, pageWithUrl, space, state, useApp } from './app'
 
 useApp()
 
@@ -72,6 +72,27 @@ test('closing a tab closes its docked Developer Tools', async () => {
   await expect.poll(() => app.evaluate(({ webContents }, id) => !webContents.fromId(id) || webContents.fromId(id)!.isDestroyed(), devtoolsId)).toBe(true)
 })
 
+const pressInDockedDevtools = (keyCode: string, modifiers: string[]) =>
+  app.evaluate((_electron, [key, held]) => {
+    const browser = (globalThis as any).arcBrowser
+    browser.devtools.viewOf(browser.activeTab()).webContents.sendInputEvent({ type: 'keyDown', keyCode: key, modifiers: held })
+  }, [keyCode, modifiers] as const)
+
+test('YARC shortcuts work while the docked Developer Tools have the keyboard', async () => {
+  const tabId = await openTab('devtools-shortcuts')
+  try {
+    await dispatch({ type: 'devtools' })
+    await expect.poll(async () => (await dockedDevtoolsUrl()).startsWith('devtools:')).toBe(true)
+    await pressInDockedDevtools('T', [mod])
+    await expect.poll(overlayKind).toBe('command')
+    await dispatch({ type: 'overlay', mode: { kind: 'none' } })
+    await pressInDockedDevtools('F12', [])
+    await expect.poll(dockedLayout).toBeUndefined()
+  } finally {
+    await dispatch({ type: 'close', id: tabId })
+  }
+})
+
 test('Inspect docks Developer Tools, and dragging their edge resizes them', async () => {
   const tabId = await openTab('devtools-inspect')
   const ui = await pageWithUrl('index.html')
@@ -83,6 +104,7 @@ test('Inspect docks Developer Tools, and dragging their edge resizes them', asyn
     await expect(ui.locator('.devtools-bar')).toBeVisible()
     await dispatch({ type: 'settings', patch: { devtoolsWidth: 300 } })
     await expect.poll(async () => (await dockedLayout())?.bar.width).toBe(300)
+    await expect.poll(async () => (await ui.locator('.devtools-bar').boundingBox())?.width).toBe(300)
     const edge = (await ui.locator('.devtools-resize').boundingBox())!
     await ui.mouse.move(edge.x + edge.width / 2, edge.y + 200)
     await ui.mouse.down()

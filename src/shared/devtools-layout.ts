@@ -5,7 +5,8 @@ export const DEVTOOLS_WIDTH = { min: 280, max: 1200 }
 const PAGE_MIN_WIDTH = 320
 
 export function devtoolsWidthWithin(contentWidth: number, wanted: number): number {
-  return Math.round(Math.max(DEVTOOLS_WIDTH.min, Math.min(wanted, DEVTOOLS_WIDTH.max, contentWidth - PAGE_MIN_WIDTH - SPLIT_GAP)))
+  const roomy = Math.max(DEVTOOLS_WIDTH.min, Math.min(wanted, DEVTOOLS_WIDTH.max, contentWidth - PAGE_MIN_WIDTH - SPLIT_GAP))
+  return Math.round(Math.max(0, Math.min(roomy, contentWidth - SPLIT_GAP)))
 }
 
 export function dockedDevtoolsLayout(content: Rect, wantedWidth: number): { page: Rect; bar: Rect; devtools: Rect } {

@@ -1,4 +1,4 @@
-import { WebContentsView } from 'electron'
+import { WebContentsView, type Event, type Input } from 'electron'
 import type { LiveTab } from './tab'
 
 interface Docked {
@@ -9,7 +9,10 @@ interface Docked {
 export class DockedDevtools {
   private docked = new Map<LiveTab, Docked>()
 
-  constructor(private onChange: (tab: LiveTab) => void) {}
+  constructor(
+    private onChange: (tab: LiveTab) => void,
+    private onInput: (tab: LiveTab, event: Event, input: Input) => void
+  ) {}
 
   viewOf(tab: LiveTab | undefined): WebContentsView | undefined {
     return tab ? this.docked.get(tab)?.view : undefined
@@ -24,6 +27,7 @@ export class DockedDevtools {
   open(tab: LiveTab): Promise<void> {
     const view = new WebContentsView()
     view.setBorderRadius(8)
+    view.webContents.on('before-input-event', (event, input) => this.onInput(tab, event, input))
     const forgetOnTabDestroyed = () => this.forget(tab, view)
     this.docked.set(tab, { view, forgetOnTabDestroyed })
     tab.wc.setDevToolsWebContents(view.webContents)
