@@ -1,6 +1,6 @@
 name: release
 
-# main is released once a day (05:00 UTC) when something merged since the last release changes the
+# main is released once a day (04:17 UTC, off the hour: GitHub starts scheduled runs at :00 hours late) when something merged since the last release changes the
 # app, so users get at most one update a day. Released at once instead: a merge whose PR has the
 # label `release:now` (urgent fixes), Electron bumps (dependabot-automerge.yml starts this workflow),
 # and a manual run from the Actions tab.
@@ -28,7 +28,7 @@ on:
   push:
     branches: [main]
   schedule:
-    - cron: '0 5 * * *'
+    - cron: '17 4 * * *'
   pull_request:
   workflow_dispatch:
     inputs:

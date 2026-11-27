@@ -27,7 +27,7 @@ pnpm dev             # start with hot reload
 
 ## Releasing
 
-Releases are automatic, once a day: at 05:00 UTC, `main` is released if anything merged since the last release changes the app, so users get at most one update a day. Label a PR `release:now` to release it as soon as it merges (an urgent fix); Electron bumps are released at once too (below).
+Releases are automatic, once a day: at 04:17 UTC, `main` is released if anything merged since the last release changes the app, so users get at most one update a day. Label a PR `release:now` to release it as soon as it merges (an urgent fix); Electron bumps are released at once too (below).
 
 1. The [release workflow](../.github/workflows/release.yml) tags `main`'s newest commit with the next version: the biggest bump the unreleased PRs ask for, a patch by default (`v0.1.2` → `v0.1.3`), or a minor or major with the PR label `release:minor` or `release:major`. A PR labeled `release:skip` (or with `[skip release]` in its commit message), or one that only changes workflows, docs, tests or top-level Markdown, doesn't count towards a release and ships with the next one.
 2. It builds Windows, macOS and Linux from that tag and uploads them to the release, with a `release.json` that names the Electron version, so installed copies can tell a security update from a normal one.
