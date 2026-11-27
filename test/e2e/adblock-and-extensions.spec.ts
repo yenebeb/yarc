@@ -155,6 +155,12 @@ const loadExtension = (dir: string): Promise<string> =>
     return (await browser.profiles.get(browser.store.activeSpace.profileId).session.extensions.loadExtension(extDir)).id
   }, dir)
 
+const badgeInMain = (extensionId: string): Promise<string | undefined> =>
+  app.evaluate((_electron, id) => {
+    const browser = (globalThis as any).arcBrowser
+    return browser.extensions.byProfile.get(browser.store.activeSpace.profileId).library.api.browserAction.actionMap.get(id)?.text
+  }, extensionId)
+
 test('only pinned extensions show in the address field, after the puzzle button opens the rest', async () => {
   const action = { default_popup: 'popup.html' }
   const first = await loadExtension(extensionDir({ 'manifest.json': { manifest_version: 3, name: 'pinned', version: '1.0', action }, 'popup.html': 'popup' }))
@@ -177,6 +183,7 @@ test('only pinned extensions show in the address field, after the puzzle button 
     await pin(first, false)
     await expect(button(first)).toHaveCount(0)
     await expect(ui.locator('.extensions-button')).toBeVisible()
+    await expect.poll(() => badgeInMain(second), { timeout: 15_000 }).toBe('7')
     await pin(second, true)
     await expect(button(second).locator('.badge')).toHaveText('7')
     await removeExtension(second)
