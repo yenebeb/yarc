@@ -2,7 +2,7 @@
 
 ## Reporting a vulnerability
 
-Please report it privately: on GitHub, **Security > Report a vulnerability** on this repository. Don't open a public issue for it.
+Please report it privately: on GitHub, [**Security > Report a vulnerability**](https://github.com/yenebeb/yarc/security/advisories/new) on this repository. Don't open a public issue for it.
 
 Say what you found, how to reproduce it, and which version and platform. You'll get an answer within a few days. YARC is maintained by volunteers and has no bounty.
 

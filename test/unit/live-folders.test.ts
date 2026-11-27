@@ -73,6 +73,7 @@ describe('a site address instead of a feed', () => {
     assert.equal(looksLikeHtml('<!DOCTYPE html><html><head>'), true)
     assert.equal(looksLikeHtml('  <!-- hi --><html lang="en">'), true)
     assert.equal(looksLikeHtml('<?xml version="1.0"?><rss>'), false)
+    assert.equal(looksLikeHtml(`<!--${'--><!--'.repeat(5000)}`), false, 'in linear time: a page can\'t hang the browser')
   })
 
   test('leads to the feed the page names', () => {

@@ -52,7 +52,7 @@ export function parseFeed(xml: string, base: string): LiveEntry[] {
 }
 
 export function looksLikeHtml(text: string): boolean {
-  return /^\s*(<!--[\s\S]*?-->\s*)*<(!doctype html|html)\b/i.test(text)
+  return /^\s*(<!--(?:(?!-->)[\s\S])*-->\s*)*<(!doctype html|html)\b/i.test(text)
 }
 
 /** The feed a web page names in `<link rel="alternate" type="application/rss+xml">`, so a site's address works too. */
