@@ -860,11 +860,18 @@ export class Browser implements TabHost {
     this.window.setTrafficLights(this.state.settings.sidebarVisible || this.window.overlayMode.kind === 'sidebar', trafficLightsAt(this.frame()))
   }
 
+  /** Peek is a short preview, so it covers docked DevTools rather than squeezing beside them. */
+  private contentWithDevtools(): Rect {
+    const { content, devtools } = this.cur.layout
+    return devtools ? { ...content, width: devtools.bar.x + devtools.bar.width - content.x } : content
+  }
+
   private frame(): WindowFrame {
     const settings = this.state.settings
     return {
       size: this.window.size(),
       content: this.cur.layout.content,
+      contentWithDevtools: this.contentWithDevtools(),
       settings,
       sidebarRevealed: !settings.sidebarVisible && this.window.overlayMode.kind === 'sidebar',
       captionHeight: this.window.captionHeight()
@@ -929,7 +936,7 @@ export class Browser implements TabHost {
       }
     }
     this.cur.layout = { content: pageArea ?? content, views, splitId, devtools }
-    if (this.cur.peek) mainWindow.setTop(this.cur.peek.tab.view, peekRects(pageArea ?? content).card)
+    if (this.cur.peek) mainWindow.setTop(this.cur.peek.tab.view, peekRects(content).card)
     const mode = mainWindow.overlayMode.kind === 'peek' ? this.peekMode() : this.placed(mainWindow.overlayMode)
     if (mode.kind !== 'none') mainWindow.setOverlay(mode, overlayRect(mode, this.frame(), !!this.cur.tabDrag))
     this.syncPrompts()
@@ -1127,7 +1134,7 @@ export class Browser implements TabHost {
   openPeek(profileId: ID, url: string): void {
     this.dropPeek()
     this.cur.peek = new Peek(this, this.profiles.get(profileId), url)
-    this.window.setTop(this.cur.peek.tab.view, peekRects(this.cur.layout.content).card)
+    this.window.setTop(this.cur.peek.tab.view, peekRects(this.contentWithDevtools()).card)
     this.setOverlay(this.peekMode())
     this.cur.peek.tab.wc.focus()
   }
@@ -1173,7 +1180,7 @@ export class Browser implements TabHost {
   }
 
   private peekMode(): OverlayMode {
-    return { kind: 'peek', card: peekRects(this.cur.layout.content).local }
+    return { kind: 'peek', card: peekRects(this.contentWithDevtools()).local }
   }
 
   onPeekChanged(tab: LiveTab, change: { url?: string; navigated?: boolean }): void {

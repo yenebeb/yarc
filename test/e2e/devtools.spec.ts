@@ -136,3 +136,29 @@ test('in split view, Developer Tools dock to the right of all the panes', async 
     for (const tab of (await space()).today.filter((today) => today.url.includes('devtools-split'))) await dispatch({ type: 'close', id: tab.id })
   }
 })
+
+test('Peek covers docked Developer Tools instead of squeezing beside them', async () => {
+  const tabId = await openTab('devtools-peek')
+  try {
+    await dispatch({ type: 'devtools' })
+    await expect.poll(dockedLayout).toBeDefined()
+    const { content, devtools } = (await state()).layout
+    const right = devtools!.bar.x + devtools!.bar.width
+    await app.evaluate(
+      (_electron, [profileId, url]) => (globalThis as any).arcBrowser.openPeek(profileId, url),
+      [(await space()).profileId, `${base}/devtools-peeked`] as const
+    )
+    await expect.poll(async () => (await state()).peek?.url).toBe(`${base}/devtools-peeked`)
+    const shown = await app.evaluate(() => {
+      const browser = (globalThis as any).arcBrowser
+      return { overlay: browser.window.overlay.getBounds(), card: browser.cur.peek.tab.view.getBounds() }
+    })
+    expect(shown.overlay.x).toBe(content.x)
+    expect(shown.overlay.x + shown.overlay.width).toBe(right)
+    expect(shown.card.x + shown.card.width).toBeGreaterThan(devtools!.bar.x)
+  } finally {
+    await dispatch({ type: 'overlay', mode: { kind: 'none' } })
+    await dispatch({ type: 'devtools' })
+    await dispatch({ type: 'close', id: tabId })
+  }
+})
