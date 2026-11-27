@@ -10,7 +10,7 @@
 }
 
 .sheet .note.warn {
-  color: color-mix(in oklab, #d97706 80%, var(--text));
+  color: color-mix(in oklab, var(--warning) 80%, var(--text));
 }
 
 .sheet .muted {
@@ -41,7 +41,7 @@
 }
 
 .sheet .btn:disabled {
-  opacity: 0.45;
+  opacity: var(--disabled-opacity);
 }
 
 .sheet .btn.primary:hover {

@@ -6,7 +6,7 @@
   --bg-2: color-mix(in oklab, var(--space-2) 40%, #e8e4f6);
   --text: #1d1b22;
   --text-2: rgb(29 27 34 / 0.62);
-  --text-3: rgb(29 27 34 / 0.42);
+  --text-3: rgb(29 27 34 / 0.52);
   --hover: rgb(255 255 255 / 0.38);
   --active: rgb(255 255 255 / 0.88);
   --active-shadow: 0 1px 2px rgb(0 0 0 / 0.08), 0 0 0 0.5px rgb(0 0 0 / 0.05);
@@ -17,6 +17,14 @@
   --accent: color-mix(in oklab, var(--space) 85%, #000);
   --shadow-lg: 0 24px 64px rgb(20 10 40 / 0.28), 0 2px 8px rgb(20 10 40 / 0.12);
   --urlfield: rgb(0 0 0 / 0.07);
+  --danger: #d33;
+  --warning: #d97706;
+  --success: #30a46c;
+  --disabled-opacity: 0.4;
+  --scrim: rgb(10 5 25 / 0.28);
+  --float: rgb(20 20 24 / 0.92);
+  --float-hover: rgb(45 45 52 / 0.95);
+  --float-text: #f1eff6;
   --tile: rgb(255 255 255 / 0.1);
   --space-strong: oklch(from var(--space) calc(l * 0.67) c h);
   --vibrant-1: color-mix(in srgb, var(--space) 74%, transparent);
@@ -41,6 +49,7 @@
   --shadow-lg: 0 24px 64px rgb(0 0 0 / 0.55), 0 2px 8px rgb(0 0 0 / 0.3);
   color-scheme: dark;
   --urlfield: rgb(0 0 0 / 0.18);
+  --scrim: rgb(0 0 0 / 0.35);
   --tile: rgb(255 255 255 / 0.07);
   --vibrant-1: color-mix(in srgb, color-mix(in oklab, var(--space) 32%, #17161b) 84%, transparent);
   --vibrant-2: color-mix(in srgb, color-mix(in oklab, var(--space-2) 24%, #131217) 88%, transparent);
@@ -120,7 +129,7 @@ input {
 }
 
 .icon-btn:disabled {
-  opacity: 0.35;
+  opacity: var(--disabled-opacity);
 }
 
 .icon {
@@ -148,4 +157,19 @@ input {
   width: 16px;
   height: 16px;
   flex: none;
+}
+
+:where(button, a, [role='button']):focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--accent) 60%, transparent);
+  outline-offset: -2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *:not(.spinner, .progress.indeterminate > div),
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

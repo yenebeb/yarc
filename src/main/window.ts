@@ -14,7 +14,7 @@ export const TRAFFIC_LIGHTS = { x: 13, y: 16 }
 /** Electron doesn't report the button group's width. From macOS 26 (Darwin 25), apps built with its SDK space the buttons 23pt apart instead of 20. */
 export const TRAFFIC_LIGHTS_WIDTH = Number(release().split('.')[0]) >= 25 ? 60 : 54
 export const CAPTION_H = mac ? 0 : 32
-/** The UI's --text (styles.css). */
+/** The UI's --text (base.css). */
 export const captionSymbols = (dark: boolean): string => (dark ? '#f1eff6' : '#1d1b22')
 
 export interface ViewSlot {

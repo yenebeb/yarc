@@ -11,26 +11,26 @@
   padding: 0 7px;
   border-radius: 8px 8px 0 0;
   background: var(--panel);
-  color: rgb(0 0 0 / 0.6);
-  box-shadow: inset 0 -0.5px 0 rgb(0 0 0 / 0.1);
+  --pane-text: rgb(0 0 0 / 0.6);
+  --pane-icon: rgb(0 0 0 / 0.38);
+  --pane-edge: rgb(0 0 0 / 0.1);
+  color: var(--pane-text);
+  box-shadow: inset 0 -0.5px 0 var(--pane-edge);
   font-size: 13px;
   font-weight: 500;
   -webkit-app-region: no-drag;
 }
 
 .pane-bar.dark {
-  color: rgb(255 255 255 / 0.72);
-  box-shadow: inset 0 -0.5px 0 rgb(255 255 255 / 0.12);
+  --pane-text: rgb(255 255 255 / 0.72);
+  --pane-icon: rgb(255 255 255 / 0.45);
+  --pane-edge: rgb(255 255 255 / 0.12);
 }
 
 .pane-bar .icon-btn {
   width: 28px;
   height: 24px;
-  color: rgb(0 0 0 / 0.38);
-}
-
-.pane-bar.dark .icon-btn {
-  color: rgb(255 255 255 / 0.45);
+  color: var(--pane-icon);
 }
 
 .pane-bar .icon-btn:hover:not(:disabled) {

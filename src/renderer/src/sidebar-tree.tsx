@@ -423,7 +423,7 @@ function TabRow({ item, ctx, section, folderId, index, onDrop }: { item: TabItem
           dispatch({ type: 'close', id: item.id })
         }}
       >
-        <Icon name={section === 'today' ? 'x' : 'minimize'} size={14} />
+        <Icon name={section === 'today' ? 'x' : 'minus'} size={14} />
       </button>
     </div>
   )

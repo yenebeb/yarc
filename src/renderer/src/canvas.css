@@ -17,9 +17,10 @@ body {
   --chrome: #ffffff;
   --chrome-text: #1d1b22;
   --muted: #8a8794;
-  --accent: #6d5dfc;
-  --line: rgb(127 127 127 / 0.2);
-  --hover: rgb(127 127 127 / 0.12);
+  --canvas-accent: #6d5dfc;
+  --danger: #d33;
+  --canvas-line: rgb(127 127 127 / 0.2);
+  --canvas-hover: rgb(127 127 127 / 0.12);
   --shadow: 0 1px 3px rgb(0 0 0 / 0.08), 0 6px 20px rgb(0 0 0 / 0.1);
   --dot: rgb(127 127 127 / 0.3);
   position: relative;
@@ -39,7 +40,7 @@ body {
   --chrome: #2a2930;
   --chrome-text: #ecebf0;
   --muted: #9e9ba8;
-  --accent: #8b7eff;
+  --canvas-accent: #8b7eff;
   --shadow: 0 1px 3px rgb(0 0 0 / 0.4), 0 6px 20px rgb(0 0 0 / 0.35);
 }
 
@@ -163,7 +164,7 @@ body {
   padding: 0;
   border: 0;
   border-radius: 7px;
-  background: var(--hover);
+  background: var(--canvas-hover);
   color: inherit;
   cursor: pointer;
 }
@@ -205,7 +206,7 @@ body {
   gap: 7px;
   margin-top: 10px;
   padding-top: 8px;
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--canvas-line);
   font-size: 13px;
   font-weight: 400;
   color: var(--chrome-text);
@@ -309,7 +310,7 @@ svg.draft path {
 .selection {
   position: absolute;
   box-sizing: border-box;
-  border: 1.5px solid var(--accent);
+  border: 1.5px solid var(--canvas-accent);
   border-radius: 4px;
 }
 
@@ -319,7 +320,7 @@ svg.draft path {
   height: 10px;
   margin: -5px 0 0 -5px;
   box-sizing: border-box;
-  border: 1.5px solid var(--accent);
+  border: 1.5px solid var(--canvas-accent);
   border-radius: 3px;
   background: var(--chrome);
   pointer-events: auto;
@@ -354,8 +355,8 @@ svg.draft path {
 
 .marquee {
   position: absolute;
-  border: 1px solid var(--accent);
-  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  border: 1px solid var(--canvas-accent);
+  background: color-mix(in srgb, var(--canvas-accent) 10%, transparent);
 }
 
 .empty-hint {
@@ -434,12 +435,12 @@ svg.draft path {
 .toolbar button:hover,
 .zoombar button:hover,
 .board-menu-button:hover {
-  background: var(--hover);
+  background: var(--canvas-hover);
 }
 
 .toolbar button.on {
-  background: color-mix(in srgb, var(--accent) 18%, transparent);
-  color: var(--accent);
+  background: color-mix(in srgb, var(--canvas-accent) 18%, transparent);
+  color: var(--canvas-accent);
 }
 
 .toolbar svg,
@@ -455,7 +456,7 @@ svg.draft path {
   width: 1px;
   height: 22px;
   margin: 0 4px;
-  background: var(--line);
+  background: var(--canvas-line);
 }
 
 .toolbar .swatch {
@@ -470,7 +471,7 @@ svg.draft path {
 }
 
 .toolbar .swatch.on span {
-  box-shadow: 0 0 0 2px var(--chrome), 0 0 0 3.5px var(--accent);
+  box-shadow: 0 0 0 2px var(--chrome), 0 0 0 3.5px var(--canvas-accent);
 }
 
 .toolbar .swatch.on {
@@ -537,7 +538,7 @@ svg.draft path {
 }
 
 .canvas-find button:hover {
-  background: var(--hover);
+  background: var(--canvas-hover);
 }
 
 .canvas-find svg {
@@ -548,13 +549,13 @@ svg.draft path {
 }
 
 .item.found-current {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--canvas-accent);
   outline-offset: 4px;
   border-radius: 6px;
 }
 
 .item.found-other {
-  outline: 1px dashed var(--accent);
+  outline: 1px dashed var(--canvas-accent);
   outline-offset: 4px;
   border-radius: 6px;
 }
@@ -564,7 +565,7 @@ svg.draft path {
   height: 30px;
   margin: 0 2px 0 4px;
   padding: 0 8px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--canvas-line);
   border-radius: 8px;
   background: transparent;
   color: inherit;
@@ -573,11 +574,11 @@ svg.draft path {
 }
 
 .toolbar .link-field:focus {
-  border-color: var(--accent);
+  border-color: var(--canvas-accent);
 }
 
 .toolbar .link-field.invalid {
-  border-color: #d64545;
+  border-color: var(--danger);
 }
 
 .zoombar {
@@ -621,7 +622,7 @@ svg.draft path {
   height: 28px;
   padding: 0 10px 0 4px;
   border: 0;
-  border-radius: 6px;
+  border-radius: 7px;
   background: transparent;
   color: inherit;
   font: inherit;
@@ -630,7 +631,7 @@ svg.draft path {
 }
 
 .menu button:hover {
-  background: color-mix(in srgb, var(--accent) 85%, transparent);
+  background: color-mix(in srgb, var(--canvas-accent) 85%, transparent);
   color: #fff;
 }
 
@@ -651,15 +652,28 @@ svg.draft path {
 .menu-line {
   height: 1px;
   margin: 4px 6px;
-  background: var(--line);
+  background: var(--canvas-line);
 }
 
 .item.image > .spotlight-picture {
   --panel: var(--card);
-  --space: var(--accent);
+  --space: var(--canvas-accent);
+  --accent: var(--canvas-accent);
+  --line: var(--canvas-line);
+  --hover: var(--canvas-hover);
   --text: var(--chrome-text);
   height: 100%;
   border-radius: 10px;
   box-shadow: var(--shadow);
   pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

@@ -13,14 +13,14 @@
 .capture-dim {
   position: absolute;
   inset: 0;
-  background: rgb(0 0 0 / 0.32);
+  background: var(--scrim);
 }
 
 .capture-area {
   position: absolute;
   border: 2px solid var(--accent);
   border-radius: 4px;
-  box-shadow: 0 0 0 9999px rgb(0 0 0 / 0.32);
+  box-shadow: 0 0 0 9999px var(--scrim);
   pointer-events: none;
   transition:
     left 0.08s ease-out,

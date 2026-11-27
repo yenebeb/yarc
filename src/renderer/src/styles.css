@@ -26,7 +26,7 @@
   border: 0;
   border-radius: 8px;
   overflow: hidden;
-  background: #fff;
+  background: var(--panel);
   box-shadow: 0 0 0 0.5px rgb(0 0 0 / 0.08), 0 1px 3px rgb(0 0 0 / 0.06);
   cursor: default;
 }
@@ -157,7 +157,7 @@
   border-radius: 9px;
   background: var(--panel);
   box-shadow: var(--shadow-lg);
-  font-size: 12.5px;
+  font-size: 13px;
   animation: toast-in 0.18s ease-out;
 }
 
@@ -171,12 +171,8 @@
 .scrim {
   position: fixed;
   inset: 0;
-  background: rgb(10 5 25 / 0.28);
+  background: var(--scrim);
   animation: fade 0.12s ease-out;
-}
-
-:where([data-appearance='dark']) .scrim {
-  background: rgb(0 0 0 / 0.35);
 }
 
 @keyframes fade {
@@ -225,14 +221,14 @@
   place-items: center;
   border: 0;
   border-radius: 50%;
-  background: rgb(20 20 24 / 0.92);
-  color: #fff;
+  background: var(--float);
+  color: var(--float-text);
   box-shadow: 0 2px 8px rgb(0 0 0 / 0.25);
   cursor: pointer;
 }
 
 .peek-buttons button:hover {
-  background: rgb(45 45 52 / 0.95);
+  background: var(--float-hover);
 }
 
 .notice {
@@ -242,8 +238,8 @@
   align-items: center;
   justify-content: center;
   padding: 0 16px;
-  background: rgba(20, 19, 24, 0.86);
-  color: #f1eff6;
+  background: var(--float);
+  color: var(--float-text);
   border-radius: 22px;
   font-size: 13px;
   white-space: nowrap;
@@ -338,7 +334,7 @@
   gap: 10px;
   padding: 14px 16px 10px 20px;
   font-size: 16px;
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .sheet header .spacer {
@@ -429,7 +425,7 @@ select:focus {
 }
 
 .btn.danger {
-  color: #d33;
+  color: var(--danger);
 }
 
 .list-row {

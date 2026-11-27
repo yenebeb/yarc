@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { Action } from '../../shared/actions'
 import type { ArcApi } from '../../shared/ipc'
+import { SIDEBAR_CSS_LENGTHS } from '../../shared/sidebar-geometry'
 import { bindingLabel, type CommandId, type Shortcuts } from '../../shared/keymap'
 import type { AppState, OverlayMode, Space } from '../../shared/types'
 
@@ -13,6 +14,7 @@ declare global {
 export const arc = window.arc
 export const isMac = arc.platform === 'darwin'
 document.documentElement.dataset.platform = arc.platform
+for (const [name, pixels] of Object.entries(SIDEBAR_CSS_LENGTHS)) document.documentElement.style.setProperty(name, `${pixels}px`)
 export const dispatch = (a: Action) => void arc.dispatch(a)
 export const openMenu = (action: Action) => (event: { preventDefault(): void }) => {
   event.preventDefault()

@@ -1,15 +1,9 @@
 import type { Point, Rectangle } from 'electron'
+import { FLOATING_SIDEBAR_INSET, SIDEBAR_GAP, SIDEBAR_PAD, TOP_BAR_HEIGHT, URL_FIELD_HEIGHT } from '../shared/sidebar-geometry'
 import { isFloating } from '../shared/tour'
 import type { OverlayMode, Rect, Settings } from '../shared/types'
 import { PROMPT_WIDTH, type PromptAnchor } from './prompt-view'
 import { PAD, TRAFFIC_LIGHTS, TRAFFIC_LIGHTS_WIDTH } from './window'
-
-// Sidebar geometry, kept in step with styles.css.
-const SIDEBAR_PAD = 8
-const FLOATING_SIDEBAR_INSET = 4
-const TOP_BAR_HEIGHT = 32
-const URL_FIELD_GAP = 6
-const URL_FIELD_HEIGHT = 36
 
 export interface WindowFrame {
   size: { width: number; height: number }
@@ -70,7 +64,7 @@ export function promptAnchor(frame: WindowFrame, fullscreenPage: boolean): Promp
   if ((settings.sidebarVisible || sidebarRevealed) && !fullscreenPage) {
     const inset = sidebarRevealed ? FLOATING_SIDEBAR_INSET : 0
     const fieldRight = settings.sidebarRight ? frame.size.width - 10 : inset + settings.sidebarWidth - 6
-    const fieldBottom = topBarY(frame, inset) + TOP_BAR_HEIGHT + URL_FIELD_GAP + URL_FIELD_HEIGHT
+    const fieldBottom = topBarY(frame, inset) + TOP_BAR_HEIGHT + SIDEBAR_GAP + URL_FIELD_HEIGHT
     return { arrow: true, x: fieldRight - 22, y: fieldBottom + 2 }
   }
   const x = settings.sidebarRight ? content.x + content.width - PROMPT_WIDTH - 12 : content.x + 12
