@@ -152,10 +152,10 @@ function cut(rect: Rect, dir: SplitGroup['dir'], sizes: number[], gap: number): 
   const row = dir === 'row'
   const length = row ? rect.width : rect.height
   const start = row ? rect.x : rect.y
-  const total = length - gap * (sizes.length - 1)
+  const total = Math.max(0, length - gap * (sizes.length - 1))
   let at = start
   return sizes.map((s, i) => {
-    const len = i === sizes.length - 1 ? start + length - at : Math.round(total * s)
+    const len = Math.max(0, i === sizes.length - 1 ? start + length - at : Math.round(total * s))
     const r = row ? { x: at, y: rect.y, width: len, height: rect.height } : { x: rect.x, y: at, width: rect.width, height: len }
     at += len + gap
     return r
