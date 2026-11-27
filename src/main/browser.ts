@@ -66,7 +66,7 @@ import { Media } from './media'
 import { Mirror, stillOf } from './mirror'
 import { runPageAction } from './page-actions'
 import { Peek, sameSite } from './peek'
-import { buildAppMenu, buildCanvasMenu, buildContextMenu, buildFolderMenu, buildItemMenu, buildSpaceMenu, buildSplitMenu } from './menus'
+import { buildAppMenu, buildCanvasMenu, buildContextMenu, buildFolderMenu, buildItemMenu, buildSidebarMenu, buildSpaceMenu, buildSplitMenu } from './menus'
 import { Profiles, type ProfileRuntime } from './profiles'
 import { overlayRect, peekRects, promptAnchor, trafficLightsAt, type WindowFrame } from './overlay-layout'
 import { PageSwipe, type SwipeTarget } from './page-swipe'
@@ -1907,6 +1907,8 @@ export class Browser implements TabHost {
       }
       case 'spaceMenu':
         return buildSpaceMenu(this, action.id)?.popup({ window: this.window.win })
+      case 'sidebarMenu':
+        return buildSidebarMenu(this).popup({ window: this.window.win })
       case 'extensionsStore':
         this.setOverlay({ kind: 'none' }, false)
         this.newTab('https://chromewebstore.google.com/category/extensions')

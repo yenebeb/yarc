@@ -1,5 +1,5 @@
 diff --git a/dist/cjs/index.js b/dist/cjs/index.js
-index a91ca8fd07194abb081e9bb35fad0060fefddf91..3aa4017deb96c4d1e25e4feb77525bd7a5d9e829 100644
+index a91ca8fd07194abb081e9bb35fad0060fefddf91..c51a0c04aeb29fb674abeb1c3b7c16471d027f4f 100644
 --- a/dist/cjs/index.js
 +++ b/dist/cjs/index.js
 @@ -193,7 +193,8 @@ var _PopupView = class _PopupView extends import_node_events.EventEmitter {
@@ -12,7 +12,15 @@ index a91ca8fd07194abb081e9bb35fad0060fefddf91..3aa4017deb96c4d1e25e4feb77525bd7
        webPreferences: {
          session: opts.session,
          sandbox: true,
-@@ -581,7 +582,7 @@ var BrowserActionAPI = class {
+@@ -222,6 +223,7 @@ var _PopupView = class _PopupView extends import_node_events.EventEmitter {
+     } catch (e) {
+       console.error(e);
+     }
++    this.finishedLoading = true;
+     if (this.destroyed) return;
+     if (this.usingPreferredSize) {
+       this.setSize({ width: _PopupView.BOUNDS.minWidth, height: _PopupView.BOUNDS.minHeight });
+@@ -581,7 +583,7 @@ var BrowserActionAPI = class {
          this.activateClick(details);
          break;
        case "contextmenu":
@@ -21,7 +29,19 @@ index a91ca8fd07194abb081e9bb35fad0060fefddf91..3aa4017deb96c4d1e25e4feb77525bd7
          break;
        default:
          console.debug(`Ignoring unknown browserAction.activate event '${eventType}'`);
-@@ -669,6 +670,8 @@ var BrowserActionAPI = class {
+@@ -591,6 +593,11 @@ var BrowserActionAPI = class {
+     const { extensionId, tabId, anchorRect, alignment } = details;
+     if (this.popup) {
+       const toggleExtension = !this.popup.isDestroyed() && this.popup.extensionId === extensionId;
++      // YARC: a popup still loading keeps one more click (the second of a double click; closing it then made it flash open and shut). The click after closes it, so one that never loads can still be closed.
++      if (toggleExtension && !this.popup.finishedLoading && !this.popup.keptThroughClick) {
++        this.popup.keptThroughClick = true;
++        return;
++      }
+       this.popup.destroy();
+       this.popup = void 0;
+       if (toggleExtension) {
+@@ -669,6 +676,8 @@ var BrowserActionAPI = class {
          }
        });
      }
@@ -30,7 +50,7 @@ index a91ca8fd07194abb081e9bb35fad0060fefddf91..3aa4017deb96c4d1e25e4feb77525bd7
      menu.popup({
        x: Math.floor(anchorRect.x),
        y: Math.floor(anchorRect.y + anchorRect.height)
-@@ -1907,6 +1910,10 @@ var NativeMessagingHost = class {
+@@ -1907,6 +1916,10 @@ var NativeMessagingHost = class {
      this.process = (0, import_node_child_process.spawn)(config.path, [extensionUrl], {
        shell: false
      });
@@ -42,7 +62,7 @@ index a91ca8fd07194abb081e9bb35fad0060fefddf91..3aa4017deb96c4d1e25e4feb77525bd7
      this.process.stderr.on("data", (data) => {
        d7("stderr: %s", data.toString());
 diff --git a/dist/esm/index.mjs b/dist/esm/index.mjs
-index 43929222572e4d6875cc192aca0750da79d8ff14..91e5e15b1d5bc581c90d0bd5b8036cb7ceafea35 100644
+index 43929222572e4d6875cc192aca0750da79d8ff14..ada6b8b3aa920a87a068b2fb9cce78a124456b34 100644
 --- a/dist/esm/index.mjs
 +++ b/dist/esm/index.mjs
 @@ -156,7 +156,8 @@ var _PopupView = class _PopupView extends EventEmitter {
@@ -55,7 +75,15 @@ index 43929222572e4d6875cc192aca0750da79d8ff14..91e5e15b1d5bc581c90d0bd5b8036cb7
        webPreferences: {
          session: opts.session,
          sandbox: true,
-@@ -544,7 +545,7 @@ var BrowserActionAPI = class {
+@@ -185,6 +186,7 @@ var _PopupView = class _PopupView extends EventEmitter {
+     } catch (e) {
+       console.error(e);
+     }
++    this.finishedLoading = true;
+     if (this.destroyed) return;
+     if (this.usingPreferredSize) {
+       this.setSize({ width: _PopupView.BOUNDS.minWidth, height: _PopupView.BOUNDS.minHeight });
+@@ -544,7 +546,7 @@ var BrowserActionAPI = class {
          this.activateClick(details);
          break;
        case "contextmenu":
@@ -64,7 +92,19 @@ index 43929222572e4d6875cc192aca0750da79d8ff14..91e5e15b1d5bc581c90d0bd5b8036cb7
          break;
        default:
          console.debug(`Ignoring unknown browserAction.activate event '${eventType}'`);
-@@ -632,6 +633,8 @@ var BrowserActionAPI = class {
+@@ -554,6 +556,11 @@ var BrowserActionAPI = class {
+     const { extensionId, tabId, anchorRect, alignment } = details;
+     if (this.popup) {
+       const toggleExtension = !this.popup.isDestroyed() && this.popup.extensionId === extensionId;
++      // YARC: a popup still loading keeps one more click (the second of a double click; closing it then made it flash open and shut). The click after closes it, so one that never loads can still be closed.
++      if (toggleExtension && !this.popup.finishedLoading && !this.popup.keptThroughClick) {
++        this.popup.keptThroughClick = true;
++        return;
++      }
+       this.popup.destroy();
+       this.popup = void 0;
+       if (toggleExtension) {
+@@ -632,6 +639,8 @@ var BrowserActionAPI = class {
          }
        });
      }
@@ -73,7 +113,7 @@ index 43929222572e4d6875cc192aca0750da79d8ff14..91e5e15b1d5bc581c90d0bd5b8036cb7
      menu.popup({
        x: Math.floor(anchorRect.x),
        y: Math.floor(anchorRect.y + anchorRect.height)
-@@ -1870,6 +1873,10 @@ var NativeMessagingHost = class {
+@@ -1870,6 +1879,10 @@ var NativeMessagingHost = class {
      this.process = spawn2(config.path, [extensionUrl], {
        shell: false
      });

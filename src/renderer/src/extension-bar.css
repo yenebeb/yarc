@@ -9,7 +9,13 @@
   background-color: transparent;
   background-position: center;
   background-repeat: no-repeat;
-  background-size: 70%;
+  background-size: 16px;
+}
+
+.urlbar .extension-action {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
 }
 
 .extension-action:hover {

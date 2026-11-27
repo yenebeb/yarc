@@ -104,6 +104,7 @@ export type Action =
   | { type: 'itemMenu'; id: ID }
   | { type: 'folderMenu'; id: ID }
   | { type: 'spaceMenu'; id: ID }
+  | { type: 'sidebarMenu' }
   /** In window coordinates. */
   | { type: 'appMenu'; x: number; y: number }
   | { type: 'extensionsStore' }

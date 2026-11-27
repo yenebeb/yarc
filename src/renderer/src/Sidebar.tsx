@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type DragEvent } from 'react'
 import type { DropTarget } from '../../shared/actions'
 import type { EditRequest } from '../../shared/ipc'
 import { SIDEBAR_WIDTH, type AppState, type ID, type FeatureBoard, type UpdateStatus } from '../../shared/types'
-import { activeSpace, arc, cx, dispatch, displayHost, isMac } from './api'
+import { activeSpace, arc, cx, dispatch, displayHost, isMac, openMenu } from './api'
 import { ExtensionBar } from './ExtensionBar'
 import { Icon } from './icons'
 import { MediaCards } from './media-cards'
@@ -64,6 +64,9 @@ export function Sidebar({ state, floating }: { state: AppState; floating?: boole
       className={cx('sidebar', floating && 'floating', right && 'right')}
       style={{ width: state.settings.sidebarWidth, [right ? 'right' : 'left']: 0 }}
       onWheel={switchSpaceOnSwipe}
+      onContextMenu={(event) => {
+        if (!event.defaultPrevented) dispatch({ type: 'sidebarMenu' })
+      }}
       onDragStart={(event) => {
         setDragging(true)
         // The row's own handler has just set what's dragged.
@@ -123,7 +126,7 @@ export function Sidebar({ state, floating }: { state: AppState; floating?: boole
       ) : null}
 
       <div className="scroll">
-        <div className="space-name" onContextMenu={() => dispatch({ type: 'spaceMenu', id: space.id })}>
+        <div className="space-name" onContextMenu={openMenu({ type: 'spaceMenu', id: space.id })}>
           {space.emoji ? <span>{space.emoji}</span> : null}
           {space.name}
         </div>
@@ -322,7 +325,7 @@ function BottomBar({ ctx }: { ctx: Ctx }) {
               className={cx('space-dot', space.id === currentSpace.id && 'active', over && 'drop-into')}
               title={space.name}
               onClick={() => dispatch(space.id === currentSpace.id ? { type: 'spaceMenu', id: space.id } : { type: 'switchSpace', id: space.id })}
-              onContextMenu={() => dispatch({ type: 'spaceMenu', id: space.id })}
+              onContextMenu={openMenu({ type: 'spaceMenu', id: space.id })}
               onDragOver={(event) => {
                 event.preventDefault()
                 setHint({ section: `space:${space.id}` })

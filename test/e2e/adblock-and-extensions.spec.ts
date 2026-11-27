@@ -413,6 +413,78 @@ test("an extension's right-click menu opens under its button, from the sidebar s
   }
 })
 
+async function clickAndWaitForPopup(extId: string): Promise<{ open: boolean; finishedLoading: boolean; created: number }> {
+  const ui = app.windows().find((page) => page.url().endsWith('index.html'))!
+  const handled = await app.evaluate(() => (globalThis as any).clicksHandled)
+  await ui.locator(`button[is="browser-action"][id="${extId}"]`).click()
+  await expect.poll(() => app.evaluate(() => (globalThis as any).clicksHandled)).toBe(handled + 1)
+  return app.evaluate(() => {
+    const globals = globalThis as any
+    const popup = globals.browserActions.popup
+    return { open: !!popup && !popup.isDestroyed(), finishedLoading: !!popup?.finishedLoading, created: globals.popupsCreated }
+  })
+}
+
+async function withClickCounting(extId: string, run: () => Promise<void>): Promise<void> {
+  const { profileId } = await space()
+  await dispatch({ type: 'extensionPin', profileId, extensionId: extId, pinned: true })
+  await dispatch({ type: 'open', url: `${base}/popup-clicks`, where: 'tab' })
+  const tabId = (await space()).activeItemId!
+  await app.evaluate(() => {
+    const globals = globalThis as any
+    const library = globals.arcBrowser.extensions.byProfile.get(globals.arcBrowser.store.activeSpace.profileId).library
+    globals.browserActions = library.api.browserAction
+    globals.clicksHandled = 0
+    globals.popupsCreated = 0
+    globals.countPopups = () => globals.popupsCreated++
+    library.on('browser-action-popup-created', globals.countPopups)
+    globals.realActivateClick = globals.browserActions.activateClick
+    globals.browserActions.activateClick = function (details: unknown) {
+      globals.realActivateClick.call(this, details)
+      globals.clicksHandled++
+    }
+  })
+  try {
+    await run()
+  } finally {
+    await app.evaluate(() => {
+      const globals = globalThis as any
+      const library = globals.arcBrowser.extensions.byProfile.get(globals.arcBrowser.store.activeSpace.profileId).library
+      library.off('browser-action-popup-created', globals.countPopups)
+      globals.browserActions.activateClick = globals.realActivateClick
+      globals.browserActions.popup?.destroy()
+      globals.browserActions.popup = undefined
+    })
+    await dispatch({ type: 'extensionPin', profileId, extensionId: extId, pinned: false })
+    await dispatch({ type: 'close', id: tabId })
+    await removeExtension(extId)
+  }
+}
+
+test('a popup still loading stays open on a second click, closes on the next one, and a click after that opens it again', async () => {
+  const extId = await loadExtension(
+    extensionDir({
+      'manifest.json': { manifest_version: 3, name: 'slow popup', version: '1.0', action: { default_popup: 'popup.html' } },
+      'popup.html': `<img src="${base}/never-loads">`
+    })
+  )
+  await withClickCounting(extId, async () => {
+    expect(await clickAndWaitForPopup(extId)).toEqual({ open: true, finishedLoading: false, created: 1 })
+    expect(await clickAndWaitForPopup(extId)).toEqual({ open: true, finishedLoading: false, created: 1 })
+    expect((await clickAndWaitForPopup(extId)).open).toBe(false)
+    expect(await clickAndWaitForPopup(extId)).toEqual({ open: true, finishedLoading: false, created: 2 })
+  })
+})
+
+test('a popup that has loaded closes on the next click', async () => {
+  const extId = await loadExtension(popupExtensionDir('loaded popup'))
+  await withClickCounting(extId, async () => {
+    expect((await clickAndWaitForPopup(extId)).open).toBe(true)
+    await expect.poll(() => app.evaluate(() => !!(globalThis as any).browserActions.popup?.finishedLoading)).toBe(true)
+    expect((await clickAndWaitForPopup(extId)).open).toBe(false)
+  })
+})
+
 test('an extension popup opens next to its button, from the sidebar shown or hidden, on either side', async () => {
   const dir = extensionDir({
     'manifest.json': { manifest_version: 3, name: 'popup side', version: '1.0', action: { default_popup: 'popup.html' } },

@@ -4,7 +4,7 @@ import type { EditRequest } from '../../shared/ipc'
 import { MAX_PANES, paneIds, splitRows } from '../../shared/split'
 import { isAwayFromSaved, spaceItems, tabTitle } from '../../shared/tree'
 import type { AppState, ID, PinnedCanvas, PinnedNode, Space, TabItem } from '../../shared/types'
-import { arc, cx, dispatch, displayHost } from './api'
+import { arc, cx, dispatch, displayHost, openMenu } from './api'
 import { Favicon, Icon } from './icons'
 
 const DRAG_TYPE = 'application/x-arc-item'
@@ -65,7 +65,7 @@ export function FavoriteTile({ item, index, ctx, onDrop }: { item: TabItem; inde
       onDrop={(event) => onDrop(event, { section: 'favorites', index: dropPos === 'after' ? index + 1 : index })}
       onClick={() => dispatch({ type: 'activate', id: item.id })}
       onAuxClick={(event) => event.button === 1 && dispatch({ type: 'close', id: item.id })}
-      onContextMenu={() => dispatch({ type: 'itemMenu', id: item.id })}
+      onContextMenu={openMenu({ type: 'itemMenu', id: item.id })}
     >
       <Favicon url={item.url} favicon={live?.favicon ?? item.favicon} />
     </div>
@@ -196,7 +196,7 @@ function SplitRow({
               onDragStart={(event) => startDrag(event, item.id)}
               onClick={() => dispatch({ type: 'activate', id: item.id })}
               onAuxClick={(event) => event.button === 1 && dispatch({ type: 'close', id: item.id })}
-              onContextMenu={() => dispatch({ type: 'itemMenu', id: item.id })}
+              onContextMenu={openMenu({ type: 'itemMenu', id: item.id })}
             >
               <Favicon url={item.url} favicon={live?.favicon ?? item.favicon} />
               <span className="title">{itemTitle(state, item)}</span>
@@ -261,7 +261,7 @@ function FolderRow({ node, ctx, index, parentId, onDrop }: { node: Extract<Pinne
         }
         onClick={() => dispatch({ type: 'toggleFolder', id: node.id })}
         onDoubleClick={() => ctx.setEdit({ kind: 'renameFolder', id: node.id })}
-        onContextMenu={() => dispatch({ type: 'folderMenu', id: node.id })}
+        onContextMenu={openMenu({ type: 'folderMenu', id: node.id })}
       >
         <Icon name={node.live ? 'liveFolder' : 'folder'} size={16} />
         {editing ? (
@@ -306,7 +306,7 @@ function CanvasRow({ node, ctx, index, folderId, onDrop }: { node: PinnedCanvas;
         dispatch({ type: 'activate', id: node.id })
       }}
       onDoubleClick={() => ctx.setEdit({ kind: 'renameCanvas', id: node.id })}
-      onContextMenu={() => dispatch({ type: 'canvasMenu', id: node.id })}
+      onContextMenu={openMenu({ type: 'canvasMenu', id: node.id })}
     >
       <span className="favicon-wrap">
         <Icon name="canvas" size={16} />
@@ -379,7 +379,7 @@ function TabRow({ item, ctx, section, folderId, index, onDrop }: { item: TabItem
       }}
       onAuxClick={(event) => event.button === 1 && dispatch({ type: 'close', id: item.id })}
       onDoubleClick={() => ctx.setEdit({ kind: 'rename', id: item.id })}
-      onContextMenu={() => dispatch({ type: 'itemMenu', id: item.id })}
+      onContextMenu={openMenu({ type: 'itemMenu', id: item.id })}
       title={live?.url ?? item.url}
     >
       <span className={cx('favicon-wrap', away && 'away')}>

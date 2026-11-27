@@ -2,10 +2,12 @@ import { app, clipboard, dialog, Menu, type ContextMenuParams, type MenuItemCons
 import { IPC, type EditRequest } from '../shared/ipc'
 import { paneIds, splitMenuModel } from '../shared/split'
 import { findCanvas, findFolder, findItem, isAwayFromSaved, spaceCanvases } from '../shared/tree'
+import { THEMES } from '../shared/settings'
 import { SEARCH_ENGINES, searchUrl } from '../shared/url'
 import { bindingLabel, commandTitle, type CommandId } from '../shared/keymap'
 import type { Browser } from './browser'
 import type { LiveTab } from './tab'
+import type { Settings } from '../shared/types'
 
 const WEB_LINK = /^https?:/i
 
@@ -357,6 +359,23 @@ export function buildFolderMenu(browser: Browser, id: string): Menu | undefined 
     rename,
     { type: 'separator' },
     { label: 'Delete Folder (keep tabs)', click: () => void browser.dispatch({ type: 'deleteFolder', id }) }
+  ])
+}
+
+export function buildSidebarMenu(browser: Browser): Menu {
+  const { settings } = browser.store.state
+  const patch = (changes: Partial<Settings>) => void browser.dispatch({ type: 'settings', patch: changes })
+  return Menu.buildFromTemplate([
+    { label: 'New Space…', click: () => browser.setOverlay({ kind: 'space-editor' }) },
+    { label: 'Edit Space…', click: () => browser.setOverlay({ kind: 'space-editor', spaceId: browser.store.activeSpace.id }) },
+    { type: 'separator' },
+    {
+      label: 'Appearance',
+      submenu: THEMES.map(({ value, label }) => ({ label, type: 'radio', checked: settings.theme === value, click: () => patch({ theme: value }) }))
+    },
+    { type: 'separator' },
+    { label: 'Sidebar on the Left', type: 'radio', checked: !settings.sidebarRight, click: () => patch({ sidebarRight: false }) },
+    { label: 'Sidebar on the Right', type: 'radio', checked: settings.sidebarRight, click: () => patch({ sidebarRight: true }) }
   ])
 }
 

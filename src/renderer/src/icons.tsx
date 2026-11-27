@@ -133,7 +133,7 @@ const paths: Record<string, ReactNode> = {
       <path d="M12 7v5l3 2" />
     </>
   ),
-  puzzle: <path d="M10 4a2 2 0 1 1 4 0v2h4v4h-2a2 2 0 1 0 0 4h2v4h-4v-2a2 2 0 1 0-4 0v2H6v-4h2a2 2 0 1 0 0-4H6V6h4z" />,
+  puzzle: <path d="M9.75 5.25a2.25 2.25 0 1 1 4.5 0v2.25h4.5v4.5h-2.25a2.25 2.25 0 1 0 0 4.5h2.25v4.5h-4.5v-2.25a2.25 2.25 0 1 0-4.5 0v2.25h-4.5v-4.5h2.25a2.25 2.25 0 1 0 0-4.5h-2.25V7.5h4.5z" />,
   pin: <path d="M12 17v5M8 3h8l-1 6 3 4H6l3-4z" />,
   shield: <path d="M12 3l7 3v5c0 4.5-3 8.5-7 10-4-1.5-7-5.5-7-10V6z" />,
   profile: (

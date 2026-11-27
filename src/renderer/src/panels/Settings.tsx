@@ -2,7 +2,8 @@ import { useState, type CSSProperties, type KeyboardEvent } from 'react'
 import logo from '../../../../build/icon.svg'
 import { cleanMatch } from '../../../shared/link-routes'
 import { permissionLabel, siteName, type SitePermissionRow } from '../../../shared/permissions'
-import { SIDEBAR_WIDTH, type AppState, type ExtensionInfo, type Profile, type SearchEngine, type Settings as SettingsT, type SettingsSection as Section } from '../../../shared/types'
+import { THEMES } from '../../../shared/settings'
+import { SIDEBAR_WIDTH, type AppState, type ExtensionInfo, type Profile, type SearchEngine, type SettingsSection as Section } from '../../../shared/types'
 import { SEARCH_ENGINES } from '../../../shared/url'
 import { activeSpace, dispatch } from '../api'
 import { Icon, type IconName } from '../icons'
@@ -37,12 +38,6 @@ const LITTLE_CLOSE_OPTIONS: HoursOption[] = [
   { hours: 6, label: 'After 6 hours' },
   { hours: 12, label: 'After 12 hours' },
   { hours: 0, label: 'Never' }
-]
-
-const THEMES: { value: SettingsT['theme']; label: string }[] = [
-  { value: 'system', label: 'System' },
-  { value: 'light', label: 'Light' },
-  { value: 'dark', label: 'Dark' }
 ]
 
 export function Settings({ state, section: initial = 'general', close }: { state: AppState; section?: Section; close: () => void }) {

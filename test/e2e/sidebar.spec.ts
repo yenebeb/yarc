@@ -267,3 +267,53 @@ test('dragging a tab inside the peeking sidebar drops in the sidebar, not on the
     browser.watchSidebarReveal = browser.realWatchSidebarReveal
   })
 })
+
+test('right-clicking the sidebar offers new spaces, the appearance and its side; a tab keeps its own menu', async () => {
+  await dispatch({ type: 'open', url: `${base}/sidebar-menu`, where: 'tab' })
+  const tabId = (await space()).activeItemId!
+  const ui = await pageWithUrl('index.html')
+  await app.evaluate(({ Menu }) => {
+    const globals = globalThis as any
+    globals.realPopup = Menu.prototype.popup
+    globals.shownMenus = []
+    Menu.prototype.popup = function (this: Electron.Menu) {
+      globals.shownMenus.push(this)
+    }
+  })
+  const shownLabels = () => app.evaluate(() => (globalThis as any).shownMenus.map((menu: Electron.Menu) => menu.items.map((item) => item.label)))
+  const rightClickSidebarAndChoose = async (...path: string[]) => {
+    await app.evaluate(() => ((globalThis as any).shownMenus = []))
+    await ui.locator('.sidebar').dispatchEvent('contextmenu')
+    await expect.poll(async () => (await shownLabels()).length).toBe(1)
+    await app.evaluate((_electron, labels) => {
+      let items: Electron.MenuItem[] = (globalThis as any).shownMenus[0].items
+      for (const label of labels.slice(0, -1)) items = items.find((item) => item.label === label)!.submenu!.items
+      items.find((item) => item.label === labels[labels.length - 1])!.click()
+    }, path)
+  }
+  try {
+    await rightClickSidebarAndChoose('Sidebar on the Right')
+    await expect.poll(async () => (await state()).settings.sidebarRight).toBe(true)
+    await rightClickSidebarAndChoose('Appearance', 'Dark')
+    await expect.poll(async () => (await state()).settings.theme).toBe('dark')
+    await rightClickSidebarAndChoose('New Space…')
+    await expect.poll(overlayKind).toBe('space-editor')
+    await dispatch({ type: 'overlay', mode: { kind: 'none' } })
+
+    await app.evaluate(() => ((globalThis as any).shownMenus = []))
+    await ui.locator('.row', { hasText: 'Page sidebar-menu' }).click({ button: 'right' })
+    await expect.poll(async () => (await shownLabels()).length).toBeGreaterThan(0)
+    // Messages from one page arrive in order: once this one is handled, every menu the right-click asked for has opened.
+    await ui.evaluate(() => (window as any).arc.dispatch({ type: 'overlay', mode: { kind: 'none' } }))
+    const menus = await shownLabels()
+    expect(menus).toHaveLength(1)
+    expect(menus[0]).not.toContain('New Space…')
+  } finally {
+    await app.evaluate(({ Menu }) => {
+      Menu.prototype.popup = (globalThis as any).realPopup
+    })
+    await dispatch({ type: 'overlay', mode: { kind: 'none' } })
+    await dispatch({ type: 'settings', patch: { sidebarRight: false, theme: 'system' } })
+    await dispatch({ type: 'close', id: tabId })
+  }
+})

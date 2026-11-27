@@ -3,8 +3,14 @@ import { validRoutes } from './link-routes.ts'
 import type { Settings } from './types.ts'
 import { SEARCH_ENGINES } from './url.ts'
 
+export const THEMES = [
+  { value: 'system', label: 'System' },
+  { value: 'light', label: 'Light' },
+  { value: 'dark', label: 'Dark' }
+] as const satisfies readonly { value: Settings['theme']; label: string }[]
+
 const ENUMS: Partial<Record<keyof Settings, readonly string[]>> = {
-  theme: ['system', 'light', 'dark'],
+  theme: THEMES.map((theme) => theme.value),
   searchEngine: Object.keys(SEARCH_ENGINES)
 }
 
