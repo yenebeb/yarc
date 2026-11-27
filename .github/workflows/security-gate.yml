@@ -1,0 +1,56 @@
+name: security-gate
+
+# Decides, for every pull request, what it needs before it may merge: nothing (documentation), or an
+# AI security review and a maintainer's sign-off of the exact commit (docs/security-review.md).
+# pull_request_target: this workflow and .github/security/ always come from main, never from the
+# pull request, so a contributor can't change the rules their own change is judged by. The pull
+# request's commits are fetched as git objects and read; nothing of them is checked out, installed
+# or run. Don't add a step here that does.
+on:
+  pull_request_target:
+    branches: [main]
+    types: [opened, reopened, synchronize, edited, labeled, ready_for_review]
+
+permissions: {}
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write # the security-ledger branch (sign-offs)
+      pull-requests: write # the report comment, removing stale labels
+      statuses: write # the security-gate status
+    outputs:
+      review: ${{ steps.gate.outputs.review }}
+      head: ${{ steps.gate.outputs.head }}
+      base: ${{ steps.gate.outputs.base }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - id: gate
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node --experimental-strip-types .github/security/cli.ts gate
+
+  # Paid, so only when a maintainer put the review label on this commit (the gate job checked who did).
+  ai-review:
+    needs: gate
+    if: needs.gate.outputs.review == 'true'
+    concurrency:
+      group: security-ai-review-${{ github.event.pull_request.number }}
+    permissions:
+      contents: write
+      pull-requests: write
+      statuses: write
+    uses: ./.github/workflows/security-ai-review.yml
+    with:
+      kind: pr
+      pr: ${{ github.event.pull_request.number }}
+      head: ${{ needs.gate.outputs.head }}
+      base: ${{ needs.gate.outputs.base }}

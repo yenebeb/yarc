@@ -1,0 +1,34 @@
+name: scorecard
+
+# OpenSSF Scorecard: grades the repository's supply-chain habits (pinned actions, token
+# permissions, branch rules, dangerous workflow patterns) and lists what slipped under
+# Security > Code scanning.
+on:
+  schedule:
+    - cron: '23 4 * * 1'
+  push:
+    branches: [main]
+    paths: ['.github/**']
+  workflow_dispatch:
+
+permissions: read-all
+
+jobs:
+  scorecard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      security-events: write # the code-scanning results
+      id-token: write # publishing the score
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ossf/scorecard-action@23f22cd43608bae7a1f1fa2603d7314dee9538a5 # v2.6.0
+        with:
+          results_file: results.sarif
+          results_format: sarif
+          publish_results: true
+      - uses: github/codeql-action/upload-sarif@915412ff23e8b7659517e607487dbeae018f2934 # v4.39.5
+        with:
+          sarif_file: results.sarif

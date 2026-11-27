@@ -11,6 +11,11 @@ name: release
 # top level); it ships with the next release.
 # The tag is created on main's newest commit, the three platforms build into a draft release,
 # and the release is published once all of them succeed. A failed build leaves the draft.
+# Merging is not publishing (docs/security-review.md): while the platforms build, the security jobs
+# check that every commit since the last published release passed the security gate, and one AI
+# review reads all of those changes together. Then the sign job waits for a maintainer to approve
+# the release-signing environment, with that report on the run's summary page. Nothing is signed,
+# uploaded or published without both; rejecting leaves a tag and a draft that the next release covers.
 # Pull requests run it too, as a dry run: the same three builds, tests and packaging, without a
 # tag, a draft, signing secrets or an upload, so a change that would break the release fails on
 # the PR instead of after the merge.
@@ -32,6 +37,10 @@ on:
         type: choice
         options: [auto, patch, minor, major]
         default: auto
+      security_exception:
+        description: Only to release although a security check can't pass - the reason, kept in the ledger
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -50,6 +59,7 @@ jobs:
       pull-requests: read # labels of the merged PRs
     outputs:
       version: ${{ steps.next.outputs.version }}
+      sha: ${{ steps.next.outputs.sha }}
       changelog: ${{ steps.changelog.outputs.changelog }}
     steps:
       # Keeps its credentials to push the tag; this job runs no dependency code.
@@ -72,8 +82,16 @@ jobs:
             echo "::error::Releases are made from main only."
             exit 1
           fi
-          if git tag --points-at HEAD | grep -q '^v'; then
-            echo "This commit is already released ($(git tag --points-at HEAD | tr '\n' ' '))."
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          tagged=$(git tag --points-at HEAD | grep '^v' | head -n1 || true)
+          if [ -n "$tagged" ]; then
+            # A candidate that was built but never published (a check failed, nobody approved) can be tried again by hand.
+            if [ "$EVENT" = "workflow_dispatch" ] && [ "$(gh release view "$tagged" --json isDraft --jq .isDraft)" = "true" ]; then
+              echo "Trying the unpublished $tagged again."
+              echo "version=${tagged#v}" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            echo "This commit is already released ($tagged)."
             exit 0
           fi
 
@@ -273,13 +291,56 @@ jobs:
           if-no-files-found: error
           retention-days: 3
 
+  # Before anything is signed: every commit since the last published release passed the security
+  # gate (or a maintainer's recorded exception says why not). Runs only main's own code.
+  security-verify:
+    needs: version
+    if: github.event_name != 'pull_request' && needs.version.outputs.version != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write # the security-ledger branch, for an exception
+      pull-requests: read
+    outputs:
+      base: ${{ steps.verify.outputs.base }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.version.outputs.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - id: verify
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HEAD_SHA: ${{ needs.version.outputs.sha }}
+          # Empty unless a maintainer started this run by hand with a reason.
+          EXCEPTION: ${{ github.event_name == 'workflow_dispatch' && inputs.security_exception || '' }}
+        run: node --experimental-strip-types .github/security/cli.ts release-verify --head "$HEAD_SHA" --exception "$EXCEPTION"
+
+  # One review of everything in the release together: what several pull requests do in combination.
+  security-review:
+    needs: [version, security-verify]
+    permissions:
+      contents: write
+      pull-requests: write
+      statuses: write
+    uses: ./.github/workflows/security-ai-review.yml
+    with:
+      kind: release
+      head: ${{ needs.version.outputs.sha }}
+      base: ${{ needs.security-verify.outputs.base }}
+
   # Signs what installed copies check before they update (src/main/update-signature.ts): the macOS
   # update zips (mac-update.ts) and the Windows installers (updater.ts). No dependencies, no
   # build: the repository's own script and Node's crypto. In the release-signing environment, so
   # the key can live there (Settings > Environments, deployment branch main) instead of in a
-  # repository secret that every job can read.
+  # repository secret that every job can read. The environment's required reviewer is the release's
+  # authorization: a maintainer approves after reading the security report on this run's summary.
   sign:
-    needs: [version, build]
+    needs: [version, build, security-review]
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -325,11 +386,27 @@ jobs:
     timeout-minutes: 20
     permissions:
       contents: write
+      id-token: write # build provenance
+      attestations: write
     steps:
+      # By name: the run also holds the security report, which is not a release file.
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
+          pattern: dist-*
           path: dist
           merge-multiple: true
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: signatures
+          path: dist
+      - name: List the checksums
+        run: (cd dist && sha256sum -- * > "$RUNNER_TEMP/SHA256SUMS.txt" && mv "$RUNNER_TEMP/SHA256SUMS.txt" . && cat SHA256SUMS.txt)
+      # Lets anyone check a download came from this workflow run and commit: gh attestation verify <file> -R yenebeb/yarc.
+      # An extra, not a gate: installed copies trust the Ed25519 signatures.
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        continue-on-error: true
+        with:
+          subject-path: dist/*
       - name: Upload to the draft release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -46,6 +46,31 @@ jobs:
       - run: pnpm test
       - run: pnpm build
 
+  # YARC's own security invariants (.github/security/semgrep.yml): IPC only through handleUi/onUi,
+  # no weakened web preferences, no code built from strings. General analysis is CodeQL's job
+  # (default setup, in the repository settings).
+  semgrep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: pipx run --spec semgrep==1.187.0 semgrep scan --config .github/security/semgrep.yml --error --metrics=off --disable-version-check src
+
+  # A pull request that adds a dependency with a known vulnerability fails here, before it merges.
+  dependency-review:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/dependency-review-action@bbc44d14a204704ccc493733616cd1e93a0321ec # v5.0.1
+        with:
+          fail-on-severity: high
+
   # The real app on each platform, away from a desktop someone is using. Linux runs on X11 (Xvfb), not Wayland.
   e2e:
     strategy:

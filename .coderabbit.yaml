@@ -1,0 +1,19 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+# General code review, free for public repositories. It looks for bugs; whether a change is an
+# attack is the security gate's question (docs/security-review.md).
+language: en-US
+reviews:
+  profile: chill
+  poem: false
+  high_level_summary: false
+  review_status: false
+  collapse_walkthrough: true
+  auto_review:
+    enabled: true
+    drafts: false
+  path_filters:
+    - '!pnpm-lock.yaml'
+    - '!docs/screenshots/**'
+    - '!build/*.png'
+chat:
+  auto_reply: true

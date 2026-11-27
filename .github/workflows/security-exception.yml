@@ -1,0 +1,43 @@
+name: security-exception
+
+# For when the AI review can't run (budget used up, provider down) and a change can't wait: a
+# maintainer takes responsibility for one pull request's current commit, with a reason. It stands
+# in for the AI review and the sign-off, is written to the security-ledger branch with who and why,
+# and lapses with the next commit. Only people with write access can start it, and the script only
+# accepts a maintainer from .github/security/policy.json. For a release: release.yml's own input.
+on:
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: Pull request number
+        type: number
+        required: true
+      reason:
+        description: Why this goes ahead without the AI review (kept in the ledger)
+        type: string
+        required: true
+
+permissions: {}
+
+jobs:
+  exception:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+      statuses: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ inputs.pr }}
+          REASON: ${{ inputs.reason }}
+        run: node --experimental-strip-types .github/security/cli.ts exception --pr "$PR" --reason "$REASON"

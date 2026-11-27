@@ -38,6 +38,7 @@
     "electron-updater": "6.8.11"
   },
   "devDependencies": {
+    "@anthropic-ai/sdk": "1.14.0",
     "@electron/fuses": "2.1.3",
     "@electron/osx-sign": "2.7.2",
     "@ghostery/adblocker-electron": "2.20.3",

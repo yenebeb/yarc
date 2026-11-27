@@ -15,5 +15,5 @@
     "noUnusedLocals": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src", "test", "scripts", "electron.vite.config.ts", "playwright.config.ts"]
+  "include": ["src", "test", "scripts", ".github/security", "electron.vite.config.ts", "playwright.config.ts"]
 }

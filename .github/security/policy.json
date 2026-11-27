@@ -1,0 +1,101 @@
+{
+  "maintainers": ["yenebeb"],
+  "trustedBots": ["dependabot[bot]"],
+  "labels": { "review": "ready-for-security-review", "approve": "security-approved" },
+  "approvals": { "medium": 1, "high": 2 },
+  "budget": {
+    "monthlyEur": 20,
+    "usdPerEur": 1.05,
+    "releaseReservePercent": 40,
+    "maxConcurrentReviews": 2,
+    "maxReviewsPerPrPerDay": 2,
+    "maxPrReviewsPerDay": 12
+  },
+  "reviewer": {
+    "provider": "anthropic",
+    "model": "claude-sonnet-5-5",
+    "fallbackModel": "claude-sonnet-5",
+    "effort": "medium",
+    "maxIterations": 14,
+    "maxInputTokens": 400000,
+    "maxOutputTokens": 32000,
+    "maxOutputTokensPerTurn": 8000,
+    "usdPerMillionTokens": { "input": 2, "output": 10, "cacheWrite": 2.5, "cacheRead": 0.1 }
+  },
+  "risk": {
+    "low": {
+      "maxAddedLines": 40,
+      "paths": ["README.md", "docs/*.md", "docs/screenshots/*.{png,jpg,jpeg,gif,webp}"]
+    },
+    "high": {
+      "paths": [
+        ".github/**",
+        ".claude/**",
+        "CLAUDE.md",
+        "SECURITY.md",
+        ".npmrc",
+        ".gitattributes",
+        ".gitmodules",
+        "package.json",
+        "pnpm-lock.yaml",
+        "pnpm-workspace.yaml",
+        "patches/**",
+        "scripts/**",
+        "build/**",
+        "electron-builder.yml",
+        "electron.vite.config.ts",
+        "playwright.config.ts",
+        "tsconfig.json",
+        "src/preload/**",
+        "src/shared/ipc.ts",
+        "src/shared/permissions.ts",
+        "src/main/index.ts",
+        "src/main/window.ts",
+        "src/main/tab.ts",
+        "src/main/ui-origin.ts",
+        "src/main/update*.ts",
+        "src/main/mac-update.ts",
+        "src/main/release.ts",
+        "src/main/sync/**",
+        "src/main/importers/**",
+        "src/main/session-cookies.ts",
+        "src/main/history.ts",
+        "src/main/store.ts",
+        "src/main/profile*.ts",
+        "src/main/extension*.ts",
+        "src/main/adblock*.ts",
+        "src/main/net-rules.ts",
+        "src/main/declarative-net-request.ts",
+        "src/main/site-permissions.ts",
+        "src/main/permission-queue.ts",
+        "src/main/client-certificates.ts",
+        "src/main/download*.ts",
+        "src/main/external-link*.ts",
+        "src/main/launch-args.ts",
+        "src/main/useragent.ts",
+        "src/main/search.ts",
+        "src/main/log.ts"
+      ],
+      "content": [
+        { "name": "network request", "pattern": "\\bfetch\\s*\\(|\\bnet\\.(request|fetch)\\b|XMLHttpRequest|WebSocket|EventSource|sendBeacon|node:(http|https|http2|net|tls|dgram|dns)\\b|\\bhttps?\\.(request|get)\\s*\\(" },
+        { "name": "URL literal", "pattern": "\\b(https?|wss?|ftp):\\/\\/" },
+        { "name": "process execution", "pattern": "child_process|\\b(exec|execFile|spawn|fork)(Sync)?\\s*\\(|shell\\.(openExternal|openPath)|utilityProcess" },
+        { "name": "dynamic code", "pattern": "\\beval\\s*\\(|new\\s+Function\\b|executeJavaScript|\\bimport\\s*\\(|\\brequire\\s*\\(\\s*[^'\"`)]|node:vm\\b|WebAssembly|set(Timeout|Interval)\\s*\\(\\s*['\"`]" },
+        { "name": "encoded or hidden text", "pattern": "\\batob\\s*\\(|\\bbtoa\\s*\\(|['\"](base64|base64url|hex)['\"]|fromCharCode|(\\\\x[0-9a-fA-F]{2}){8,}|(\\\\u[0-9a-fA-F]{4}){8,}|[A-Za-z0-9+/]{120,}|[\\u200B-\\u200F\\u202A-\\u202E\\u2060-\\u2069\\uFEFF]" },
+        { "name": "sandbox or web preferences", "pattern": "webPreferences|nodeIntegration|contextIsolation|\\bsandbox\\b|webSecurity|allowRunningInsecureContent|webviewTag|contextBridge|\\bpreload\\b|setWindowOpenHandler|will-navigate|commandLine\\.appendSwitch" },
+        { "name": "IPC or privileged API", "pattern": "ipcMain|ipcRenderer|\\b(handleUi|onUi)\\s*\\(|protocol\\.(handle|register\\w*)|webRequest|setPermission(Request|Check)Handler|desktopCapturer|\\bdebugger\\b|setAsDefaultProtocolClient|setLoginItemSettings|autoUpdater" },
+        { "name": "session or sensitive data", "pattern": "\\.cookies\\b|safeStorage|session\\.(fromPartition|defaultSession)|clearStorageData|\\bclipboard\\b|process\\.env|\\b(password|passphrase|credential|secret|api[_-]?key|(access|refresh|auth)[_-]?token|private[_-]?key)", "flags": "i" }
+      ]
+    },
+    "injection": [
+      "ignore (all |any |the )?(previous|prior|above|earlier) (instructions|rules|prompts?)",
+      "disregard (all |any |the )?(previous|prior|above) ",
+      "(system|developer) (prompt|message)",
+      "(security|code|ai|automated) reviewer[s]?[,:]? (should|must|please|note|do not|don't)",
+      "(as|you are) an? (ai|llm|language model|assistant)",
+      "(mark|classify|report|rate|treat) (this|it|the)( (change|pr|pull request|commit|diff|file))? as (safe|low[- ]risk|approved|benign|harmless)",
+      "do not (flag|report|mention|review)",
+      "</?(system|instructions?|untrusted[a-z_-]*)>"
+    ]
+  }
+}

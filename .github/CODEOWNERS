@@ -1,0 +1,19 @@
+# Asks the owner for a review of whatever decides what reaches users. It only blocks a merge once
+# the ruleset's "Require review from Code Owners" is on (docs/security-review.md).
+/.github/ @yenebeb
+/scripts/ @yenebeb
+/build/ @yenebeb
+/patches/ @yenebeb
+/package.json @yenebeb
+/pnpm-lock.yaml @yenebeb
+/pnpm-workspace.yaml @yenebeb
+/electron-builder.yml @yenebeb
+/electron.vite.config.ts @yenebeb
+/CLAUDE.md @yenebeb
+/SECURITY.md @yenebeb
+/src/preload/ @yenebeb
+/src/main/ui-origin.ts @yenebeb
+/src/main/update*.ts @yenebeb
+/src/main/mac-update.ts @yenebeb
+/src/main/release.ts @yenebeb
+/src/main/sync/ @yenebeb

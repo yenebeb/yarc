@@ -1,0 +1,115 @@
+name: security-ai-review
+
+# One AI security review, of a pull request (security-gate.yml) or of a release candidate
+# (release.yml), in three jobs so that no job holds both the model's API key and a token that can
+# write: reserve takes the worst-case cost out of the month's budget, review talks to the model
+# with a read-only token, settle books the real cost and publishes the report.
+# The change under review is read as git objects. Nothing of it is checked out or run.
+on:
+  workflow_call:
+    inputs:
+      kind:
+        type: string
+        required: true
+      pr:
+        type: number
+        default: 0
+      head:
+        type: string
+        required: true
+      base:
+        type: string
+        required: true
+    outputs:
+      assessment:
+        value: ${{ jobs.settle.outputs.assessment }}
+
+permissions: {}
+
+env:
+  TARGET: --kind ${{ inputs.kind }} --pr ${{ inputs.pr }} --head ${{ inputs.head }} --base ${{ inputs.base }}
+
+jobs:
+  reserve:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write # the security-ledger branch
+    outputs:
+      proceed: ${{ steps.reserve.outputs.proceed }}
+      id: ${{ steps.reserve.outputs.id }}
+      reason: ${{ steps.reserve.outputs.reason }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - id: reserve
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node --experimental-strip-types .github/security/cli.ts reserve $TARGET
+
+  review:
+    needs: reserve
+    if: needs.reserve.outputs.proceed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    # Holds SECURITY_AI_API_KEY, for the main branch only (Settings > Environments).
+    environment: security-review
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      # main's own lockfile, and no install scripts: only the model's SDK is ever loaded.
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ANTHROPIC_API_KEY: ${{ secrets.SECURITY_AI_API_KEY }}
+        run: node --experimental-strip-types .github/security/cli.ts review $TARGET --out "$RUNNER_TEMP/review.json"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: security-review-${{ inputs.kind }}-${{ inputs.pr }}
+          path: ${{ runner.temp }}/review.json
+          if-no-files-found: error
+          retention-days: 30
+
+  # Also when the review failed or never started: the reservation is booked and the gate says why it stays closed.
+  settle:
+    needs: [reserve, review]
+    if: always() && needs.reserve.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write # the security-ledger branch
+      pull-requests: write
+      statuses: write
+    outputs:
+      assessment: ${{ steps.settle.outputs.assessment }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - if: needs.review.result == 'success'
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: security-review-${{ inputs.kind }}-${{ inputs.pr }}
+          path: ${{ runner.temp }}/result
+      - id: settle
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ID: ${{ needs.reserve.outputs.id }}
+          REASON: ${{ needs.reserve.outputs.reason }}
+        run: node --experimental-strip-types .github/security/cli.ts settle $TARGET --result "$RUNNER_TEMP/result/review.json" --id "$ID" --reason "$REASON"

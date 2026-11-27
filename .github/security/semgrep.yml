@@ -1,0 +1,74 @@
+rules:
+  - id: yarc-ipc-outside-ui-guard
+    languages: [typescript]
+    severity: ERROR
+    message: Register IPC with handleUi/onUi (src/main/ui-origin.ts), which refuse senders that aren't YARC's own UI. A bare ipcMain handler answers any web page that can reach the channel.
+    patterns:
+      - pattern-either:
+          - pattern: ipcMain.handle(...)
+          - pattern: ipcMain.on(...)
+          - pattern: ipcMain.once(...)
+          - pattern: ipcMain.handleOnce(...)
+    paths:
+      exclude:
+        - "/src/main/ui-origin.ts"
+        - "/src/main/adblock.ts"
+        - "/src/main/declarative-net-request.ts"
+        - "/src/main/swipe-nav.ts"
+
+  - id: yarc-weakened-web-preferences
+    languages: [typescript]
+    severity: ERROR
+    message: This switches off part of Chromium's sandbox or isolation for a view. Pages and YARC's UI both run sandboxed, context-isolated and without Node.
+    pattern-either:
+      - pattern: '{..., nodeIntegration: true, ...}'
+      - pattern: '{..., nodeIntegrationInSubFrames: true, ...}'
+      - pattern: '{..., nodeIntegrationInWorker: true, ...}'
+      - pattern: '{..., contextIsolation: false, ...}'
+      - pattern: '{..., sandbox: false, ...}'
+      - pattern: '{..., webSecurity: false, ...}'
+      - pattern: '{..., allowRunningInsecureContent: true, ...}'
+      - pattern: '{..., webviewTag: true, ...}'
+      - pattern: '{..., experimentalFeatures: true, ...}'
+
+  - id: yarc-code-from-strings
+    languages: [typescript]
+    severity: ERROR
+    message: Code built from a string at runtime can't be reviewed. If this must run in a page, keep it a fixed script and pass data as arguments.
+    pattern-either:
+      - pattern: eval(...)
+      - pattern: new Function(...)
+      - pattern: setTimeout("...", ...)
+      - pattern: setInterval("...", ...)
+
+  - id: yarc-sandbox-switch
+    languages: [typescript]
+    severity: ERROR
+    message: These Chromium switches turn off the sandbox, web security or certificate checks for the whole browser.
+    patterns:
+      - pattern: app.commandLine.appendSwitch($SWITCH, ...)
+      - metavariable-regex:
+          metavariable: $SWITCH
+          regex: .*(no-sandbox|disable-web-security|ignore-certificate-errors|disable-site-isolation|allow-running-insecure-content|remote-debugging|disable-features).*
+
+  - id: yarc-certificate-errors-accepted
+    languages: [typescript]
+    severity: ERROR
+    message: Accepting a certificate error lets anyone on the network read and change the page. Client certificates are chosen in src/main/client-certificates.ts; server errors are never waved through.
+    pattern-either:
+      - pattern: $SESSION.setCertificateVerifyProc(...)
+      - pattern: $APP.on('certificate-error', ...)
+
+  - id: yarc-cookies-outside-session-code
+    languages: [typescript]
+    severity: ERROR
+    message: Cookies are read and written only by the session and import code. Anything else touching them needs a reason a reviewer can check.
+    pattern-either:
+      - pattern: $SESSION.cookies.get(...)
+      - pattern: $SESSION.cookies.set(...)
+      - pattern: $SESSION.cookies.flushStore(...)
+    paths:
+      exclude:
+        - "/src/main/session-cookies.ts"
+        - "/src/main/profiles.ts"
+        - "/src/main/importers/**"
