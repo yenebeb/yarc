@@ -116,6 +116,7 @@ export type SettingsSection = 'general' | 'traffic' | 'profiles' | 'sync' | 'sit
 export interface Settings {
   sidebarVisible: boolean
   sidebarWidth: number
+  devtoolsWidth: number
   sidebarRight: boolean
   /** 0 = never. */
   archiveAfterHours: number
@@ -265,7 +266,7 @@ export interface AppState extends PersistedState {
   newTabOpen: boolean
   peek?: LiveInfo
   /** `elsewhere`: live in another window, shown here as a still. `bar`: a split pane's bar above the page. */
-  layout: { content: Rect; views: { id: ID; rect: Rect; bar?: Rect; elsewhere?: boolean }[]; splitId?: ID }
+  layout: { content: Rect; views: { id: ID; rect: Rect; bar?: Rect; elsewhere?: boolean }[]; splitId?: ID; devtools?: { bar: Rect; rect: Rect } }
   update: UpdateStatus
   /** While changes wait that the user hasn't looked at: the sidebar's What's New pill. Nothing opens by itself. */
   whatsNew?: { boards: FeatureBoard[] }

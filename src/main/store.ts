@@ -14,6 +14,7 @@ export { SPACE_COLORS }
 export const DEFAULT_SETTINGS: Settings = {
   sidebarVisible: true,
   sidebarWidth: 260,
+  devtoolsWidth: 480,
   sidebarRight: false,
   archiveAfterHours: 12,
   searchEngine: 'google',

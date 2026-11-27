@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
-import { dividers, dragBorder, type Divider } from '../../shared/split'
+import { devtoolsWidthWithin } from '../../shared/devtools-layout'
+import { dividers, dragBorder, SPLIT_GAP, type Divider } from '../../shared/split'
 import { findItem } from '../../shared/tree'
 import { TOAST_MS, type SwipeHint } from '../../shared/ipc'
 import type { AppState, Rect } from '../../shared/types'
@@ -36,6 +37,7 @@ function App() {
         </>
       ) : null}
       <ContentDecor state={state} />
+      <DevtoolsBar state={state} />
       <SwipeArrow />
       <div className="notices">
         {toast ? <div className="toast">{toast}</div> : null}
@@ -247,6 +249,44 @@ function ContentDecor({ state }: { state: AppState }) {
           />
         )
       })}
+    </>
+  )
+}
+
+function DevtoolsBar({ state }: { state: AppState }) {
+  const drag = useRef<{ startX: number; width: number } | undefined>(undefined)
+  const devtools = state.layout.devtools
+  if (!devtools) return null
+  const { bar, rect } = devtools
+  const areaWidth = bar.x + bar.width - state.layout.content.x
+  return (
+    <>
+      <div
+        className="devtools-resize"
+        style={{ left: bar.x - SPLIT_GAP, top: bar.y, width: SPLIT_GAP, height: bar.height + rect.height }}
+        onPointerDown={(event) => {
+          event.currentTarget.setPointerCapture(event.pointerId)
+          drag.current = { startX: event.clientX, width: bar.width }
+        }}
+        onPointerMove={(event) => {
+          const start = drag.current
+          if (!start) return
+          const width = devtoolsWidthWithin(areaWidth, start.width + start.startX - event.clientX)
+          if (width !== bar.width) dispatch({ type: 'settings', patch: { devtoolsWidth: width } })
+        }}
+        onPointerUp={() => (drag.current = undefined)}
+        onPointerCancel={() => (drag.current = undefined)}
+        onLostPointerCapture={() => (drag.current = undefined)}
+      />
+      <div className="pane-bar devtools-bar" style={{ left: bar.x, top: bar.y, width: bar.width, height: bar.height }}>
+        <span className="devtools-title">Developer Tools</span>
+        <button className="icon-btn" title="Open in a separate window" onClick={() => dispatch({ type: 'devtoolsPopOut' })}>
+          <Icon name="external" size={14} />
+        </button>
+        <button className="icon-btn" title="Close Developer Tools" onClick={() => dispatch({ type: 'devtools' })}>
+          <Icon name="x" size={14} />
+        </button>
+      </div>
     </>
   )
 }

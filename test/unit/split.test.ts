@@ -305,3 +305,8 @@ test('a split with only one of its tabs in the list gets no row there', () => {
   assert.equal(rows.size, 0)
   assert.equal(hidden.size, 0)
 })
+
+test('panes in a space narrower than the gap between them are empty, never negative', () => {
+  const rects = layoutPanes(newSplitRoot('A', 'B', 'right'), { x: 10, y: 0, width: 4, height: 300 })
+  for (const { rect } of rects) assert.ok(rect.width >= 0 && rect.height >= 0)
+})

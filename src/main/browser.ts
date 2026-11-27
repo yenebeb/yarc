@@ -65,6 +65,8 @@ import { logInfo, logProblem, setLogContext } from './log'
 import { Media } from './media'
 import { Mirror, stillOf } from './mirror'
 import { runPageAction } from './page-actions'
+import { DockedDevtools } from './docked-devtools'
+import { dockedDevtoolsLayout } from '../shared/devtools-layout'
 import { Peek, sameSite } from './peek'
 import { buildAppMenu, buildCanvasMenu, buildContextMenu, buildFolderMenu, buildItemMenu, buildSidebarMenu, buildSpaceMenu, buildSplitMenu } from './menus'
 import { Profiles, type ProfileRuntime } from './profiles'
@@ -178,6 +180,10 @@ export class Browser implements TabHost {
   private reportedLost: WindowSession | undefined
   readonly live = new Map<ID, LiveTab>()
   readonly canvases = new Canvases(this)
+  readonly devtools = new DockedDevtools(
+    (tab) => this.inWin(this.winOf(tab), () => this.relayout()),
+    (tab, event, input) => this.onTabInput(tab, event, input)
+  )
   /** `since`: the version whose changes the user saw last. */
   private waitingNews: { since?: string; releases: ReleaseNotes[]; spotlights: string[] } = { releases: [], spotlights: [] }
   private readonly liveFolders = new LiveFolders(this)
@@ -579,6 +585,16 @@ export class Browser implements TabHost {
     this.store.save()
   }
 
+  private docksDevtools(tab: LiveTab): boolean {
+    return this.wins.some((window) => window.open && window.main.isShown(tab.view))
+  }
+
+  inspect(tab: LiveTab, x: number, y: number): void {
+    if (!this.docksDevtools(tab)) return tab.wc.inspectElement(x, y)
+    if (this.space.activeItemId !== tab.itemId) this.activate(tab.itemId)
+    void this.devtools.inspect(tab, x, y)
+  }
+
   private winOf(tab: LiveTab): WindowSession {
     return this.wins.find((window) => window.peek?.tab === tab || (window.open && window.main.isShown(tab.view))) ?? this.cur
   }
@@ -844,11 +860,18 @@ export class Browser implements TabHost {
     this.window.setTrafficLights(this.state.settings.sidebarVisible || this.window.overlayMode.kind === 'sidebar', trafficLightsAt(this.frame()))
   }
 
+  /** Peek is a short preview, so it covers docked DevTools rather than squeezing beside them. */
+  private contentWithDevtools(): Rect {
+    const { content, devtools } = this.cur.layout
+    return devtools ? { ...content, width: devtools.bar.x + devtools.bar.width - content.x } : content
+  }
+
   private frame(): WindowFrame {
     const settings = this.state.settings
     return {
       size: this.window.size(),
       content: this.cur.layout.content,
+      contentWithDevtools: this.contentWithDevtools(),
       settings,
       sidebarRevealed: !settings.sidebarVisible && this.window.overlayMode.kind === 'sidebar',
       captionHeight: this.window.captionHeight()
@@ -865,6 +888,8 @@ export class Browser implements TabHost {
     mainWindow.setAppearance(this.space.appearance)
     const views: AppState['layout']['views'] = []
     let splitId: ID | undefined
+    let devtools: AppState['layout']['devtools']
+    let pageArea: Rectangle | undefined
     if (fullscreen && !fullscreen.destroyed) {
       fullscreen.view.setBorderRadius(0)
       this.show([{ view: fullscreen.view, rect: content }])
@@ -879,9 +904,12 @@ export class Browser implements TabHost {
       } else if (!active) {
         this.show([])
       } else {
+        const devtoolsView = this.devtools.viewOf(this.live.get(active))
+        const docked = devtoolsView && dockedDevtoolsLayout(content, settings.devtoolsWidth)
+        pageArea = docked?.page
         const split = splitOf(space.splits, active)
         splitId = split?.id
-        const panes = split ? layoutPanes(split.root, content) : [{ id: active, rect: content }]
+        const panes = split ? layoutPanes(split.root, pageArea ?? content) : [{ id: active, rect: pageArea ?? content }]
         const slots = []
         for (const pane of panes) {
           const item = findItem(this.state, pane.id)?.item
@@ -900,10 +928,14 @@ export class Browser implements TabHost {
             views.push(pane)
           }
         }
+        if (devtoolsView && docked) {
+          slots.push({ view: devtoolsView, rect: docked.devtools })
+          devtools = { bar: docked.bar, rect: docked.devtools }
+        }
         this.show(slots)
       }
     }
-    this.cur.layout = { content, views, splitId }
+    this.cur.layout = { content: pageArea ?? content, views, splitId, devtools }
     if (this.cur.peek) mainWindow.setTop(this.cur.peek.tab.view, peekRects(content).card)
     const mode = mainWindow.overlayMode.kind === 'peek' ? this.peekMode() : this.placed(mainWindow.overlayMode)
     if (mode.kind !== 'none') mainWindow.setOverlay(mode, overlayRect(mode, this.frame(), !!this.cur.tabDrag))
@@ -1102,7 +1134,7 @@ export class Browser implements TabHost {
   openPeek(profileId: ID, url: string): void {
     this.dropPeek()
     this.cur.peek = new Peek(this, this.profiles.get(profileId), url)
-    this.window.setTop(this.cur.peek.tab.view, peekRects(this.cur.layout.content).card)
+    this.window.setTop(this.cur.peek.tab.view, peekRects(this.contentWithDevtools()).card)
     this.setOverlay(this.peekMode())
     this.cur.peek.tab.wc.focus()
   }
@@ -1148,7 +1180,7 @@ export class Browser implements TabHost {
   }
 
   private peekMode(): OverlayMode {
-    return { kind: 'peek', card: peekRects(this.cur.layout.content).local }
+    return { kind: 'peek', card: peekRects(this.contentWithDevtools()).local }
   }
 
   onPeekChanged(tab: LiveTab, change: { url?: string; navigated?: boolean }): void {
@@ -1744,10 +1776,13 @@ export class Browser implements TabHost {
       case 'devtools':
       case 'find': {
         if (!tab) return
+        if (action.type === 'devtools' && this.docksDevtools(tab)) return this.devtools.toggle(tab)
         const toast = runPageAction(tab.wc, action)
         if (toast) this.toast(toast)
         return action.type === 'zoom' ? this.emitSoon() : undefined
       }
+      case 'devtoolsPopOut':
+        return tab && this.devtools.popOut(tab)
       case 'newFolder':
         space.pinned.unshift({ kind: 'folder', id: newId(), name: action.name || 'New Folder', open: true, children: [] })
         return this.changed()
@@ -2097,7 +2132,7 @@ export class Browser implements TabHost {
     if (split && paneIds(split.root).includes(space.activeItemId ?? '')) {
       space.activeItemId = tab.itemId
       this.mru = [tab.itemId, ...this.mru.filter((recent) => recent !== tab.itemId)]
-      this.changed()
+      this.relayout()
     }
   }
 

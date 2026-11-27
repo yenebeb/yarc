@@ -112,7 +112,7 @@ export function buildContextMenu(browser: Browser, tab: LiveTab, p: ContextMenuP
     items.push(...(fromExtensions as unknown as MenuItemConstructorOptions[]))
     sep()
   }
-  items.push({ label: 'Inspect', click: () => wc.inspectElement(p.x, p.y) })
+  items.push({ label: 'Inspect', click: () => browser.inspect(tab, p.x, p.y) })
   return Menu.buildFromTemplate(items)
 }
 

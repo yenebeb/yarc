@@ -8,6 +8,7 @@ import { PAD, TRAFFIC_LIGHTS, TRAFFIC_LIGHTS_WIDTH } from './window'
 export interface WindowFrame {
   size: { width: number; height: number }
   content: Rect
+  contentWithDevtools: Rect
   settings: Pick<Settings, 'sidebarVisible' | 'sidebarWidth' | 'sidebarRight'>
   sidebarRevealed: boolean
   captionHeight: number
@@ -28,9 +29,10 @@ export function overlayRect(mode: OverlayMode, frame: WindowFrame, tabDrag: bool
     }
     case 'extensions':
       return whole
+    case 'peek':
+      return frame.contentWithDevtools
     case 'command':
     case 'split-drop':
-    case 'peek':
     case 'capture':
       return content
     case 'notice': {
