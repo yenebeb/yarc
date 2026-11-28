@@ -72,8 +72,9 @@ async function exportBookmarks(browser: Browser): Promise<void> {
   const { canceled, filePath } = await dialog.showSaveDialog(browser.window.win, { defaultPath, filters: [{ name: 'Bookmarks', extensions: ['html'] }] })
   if (canceled || !filePath) return
   try {
+    const exported = state.spaces.length
     await writeFile(filePath, bookmarksHtml(state))
-    browser.toast(`Exported ${state.spaces.length === 1 ? '1 space' : `${state.spaces.length} spaces`} as bookmarks`)
+    browser.toast(`Exported ${exported === 1 ? '1 space' : `${exported} spaces`} as bookmarks`)
   } catch (err) {
     browser.toast(`Export failed: ${(err as Error).message}`)
   }
@@ -501,7 +502,7 @@ async function openTabInChrome(browser: Browser, tab: LiveTab | undefined, id?: 
   const url = tab?.wc.getURL() || (id ? findItem(browser.state, id)?.item.url : undefined)
   if (!url) return
   const ok = await openInChrome(url)
-  browser.toast(ok ? 'Opened in Chrome' : 'Chrome was not found on browser computer')
+  browser.toast(ok ? 'Opened in Chrome' : 'Chrome was not found on this computer')
 }
 
 function toggleAdblockOn(browser: Browser, tab: LiveTab | undefined): void {
