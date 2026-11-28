@@ -46,9 +46,9 @@ The main process owns all state. Renderers get whole snapshots and send typed `A
 ```mermaid
 flowchart TB
   index[index.ts<br>starts the app] --> browser
-  browser[browser.ts<br>the controller: spaces, tabs, splits, actions] --> features
+  browser[browser.ts<br>the controller: windows, layout, overlay, live pages] --> features
   ipc[ipc.ts<br>what the UI can ask] --> browser
-  features[features/<br>canvas, Little Window, Peek, media,<br>menus, search, live folders, What's New]
+  features[features/<br>commands, tabs, splits, spaces, canvas,<br>Little Window, Peek, media, menus, search]
   features --> net
   features --> update
   features --> sync
@@ -86,7 +86,12 @@ So a feature that needs a new privilege has to add that function, and the pull r
 
 | To change | Go to |
 |---|---|
-| What happens on a command, shortcut or UI action | `Browser.dispatch` / `runCommand` in `src/main/browser.ts`; action types in `src/shared/actions.ts` |
+| What happens on a command, shortcut or UI action | `dispatch` / `runCommand` in `features/commands.ts`; action types in `src/shared/actions.ts` |
+| Opening, closing, archiving, pinning, moving tabs | `features/tabs.ts` (`browser.tabs`) |
+| Split view | `features/splits.ts` (`browser.splits`), layout maths in `src/shared/split.ts` |
+| Spaces and folders | `features/spaces.ts` (`browser.spaces`) |
+| What's New, spotlights, boards | `features/whats-new.ts` (`browser.whatsNew`) |
+| Windows, which pages each shows, the overlay, live pages | `src/main/browser.ts` |
 | A call the UI makes and waits for | `src/main/ipc.ts`, channel in `src/shared/ipc.ts`, exposed in `src/preload/ui.ts`, typed in `src/renderer/src/api.ts` |
 | A message a web page sends | `PAGE_IPC` in `src/shared/ipc.ts`, handler through `core/page-ipc.ts`, sender in `src/preload/` |
 | A script YARC runs in a page | `core/page-scripts.ts` (isolated worlds), `core/page-devtools.ts` (DevTools protocol) |
@@ -117,7 +122,7 @@ The test's failure message names the file, the rule and where the code belongs. 
 
 ## Adding things
 
-- **A feature:** a file in `features/`, wired from `browser.ts`. If the test says it uses a privilege, add one narrow function to the tier named in the message.
+- **A feature:** a file in `features/`, usually a class that gets the `Browser` (like `Tabs`), wired from `browser.ts`; its actions go in `features/commands.ts`. If the test says it uses a privilege, add one narrow function to the tier named in the message.
 - **A UI call:** add the channel to `IPC`, the handler to `ipc.ts` (coerce every argument: `String(url)`, `Number(offset)`), the method to `preload/ui.ts`.
 - **A page message:** add the channel to `PAGE_IPC` and register with `onPage`/`handlePage`. Check `e.senderFrame` and the shape of every argument; a web page chose them.
 - **A page script:** a function in `core/page-scripts.ts` with fixed code. Only numbers go into the code string, through `Number()`.

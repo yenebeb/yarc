@@ -36,10 +36,10 @@ export function buildContextMenu(browser: Browser, tab: LiveTab, p: ContextMenuP
   if (p.linkURL) {
     // Loaded from main, which Chromium doesn't stop from opening local URLs a web page could never navigate to itself.
     if (WEB_LINK.test(p.linkURL) || (/^file:/i.test(p.linkURL) && /^file:/i.test(p.pageURL))) {
-      items.push({ label: 'Open Link in New Tab', click: () => browser.open(p.linkURL, 'background') })
+      items.push({ label: 'Open Link in New Tab', click: () => browser.tabs.open(p.linkURL, 'background') })
       if (WEB_LINK.test(p.linkURL) && tab.host === browser) items.push({ label: 'Open Link in Peek', click: () => browser.peekLink(tab, p.linkURL) })
       items.push(
-        { label: 'Open Link in Split View', click: () => browser.open(p.linkURL, 'split') },
+        { label: 'Open Link in Split View', click: () => browser.tabs.open(p.linkURL, 'split') },
         { label: 'Open Link in a Little Window', click: () => browser.openLittle(p.linkURL) },
         { label: 'Open Link in Incognito Window', click: () => browser.openIncognito(p.linkURL) }
       )
@@ -49,7 +49,7 @@ export function buildContextMenu(browser: Browser, tab: LiveTab, p: ContextMenuP
   }
   if (p.mediaType === 'image' && p.srcURL) {
     if (WEB_LINK.test(p.srcURL) || /^(data:image\/|blob:https?:)/i.test(p.srcURL)) {
-      items.push({ label: 'Open Image in New Tab', click: () => browser.open(p.srcURL, 'background') })
+      items.push({ label: 'Open Image in New Tab', click: () => browser.tabs.open(p.srcURL, 'background') })
     }
     if (!browser.incognito && (WEB_LINK.test(p.srcURL) || /^data:image\//i.test(p.srcURL))) {
       items.push(addToCanvasItem(browser, 'Add Image to Canvas', (canvasId) => void browser.canvases.addImage(tab, p.srcURL, canvasId)))
@@ -86,7 +86,7 @@ export function buildContextMenu(browser: Browser, tab: LiveTab, p: ContextMenuP
     const short = text.length > 24 ? `${text.slice(0, 24)}…` : text
     items.push(
       { role: 'copy' },
-      { label: `Search ${SEARCH_ENGINES[engine].name} for “${short}”`, click: () => browser.open(searchUrl(text, engine), 'tab') }
+      { label: `Search ${SEARCH_ENGINES[engine].name} for “${short}”`, click: () => browser.tabs.open(searchUrl(text, engine), 'tab') }
     )
     if (!browser.incognito) items.push(addToCanvasItem(browser, 'Add Selection to Canvas', (canvasId) => void browser.canvases.addSelection(tab, text, canvasId)))
     sep()
@@ -103,7 +103,7 @@ export function buildContextMenu(browser: Browser, tab: LiveTab, p: ContextMenuP
       { label: 'Copy URL', click: () => browser.dispatch({ type: 'copyUrl' }) }
     )
     if (chromeInstalled()) items.push({ label: 'Open in Chrome', click: () => browser.dispatch({ type: 'openInChrome', id: tab.itemId }) })
-    items.push({ type: 'separator' }, { label: 'View Page Source', click: () => browser.open(`view-source:${wc.getURL()}`, 'tab') })
+    items.push({ type: 'separator' }, { label: 'View Page Source', click: () => browser.tabs.open(`view-source:${wc.getURL()}`, 'tab') })
     sep()
   }
   const fromExtensions = browser.extensions.contextMenuItems(tab, p)

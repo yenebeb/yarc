@@ -307,7 +307,7 @@ function settle(browser: Browser, added: AddedSpaces, active?: string): void {
   if (added.replace) browser.state.activeSpaceId = active || added.spaces[0].id
   browser.store.save()
   browser.emit()
-  if (added.replacedActive) browser.switchSpace(browser.state.activeSpaceId)
+  if (added.replacedActive) browser.spaces.switchSpace(browser.state.activeSpaceId)
 }
 
 /** `profiles`: only the spaces of these Arc profile folders. */

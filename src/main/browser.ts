@@ -1,7 +1,6 @@
 import {
   app,
   BrowserWindow,
-  dialog,
   nativeTheme,
   screen,
   type BaseWindow,
@@ -16,131 +15,65 @@ import {
   type WebContents
 } from 'electron'
 import { existsSync, readFileSync } from 'node:fs'
-import { rm, writeFile } from 'node:fs/promises'
+import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
-import type { Action, DropTarget } from '../shared/actions'
+import type { Action } from '../shared/actions'
 import { withPin } from '../shared/extension-pins'
 import { IPC, TOAST_MS } from '../shared/ipc'
-import { commandForInput, type CommandId } from '../shared/keymap'
-import { cleanLiveSource, liveFolderName } from '../shared/live-folders'
-import { containsNode, findCanvas, findFolder, findInPinned, findItem, profileOfItem, spaceCanvases, spaceItems, stripKind, walkPinned } from '../shared/tree'
+import type { CommandId } from '../shared/keymap'
+import { findCanvas, findItem, profileOfItem } from '../shared/tree'
 import type {
   AppState,
   ExtensionInfo,
   ID,
-  LiveSource,
   OverlayMode,
-  PinnedNode,
-  PinnedTab,
   Rect,
-  ReleaseNotes,
   Space,
-  Split,
-  SplitAt,
   TabItem,
   WindowView
 } from '../shared/types'
-import { appendPaneIn, flipSplit, gatherSplit, layoutPanes, movePane, PANE_BAR, paneIds, placePaneIn, removeFromSplits, resizeGroup, splitOf, type Side } from '../shared/split'
-import { isFloating, nextStep, stepAfter, type TourEvent, type TourStep } from '../shared/tour'
+import { layoutPanes, PANE_BAR, paneIds, splitOf } from '../shared/split'
+import { isFloating, stepAfter, type TourEvent, type TourStep } from '../shared/tour'
 import { routeFor } from '../shared/link-routes'
-import { validSettingsPatch } from '../shared/settings'
-import { hostOf, resolveInput } from '../shared/url'
+import { hostOf } from '../shared/url'
 import { AdBlock } from './net/adblock'
-import { bookmarksHtml } from './features/bookmarks-export'
 import { Canvases } from './features/canvas'
-import { hasBoard } from './features/whats-new-boards'
-import { recentSpotlights, spotlight, SPOTLIGHTS, unseenSpotlights } from '../shared/spotlights'
-import { changesSince, newestVersion, parseChangelog, RECENT_VERSIONS, recentChanges } from './features/changelog'
-import { openInChrome } from './core/chrome'
 import { DownloadList } from './core/download-list'
 import { Extensions } from './net/extensions'
-import { importChoices, ImportScan, runImport } from './importers'
-import { FLOATING_DEMO_URL } from './features/floating-demo'
+import { ImportScan } from './importers'
 import { LittleWindow } from './features/little'
 import { LiveFolders } from './features/live-folders'
 import { logInfo, logProblem, setLogContext } from './core/log'
 import { Media } from './features/media'
 import { Mirror, stillOf } from './features/mirror'
-import { runPageAction } from './features/page-actions'
 import { Peek, sameSite } from './features/peek'
-import { buildAppMenu, buildCanvasMenu, buildContextMenu, buildFolderMenu, buildItemMenu, buildSidebarMenu, buildSpaceMenu, buildSplitMenu } from './features/menus'
+import { buildContextMenu } from './features/menus'
 import { Profiles, type ProfileRuntime } from './core/profiles'
 import { commandBarPlace, overlayRect, peekRects, promptAnchor, trafficLightsAt, type WindowFrame } from './features/overlay-layout'
 import { PageSwipe, type SwipeTarget } from './features/page-swipe'
 import { PromptView } from './core/prompt-view'
 import { SharePicker } from './core/share-picker'
 import { setSwipeStage } from './core/swipe-nav'
-import { incognitoState, MAX_ARCHIVE, newId, SPACE_COLORS, Store } from './core/store'
+import { incognitoState, newId, Store } from './core/store'
 import { HistorySync } from './sync'
 import { adoptedTabView, LiveTab, type OpenDisposition, type TabHost } from './core/tab'
 import { becomeDefaultBrowser } from './core/default-browser'
 import { registerIpc } from './ipc'
+import { dispatch, handleInput, runCommand } from './features/commands'
+import { Spaces } from './features/spaces'
+import { Splits } from './features/splits'
+import { Tabs } from './features/tabs'
+import { plainWindowForTests, WhatsNew } from './features/whats-new'
 import { Updater } from './update/updater'
 import { MainWindow, PAD, type ViewSlot } from './core/window'
-import { applyView, captureView, cascade, inAnyView, newView, stateForView, viewFromState } from './features/window-state'
+import { applyView, captureView, cascade, newView, stateForView, viewFromState } from './features/window-state'
 
-const isMac = process.platform === 'darwin'
 
-// Defined by electron.vite.config.ts from build/changelog.json; empty outside release builds.
-declare const __CHANGELOG__: unknown
-const CHANGELOG = parseChangelog(__CHANGELOG__)
-const whatsNewVersion = () => (app.isPackaged ? app.getVersion() : (newestVersion(CHANGELOG) ?? app.getVersion()))
-const UNLOAD_HIDDEN_AFTER = 3600_000
 const HOUSEKEEPING_EVERY = 5 * 60_000
 // Slack past the revealed sidebar's edge: room to grab it to resize, and no enter/leave flicker at the screen's edge.
 const SIDEBAR_REVEAL_GRACE_PX = 32
 const SIDEBAR_REVEAL_HIDE_DELAY_MS = 300
-const plainWindowForTests = () => !!process.env.YARC_TEST && !process.env.YARC_STARTUP_SCREENS
-
-/** Find on a canvas goes to its own page, which searches the board's texts. */
-const CANVAS_FIND_OPS = { find: 'open', findNext: 'next', findPrev: 'previous' } as const
-
-const COMMAND_ACTIONS: Partial<Record<CommandId, Action>> = {
-  newTab: { type: 'overlay', mode: { kind: 'command', target: 'tab' } },
-  splitAdd: { type: 'overlay', mode: { kind: 'command', target: 'split' } },
-  find: { type: 'overlay', mode: { kind: 'find' } },
-  history: { type: 'overlay', mode: { kind: 'library', tab: 'history' } },
-  downloads: { type: 'overlay', mode: { kind: 'library', tab: 'downloads' } },
-  library: { type: 'overlay', mode: { kind: 'library', tab: 'archive' } },
-  settings: { type: 'overlay', mode: { kind: 'settings' } },
-  trafficControl: { type: 'overlay', mode: { kind: 'settings', section: 'traffic' } },
-  historySync: { type: 'overlay', mode: { kind: 'settings', section: 'sync' } },
-  newSpace: { type: 'overlay', mode: { kind: 'space-editor' } },
-  tour: { type: 'overlay', mode: { kind: 'tour', step: 'welcome' } },
-  toggleSidebar: { type: 'toggleSidebar' },
-  copyUrl: { type: 'copyUrl' },
-  copyUrlMarkdown: { type: 'copyUrl', markdown: true },
-  littleArc: { type: 'littleArc' },
-  reopenClosed: { type: 'reopenClosed' },
-  clearToday: { type: 'clearToday' },
-  nextSpace: { type: 'switchSpaceRelative', delta: 1 },
-  prevSpace: { type: 'switchSpaceRelative', delta: -1 },
-  splitClose: { type: 'unsplit' },
-  devtools: { type: 'devtools' },
-  reload: { type: 'reload' },
-  hardReload: { type: 'reload', hard: true },
-  stop: { type: 'stop' },
-  back: { type: 'back' },
-  forward: { type: 'forward' },
-  zoomIn: { type: 'zoom', delta: 1 },
-  zoomOut: { type: 'zoom', delta: -1 },
-  zoomReset: { type: 'zoom', delta: 0 },
-  newFolder: { type: 'newFolder' },
-  newLiveFolder: { type: 'overlay', mode: { kind: 'live-folder' } },
-  openInChrome: { type: 'openInChrome' },
-  importArc: { type: 'import', source: 'arc' },
-  importZen: { type: 'import', source: 'zen' },
-  importChrome: { type: 'import', source: 'chrome' },
-  exportBookmarks: { type: 'exportBookmarks' },
-  extensions: { type: 'extensionsStore' }
-}
-
-interface ClosedTab {
-  url: string
-  title: string
-  spaceId: ID
-}
 
 class WindowSession {
   peek: Peek | undefined
@@ -170,24 +103,23 @@ export class Browser implements TabHost {
   /** History sync; only the main controller has it, so incognito windows never sync. */
   readonly historySync: HistorySync | undefined
   readonly main: Browser | undefined
-  private wins: WindowSession[] = []
+  wins: WindowSession[] = []
   /** The window commands act on; after the last window closes on macOS it stays, closed. */
-  private cur!: WindowSession
+  cur!: WindowSession
   private reportedLost: WindowSession | undefined
   readonly live = new Map<ID, LiveTab>()
   readonly canvases = new Canvases(this)
-  /** `since`: the version whose changes the user saw last. */
-  private waitingNews: { since?: string; releases: ReleaseNotes[]; spotlights: string[] } = { releases: [], spotlights: [] }
-  private readonly liveFolders = new LiveFolders(this)
-  private readonly media = new Media(this)
+  readonly tabs = new Tabs(this)
+  readonly splits = new Splits(this)
+  readonly spaces = new Spaces(this)
+  readonly whatsNew = new WhatsNew(this)
+  readonly liveFolders = new LiveFolders(this)
+  readonly media = new Media(this)
   private readonly swipe = new PageSwipe((page) => this.swipeTarget(page))
   /** The space editor's unsaved colors; no `spaceId` is a new space, shown on its window's current one. */
-  private colorPreview: { window: WindowSession; spaceId?: ID; color: string; color2?: string } | undefined
-  private hiddenSince = new Map<ID, number>()
+  colorPreview: { window: WindowSession; spaceId?: ID; color: string; color2?: string } | undefined
   private mirror = new Mirror((wc, still) => this.sendStill(wc, still))
-  private mru: ID[] = []
-  private recordingShortcut = false
-  private closedTabs: ClosedTab[] = []
+  recordingShortcut = false
   readonly downloads = new DownloadList({
     toast: (text) => this.toast(text),
     startedByPage: (page) => [...this.live.values()].some((tab) => tab.wc === page && !tab.userActivated),
@@ -203,8 +135,8 @@ export class Browser implements TabHost {
   openLittles(): LittleWindow[] {
     return [...this.littles].filter((little) => !little.win.isDestroyed())
   }
-  private tour: TourStep | undefined
-  private readonly imports = new ImportScan(() => this.emitSoon())
+  tour: TourStep | undefined
+  readonly imports = new ImportScan(() => this.emitSoon())
   private legacyWindowFile: string | undefined
   private static readonly all = new Set<Browser>()
 
@@ -256,7 +188,7 @@ export class Browser implements TabHost {
     main.tourEvent('newIncognitoWindow')
     const incognito = new Browser(main)
     incognito.start()
-    if (url) incognito.newTab(url)
+    if (url) incognito.tabs.newTab(url)
     else incognito.window.win.once('show', () => incognito.runCommand('newTab'))
     return incognito
   }
@@ -292,85 +224,15 @@ export class Browser implements TabHost {
     saved.forEach((view) => this.openWindow(view, view !== lastFocused))
     if (this.incognito) return
     setInterval(() => {
-      this.autoArchive()
-      this.unloadHiddenTabs()
+      this.tabs.autoArchive()
+      this.tabs.unloadHiddenTabs()
       this.closeIdleLittles()
     }, HOUSEKEEPING_EVERY)
-    this.autoArchive()
+    this.tabs.autoArchive()
     this.liveFolders.start()
     this.updater.sync()
-    this.showStartupScreen()
+    this.whatsNew.showStartupScreen()
     this.historySync?.start()
-  }
-
-  private showStartupScreen(): void {
-    this.canvases.discardTemporary()
-    const current = whatsNewVersion()
-    const state = this.state
-    const seen = state.whatsNewSeenVersion ?? state.lastSeenVersion
-    if (this.store.firstRun || !seen) this.markWhatsNewSeen()
-    else {
-      state.whatsNewSeenVersion = seen
-      this.waitingNews = { since: seen, releases: changesSince(CHANGELOG, seen, current), spotlights: unseenSpotlights(SPOTLIGHTS, state.seenSpotlights) }
-    }
-    state.lastSeenVersion = app.getVersion()
-    this.changed()
-    if (plainWindowForTests()) return
-    if (this.store.firstRun) this.whenWindowShows(() => this.setOverlay({ kind: 'tour', step: 'welcome' }))
-    else if (this.waitingNews.spotlights.length) this.whenWindowShows(() => this.openWhatsNew())
-  }
-
-  private whenWindowShows(show: () => void): void {
-    const win = this.window.win
-    if (win.isVisible()) show()
-    else win.once('show', show)
-  }
-
-  private markSpotlightsSeen(): void {
-    this.state.seenSpotlights = SPOTLIGHTS.map((known) => known.id)
-    this.waitingNews.spotlights = []
-  }
-
-  private markWhatsNewSeen(): void {
-    this.state.whatsNewSeenVersion = whatsNewVersion()
-    this.waitingNews.releases = []
-    this.markSpotlightsSeen()
-  }
-
-  private newsWaits(): boolean {
-    return this.waitingNews.releases.length + this.waitingNews.spotlights.length > 0
-  }
-
-  private spotlightsToShow(): string[] {
-    return this.newsWaits() ? this.waitingNews.spotlights : recentSpotlights(SPOTLIGHTS)
-  }
-
-  private boardsToOffer(): string[] {
-    return this.incognito ? [] : this.spotlightsToShow().filter(hasBoard)
-  }
-
-  private whatsNewPill(): AppState['whatsNew'] {
-    if (!this.newsWaits()) return undefined
-    return { boards: this.boardsToOffer().map((id) => ({ spotlight: id, title: spotlight(id)?.title ?? id })) }
-  }
-
-  /** On the user's click, or at launch for an unseen spotlight. What waits when there is something, else the latest changes and features. */
-  private openWhatsNew(): void {
-    const { releases } = this.waitingNews
-    this.setOverlay({
-      kind: 'whats-new',
-      releases: this.newsWaits() ? releases.slice(0, RECENT_VERSIONS) : recentChanges(CHANGELOG, whatsNewVersion()),
-      spotlights: this.spotlightsToShow(),
-      boards: this.boardsToOffer()
-    })
-    this.markWhatsNewSeen()
-    this.changed()
-  }
-
-  private openBoard(spotlightId: string): void {
-    if (this.incognito || !hasBoard(spotlightId)) return
-    this.setOverlay({ kind: 'none' })
-    this.activate(this.canvases.createWhatsNew(this.space, spotlightId).id)
   }
 
   openCommandBarIfBlank(): void {
@@ -382,7 +244,7 @@ export class Browser implements TabHost {
     else window.main.win.once('show', openCommandBar)
   }
 
-  private tourEvent(event: TourEvent): void {
+  tourEvent(event: TourEvent): void {
     const step = this.tour
     if (!step) return
     const next = stepAfter(step, event)
@@ -393,12 +255,12 @@ export class Browser implements TabHost {
     if (cardCanShow) this.setOverlay({ kind: 'tour', step: next }, false)
   }
 
-  private pageInFront(): boolean {
+  pageInFront(): boolean {
     const mode = this.window.overlayMode
     return mode.kind === 'none' || mode.kind === 'notice' || (mode.kind === 'tour' && isFloating(mode.step))
   }
 
-  private panelInFront(): boolean {
+  panelInFront(): boolean {
     return !this.pageInFront() && this.window.overlayMode.kind !== 'sidebar'
   }
 
@@ -541,7 +403,7 @@ export class Browser implements TabHost {
     applyView(this.state, window.view)
   }
 
-  private inWin(window: WindowSession, run: () => void): void {
+  inWin(window: WindowSession, run: () => void): void {
     const previous = this.cur
     this.use(window)
     try {
@@ -557,7 +419,7 @@ export class Browser implements TabHost {
     if (window) this.use(window)
   }
 
-  private captureCurrent(): void {
+  captureCurrent(): void {
     if (!this.cur) return
     const curViewLost = this.wins.length > 0 && (!this.cur.open || !this.state.windows.includes(this.cur.view))
     if (curViewLost && this.reportedLost !== this.cur) logProblem(`saving while the current window ${short(this.cur.view.id)} is closed or not saved`)
@@ -621,7 +483,7 @@ export class Browser implements TabHost {
     }
   }
 
-  private readonly sharePicker = new SharePicker((mode, page) => {
+  readonly sharePicker = new SharePicker((mode, page) => {
     const tab = page && [...this.live.values()].find((live) => live.wc === page)
     if (tab) this.use(this.winOf(tab))
     this.setOverlay(mode)
@@ -676,7 +538,7 @@ export class Browser implements TabHost {
       peek: window.peek && !window.peek.tab.destroyed ? window.peek.tab.info() : undefined,
       layout: window.layout,
       update: this.updater.status,
-      whatsNew: this.whatsNewPill(),
+      whatsNew: this.whatsNew.whatsNewPill(),
       archive: [],
       sitePermissions: {},
       media: this.media.snapshot(),
@@ -752,7 +614,7 @@ export class Browser implements TabHost {
     this.changed()
   }
 
-  private relayout(): void {
+  relayout(): void {
     this.layout()
     this.changed()
   }
@@ -782,7 +644,7 @@ export class Browser implements TabHost {
     return undefined
   }
 
-  private hasItem(id: ID): boolean {
+  hasItem(id: ID): boolean {
     return !!findItem(this.state, id) || !!findCanvas(this.state, id)
   }
 
@@ -790,7 +652,7 @@ export class Browser implements TabHost {
     for (const window of this.wins) if (window.open) window.main.detach(view)
   }
 
-  private dropLive(id: ID): void {
+  dropLive(id: ID): void {
     const tab = this.live.get(id)
     if (!tab) return
     this.media.gone(id)
@@ -818,7 +680,7 @@ export class Browser implements TabHost {
     this.state.activeSpaceId = space.id
     space.activeItemId = id
     found.item.lastActive = Date.now()
-    this.mru = [id, ...this.mru.filter((recent) => recent !== id)].slice(0, 200)
+    this.tabs.used(id)
     const tab = this.liveFor(found.item)
     this.extensions.selectTab(tab)
     this.layout()
@@ -929,6 +791,18 @@ export class Browser implements TabHost {
     })
   }
 
+  handleInput(event: Event, input: Input): void {
+    handleInput(this, event, input)
+  }
+
+  runCommand(cmd: CommandId | string): void {
+    runCommand(this, cmd)
+  }
+
+  dispatch(action: Action): Promise<void> {
+    return dispatch(this, action)
+  }
+
   private tabsInSight(): Set<ID> {
     const ids = new Set<ID>()
     for (const window of this.wins) if (window.open) for (const pane of window.layout.views) if (!pane.elsewhere) ids.add(pane.id)
@@ -973,33 +847,6 @@ export class Browser implements TabHost {
       }
     }
     this.mirror.watch(pages)
-  }
-
-  private async exportBookmarks(): Promise<void> {
-    const state = (this.main ?? this).state
-    const defaultPath = join(app.getPath('downloads'), `YARC bookmarks ${new Date().toISOString().slice(0, 10)}.html`)
-    const { canceled, filePath } = await dialog.showSaveDialog(this.window.win, { defaultPath, filters: [{ name: 'Bookmarks', extensions: ['html'] }] })
-    if (canceled || !filePath) return
-    try {
-      await writeFile(filePath, bookmarksHtml(state))
-      this.toast(`Exported ${state.spaces.length === 1 ? '1 space' : `${state.spaces.length} spaces`} as bookmarks`)
-    } catch (err) {
-      this.toast(`Export failed: ${(err as Error).message}`)
-    }
-  }
-
-  private async floatingPlayerDemo(): Promise<void> {
-    if (!this.state.settings.floatVideos) return this.toast('Turn on floating videos in Settings first')
-    const from = this.space.activeItemId
-    const demo = this.newTab(FLOATING_DEMO_URL)
-    demo.title = 'Floating Player Demo'
-    const tab = this.live.get(demo.id)
-    for (let attempt = 0; attempt < 50 && tab && !tab.playing && !tab.destroyed; attempt++) await sleep(100)
-    if (!tab?.playing || this.space.activeItemId !== demo.id) return
-    await sleep(1200)
-    if (this.space.activeItemId !== demo.id) return
-    if (from && findItem(this.state, from)) this.activate(from)
-    else this.toast('Switch to another tab to see the video float')
   }
 
   private sendStill(wc: WebContents, image: string): void {
@@ -1125,17 +972,9 @@ export class Browser implements TabHost {
     this.cur.peek = undefined
     this.window.setTop(undefined)
     this.setOverlay({ kind: 'none' }, false)
-    const id = this.takeInAsTodayTab(peek.release(), this.space)
-    if (split) this.splitWith(id)
+    const id = this.tabs.takeInAsTodayTab(peek.release(), this.space)
+    if (split) this.splits.splitWith(id)
     else this.activate(id)
-  }
-
-  private takeInAsTodayTab(tab: LiveTab, space: Space): ID {
-    const item: TabItem = { id: newId(), url: tab.wc.getURL(), title: tab.wc.getTitle(), favicon: tab.favicon, lastActive: Date.now() }
-    space.today.unshift(item)
-    tab.itemId = item.id
-    this.live.set(item.id, tab)
-    return item.id
   }
 
   private dropPeek(): void {
@@ -1183,299 +1022,6 @@ export class Browser implements TabHost {
     return true
   }
 
-  newTab(url: string, opts: { activate?: boolean; spaceId?: ID } = {}): TabItem {
-    const space = (opts.spaceId && this.store.space(opts.spaceId)) || this.space
-    const item: TabItem = { id: newId(), url, title: url, lastActive: Date.now() }
-    space.today.unshift(item)
-    if (opts.activate !== false) this.activate(item.id)
-    else this.changed()
-    return item
-  }
-
-  open(input: string, where: 'tab' | 'current' | 'split' | 'background' | 'little' = 'tab', splitAt?: SplitAt): void {
-    const url = resolveInput(input, this.state.settings.searchEngine)
-    if (where === 'little') return void this.openLittle(url)
-    if (where === 'current') {
-      const tab = this.activeTab()
-      if (tab) return void tab.load(url)
-      where = 'tab'
-    }
-    if (where === 'split') {
-      const item = this.newTab(url, { activate: false })
-      return this.splitWith(item.id, splitAt)
-    }
-    this.newTab(url, { activate: where === 'tab' })
-  }
-
-  private nextActiveAfter(space: Space, closedId: ID, splitPartner?: ID): ID | undefined {
-    if (splitPartner) return splitPartner
-    const visible = new Set(spaceItems(this.state, space).map((item) => item.id))
-    visible.delete(closedId)
-    const recent = this.mru.find((id) => visible.has(id) && this.live.has(id))
-    if (recent) return recent
-    return space.today.find((item) => item.id !== closedId)?.id
-  }
-
-  close(id: ID): void {
-    const canvas = findCanvas(this.state, id)
-    if (canvas) {
-      // Closing a canvas only deselects it; Delete Canvas is in its menu.
-      if (canvas.space.activeItemId === id) canvas.space.activeItemId = undefined
-      if (canvas.canvas.temporary) this.canvases.discard(id)
-      this.layout()
-      return this.changed()
-    }
-    const found = findItem(this.state, id)
-    if (!found) return
-    const loc = found.loc
-    const space = loc.kind === 'favorite' ? this.space : this.store.space(loc.spaceId)!
-    const split = splitOf(space.splits, id)
-    const partner = split && paneIds(split.root).find((paneId) => paneId !== id)
-    const wasActive = space.activeItemId === id
-    space.splits = removeFromSplits(space.splits, id)
-    this.dropLive(id)
-    this.mru = this.mru.filter((recent) => recent !== id)
-    if (loc.kind === 'today') {
-      loc.list.splice(loc.index, 1)
-      this.archiveClosed(found.item, space.id)
-    } else if (found.item.savedUrl) found.item.url = found.item.savedUrl
-    if (wasActive) {
-      space.activeItemId = this.nextActiveAfter(space, id, partner)
-      if (space.activeItemId) return this.activate(space.activeItemId)
-    }
-    this.relayout()
-  }
-
-  private archive(item: Pick<TabItem, 'url' | 'title' | 'favicon'>, spaceId: ID): void {
-    if (!/^https?:/.test(item.url)) return
-    this.state.archive.unshift({ id: newId(), url: item.url, title: item.title, favicon: item.favicon, spaceId, archivedAt: Date.now() })
-    if (this.state.archive.length > MAX_ARCHIVE) this.state.archive.length = MAX_ARCHIVE
-  }
-
-  private archiveClosed(item: Pick<TabItem, 'url' | 'title' | 'favicon'>, spaceId: ID): void {
-    this.archive(item, spaceId)
-    this.closedTabs.push({ url: item.url, title: item.title, spaceId })
-  }
-
-  private shownOrPlaying(id: ID): boolean {
-    return inAnyView(this.state.windows, id) || (this.live.get(id)?.info().audible ?? false)
-  }
-
-  private autoArchive(): void {
-    const hours = this.state.settings.archiveAfterHours
-    if (!hours) return
-    const cutoff = Date.now() - hours * 3600_000
-    let any = false
-    this.captureCurrent()
-    for (const space of this.state.spaces) {
-      const keep: TabItem[] = []
-      for (const item of space.today) {
-        if (!this.shownOrPlaying(item.id) && item.lastActive < cutoff) {
-          this.archive(item, space.id)
-          this.dropLive(item.id)
-          any = true
-        } else keep.push(item)
-      }
-      space.today = keep
-    }
-    if (any) this.changed()
-  }
-
-  private unloadHiddenTabs(): void {
-    const now = Date.now()
-    this.captureCurrent()
-    for (const [id, tab] of [...this.live]) {
-      if (tab.destroyed) continue
-      const inUse = inAnyView(this.state.windows, id) || tab.wc.isCurrentlyAudible() || this.media.keepsLoaded(id)
-      const since = this.hiddenSince.get(id)
-      if (inUse) this.hiddenSince.delete(id)
-      else if (since === undefined) this.hiddenSince.set(id, now)
-      else if (now - since >= UNLOAD_HIDDEN_AFTER) this.dropLive(id)
-    }
-    for (const id of this.hiddenSince.keys()) if (!this.live.has(id)) this.hiddenSince.delete(id)
-    this.emitSoon()
-  }
-
-  clearToday(): void {
-    const space = this.space
-    for (const item of [...space.today]) {
-      this.archiveClosed(item, space.id)
-      space.splits = removeFromSplits(space.splits, item.id)
-      this.dropLive(item.id)
-    }
-    const wasToday = space.today.some((item) => item.id === space.activeItemId)
-    space.today = []
-    if (wasToday) space.activeItemId = undefined
-    this.relayout()
-  }
-
-  reopenClosed(): void {
-    const last = this.closedTabs.pop()
-    if (!last) return
-    if (this.store.space(last.spaceId)) this.state.activeSpaceId = last.spaceId
-    this.newTab(last.url)
-  }
-
-  togglePin(id: ID): void {
-    const found = findItem(this.state, id)
-    if (!found) return
-    this.tourEvent('togglePin')
-    const item = found.item
-    const space = found.loc.kind === 'favorite' ? this.space : this.store.space(found.loc.spaceId)!
-    found.loc.list.splice(found.loc.index, 1)
-    if (found.loc.kind === 'today') {
-      const pinned: PinnedTab = { ...stripKind(item), kind: 'tab', savedUrl: item.url, savedTitle: item.savedTitle }
-      space.pinned.push(pinned)
-      this.toast('Pinned tab')
-    } else {
-      const unpinned = stripKind(item)
-      delete unpinned.savedUrl
-      space.today.unshift(unpinned)
-    }
-    this.changed()
-  }
-
-  addFavorite(id: ID): void {
-    const found = findItem(this.state, id)
-    if (!found || found.loc.kind === 'favorite') return
-    const space = this.store.space(found.loc.spaceId)!
-    const profile = this.store.profile(space.profileId)!
-    found.loc.list.splice(found.loc.index, 1)
-    const fav = stripKind(found.item)
-    fav.savedUrl ??= fav.url
-    profile.favorites.push(fav)
-    this.changed()
-  }
-
-  move(id: ID, to: DropTarget): void {
-    const space = this.space
-    const profile = this.store.profile(space.profileId)!
-    let node: PinnedNode | TabItem | undefined
-    let fromList: (PinnedNode | TabItem)[] | undefined
-    const pinnedHit = findInPinned(space.pinned, id)
-    if (pinnedHit) {
-      node = pinnedHit.list[pinnedHit.index]
-      fromList = pinnedHit.list
-    } else {
-      const found = findItem(this.state, id)
-      if (!found) return
-      node = found.item
-      fromList = found.loc.list
-    }
-    // Folders and canvases move as they are, and only among pinned items.
-    const isFolder = 'kind' in node && (node.kind === 'folder' || node.kind === 'canvas')
-    let target: unknown[]
-    if (to.section === 'favorites') target = profile.favorites
-    else if (to.section === 'today') target = space.today
-    else {
-      const folder = to.folderId ? findFolder(space, to.folderId) : undefined
-      if (folder && (folder.live || containsNode(node as PinnedNode, folder.id))) return
-      target = folder ? folder.children : space.pinned
-    }
-    if (isFolder && to.section !== 'pinned') return
-    const split = isFolder || to.section === 'favorites' ? undefined : splitOf(space.splits, id)
-    const ids = split ? paneIds(split.root) : [id]
-    const group = fromList.filter((member) => ids.includes(member.id))
-    const profileBefore = new Map(group.map((member) => [member.id, profileOfItem(this.state, member.id)]))
-    let index = to.index
-    if (fromList === target) index -= group.filter((member) => fromList.indexOf(member) < to.index).length
-    for (const member of group) fromList.splice(fromList.indexOf(member), 1)
-    const moved = group.map((member) => {
-      if (isFolder) return member
-      const item = stripKind(member as TabItem)
-      if (to.section === 'today') delete item.savedUrl
-      else item.savedUrl ??= item.url
-      return to.section === 'pinned' ? ({ ...item, kind: 'tab' } satisfies PinnedTab) : item
-    })
-    target.splice(Math.max(0, Math.min(index, target.length)), 0, ...moved)
-    if (!isFolder) {
-      for (const member of group) {
-        if (profileOfItem(this.state, member.id) === profileBefore.get(member.id)) continue
-        this.dropLive(member.id)
-        if (space.activeItemId === member.id) this.activate(member.id)
-      }
-    }
-    this.relayout()
-  }
-
-  moveToSpace(id: ID, spaceId: ID): void {
-    const canvas = findCanvas(this.state, id)
-    if (canvas) return this.moveCanvasToSpace(id, spaceId)
-    const found = findItem(this.state, id)
-    const target = this.store.space(spaceId)
-    if (!found || !target || found.loc.kind === 'favorite') return
-    const from = this.store.space(found.loc.spaceId)!
-    if (from.id === target.id) return
-    found.loc.list.splice(found.loc.index, 1)
-    from.splits = removeFromSplits(from.splits, id)
-    const item = stripKind(found.item)
-    if (found.loc.kind === 'pinned') target.pinned.push({ ...item, kind: 'tab' })
-    else target.today.unshift(item)
-    if (from.profileId !== target.profileId) this.dropLive(id)
-    if (from.activeItemId === id) {
-      from.activeItemId = undefined
-      this.activate(id)
-    } else this.relayout()
-  }
-
-  splitWith(id: ID, at?: SplitAt): void {
-    const space = this.space
-    const active = space.activeItemId
-    const found = findItem(this.state, id)
-    if (!found) return
-    if (found.loc.kind !== 'favorite' && found.loc.spaceId !== space.id) this.moveToSpace(id, space.id)
-    if (at && findItem(this.state, at.target) && at.target !== id) return this.placeInSplit(id, at.target, at.side)
-    if (!active || active === id || !findItem(this.state, active)) return this.activate(id)
-    this.showSplit(space, appendPaneIn(space.splits, active, id, newId()), id)
-  }
-
-  /** Shows `id` on `side` of `target`, joining or moving within target's split; does nothing when that split is full. */
-  placeInSplit(id: ID, target: ID, side: Side): void {
-    const space = this.space
-    const visible = new Set(spaceItems(this.state, space).map((item) => item.id))
-    if (id === target || !visible.has(id) || !visible.has(target)) return
-    const splits = placePaneIn(space.splits, target, id, side, newId())
-    if (splits) this.showSplit(space, splits, id)
-  }
-
-  private showSplit(space: Space, splits: Split[], id: ID): void {
-    space.splits = splits
-    Object.assign(space, gatherSplit(space, id))
-    this.activate(id)
-    this.tourEvent('split')
-  }
-
-  /** Chromium drops a view's key-ups after a key-down the browser handled, until its next key-down: send one so releasing Ctrl gets through. */
-  private letSwitcherSeeRelease(): void {
-    const window = this.cur
-    const overlay = window.main.overlay.webContents
-    setImmediate(() => {
-      if (window.switcher && !overlay.isDestroyed()) overlay.sendInputEvent({ type: 'keyDown', keyCode: 'Control', modifiers: ['control'] })
-    })
-  }
-
-  moveInSplit(id: ID, delta: -1 | 1): void {
-    const split = splitOf(this.space.splits, id)
-    const root = split && movePane(split.root, id, delta)
-    if (!split || !root) return
-    split.root = root
-    this.relayout()
-  }
-
-  flipSplit(id: ID): void {
-    const split = splitOf(this.space.splits, id)
-    if (!split) return
-    split.root = flipSplit(split.root)
-    this.relayout()
-  }
-
-  separateFromSplit(id: ID): void {
-    const space = this.space
-    if (!splitOf(space.splits, id)) return
-    space.splits = removeFromSplits(space.splits, id)
-    this.activate(id)
-  }
-
   setTabDrag(id: ID | undefined): void {
     if (id === this.cur.tabDrag) return
     const kind = this.window.overlayMode.kind
@@ -1489,560 +1035,6 @@ export class Browser implements TabHost {
       else if (kind === 'sidebar') this.setOverlay({ kind: 'sidebar' }, false)
       else this.emitSoon()
     }
-  }
-
-  unsplit(id?: ID): void {
-    const space = this.space
-    const target = id ?? space.activeItemId
-    space.splits = space.splits.filter((split) => !target || !paneIds(split.root).includes(target))
-    this.relayout()
-  }
-
-  switchSpace(id: ID): void {
-    const space = this.store.space(id)
-    if (!space) return
-    this.closePeek()
-    this.state.activeSpaceId = id
-    if (space.activeItemId && this.hasItem(space.activeItemId)) this.activate(space.activeItemId)
-    else {
-      space.activeItemId = undefined
-      this.relayout()
-    }
-  }
-
-  createSpace(action: Extract<Action, { type: 'createSpace' }>): void {
-    let profileId = action.profileId && action.profileId !== 'new' ? action.profileId : undefined
-    if (!profileId) {
-      profileId = newId()
-      this.state.profiles.push({ id: profileId, name: action.profileName || action.name, favorites: [] })
-    }
-    const space: Space = {
-      id: newId(),
-      name: action.name || 'New Space',
-      emoji: action.emoji,
-      color: action.color || SPACE_COLORS[this.state.spaces.length % SPACE_COLORS.length],
-      color2: action.color2 || undefined,
-      appearance: action.appearance,
-      profileId,
-      pinned: [],
-      today: [],
-      splits: []
-    }
-    this.state.spaces.push(space)
-    this.switchSpace(space.id)
-  }
-
-  deleteSpace(id: ID): void {
-    if (this.state.spaces.length <= 1) return this.toast('You need at least one space')
-    const space = this.store.space(id)
-    if (!space) return
-    for (const canvas of spaceCanvases(space)) this.canvases.delete(canvas.id)
-    for (const item of spaceItems(this.state, space)) if (!this.state.profiles.some((profile) => profile.favorites.includes(item))) this.dropLive(item.id)
-    this.state.spaces = this.state.spaces.filter((other) => other.id !== id)
-    this.state.settings.linkRoutes = this.state.settings.linkRoutes.filter((route) => route.spaceId !== id)
-    if (!this.state.spaces.some((other) => other.profileId === space.profileId)) {
-      const profile = this.store.profile(space.profileId)
-      for (const favorite of profile?.favorites ?? []) this.dropLive(favorite.id)
-      this.state.profiles = this.state.profiles.filter((other) => other.id !== space.profileId)
-      void this.profiles.remove(space.profileId)
-      this.historySync?.profilesChanged()
-    }
-    if (this.state.activeSpaceId === id) this.switchSpace(this.state.spaces[0].id)
-    else this.changed()
-  }
-
-  private saveLiveFolder(space: Space, id: ID | undefined, name: string, source: LiveSource): void {
-    const live = cleanLiveSource(source)
-    if (!live) return this.toast('That address can’t be used as a feed')
-    let folder = id ? findFolder(space, id) : undefined
-    if (id && !folder) return
-    if (!folder) {
-      folder = { kind: 'folder', id: newId(), name: '', open: true, children: [] }
-      space.pinned.unshift(folder)
-    }
-    folder.name = name.trim() || liveFolderName(live)
-    if (JSON.stringify(folder.live) !== JSON.stringify(live)) {
-      folder.live = live
-      folder.liveError = undefined
-    }
-    this.changed()
-    void this.liveFolders.refresh(folder.id)
-  }
-
-  /** For tabs already taken out of the sidebar. */
-  private forgetPinned(space: Space, nodes: PinnedNode[]): void {
-    const wasActive = space.activeItemId
-    for (const node of walkPinned(nodes)) {
-      if (node.kind !== 'tab') continue
-      this.dropLive(node.id)
-      space.splits = removeFromSplits(space.splits, node.id)
-      this.mru = this.mru.filter((recent) => recent !== node.id)
-      if (space.activeItemId === node.id) space.activeItemId = this.nextActiveAfter(space, node.id)
-    }
-    if (space.activeItemId !== wasActive && space.activeItemId) return this.activate(space.activeItemId)
-    this.relayout()
-  }
-
-  handleInput(event: Event, input: Input): void {
-    if (this.cur.switcher && input.type === 'keyUp' && (input.key === 'Control' || input.key === 'Meta')) {
-      const target = this.cur.switcher.order[this.cur.switcher.index]
-      this.cur.switcher = undefined
-      this.setOverlay({ kind: 'none' }, false)
-      if (target) this.activate(target)
-      return
-    }
-    if (this.recordingShortcut) return
-    if (input.type === 'keyDown' && input.key === 'Escape' && this.panelInFront()) {
-      event.preventDefault()
-      this.setOverlay({ kind: 'none' })
-      return
-    }
-    const cmd = commandForInput(input, isMac, this.state.settings.shortcuts)
-    if (!cmd) return
-    event.preventDefault()
-    this.runCommand(cmd)
-  }
-
-  runCommand(cmd: CommandId | string): void {
-    const tab = this.activeTab()
-    const canvasId = tab ? undefined : this.space.activeItemId
-    if (canvasId && cmd in CANVAS_FIND_OPS && findCanvas(this.state, canvasId)) return this.canvases.find(canvasId, CANVAS_FIND_OPS[cmd as keyof typeof CANVAS_FIND_OPS])
-    const findsWithNoPageToSearch = cmd === 'find' && !tab
-    if (findsWithNoPageToSearch) return
-    const action = Object.hasOwn(COMMAND_ACTIONS, cmd) && COMMAND_ACTIONS[cmd as CommandId]
-    if (action) return void this.dispatch(action)
-    const space = this.space
-    const num = /^(space|tab)(\d)$/.exec(cmd)
-    if (num) {
-      const index = Number(num[2]) - 1
-      if (num[1] === 'space') {
-        const numbered = this.state.spaces[index]
-        if (numbered) this.switchSpace(numbered.id)
-      } else {
-        const items = spaceItems(this.state, space)
-        const item = cmd === 'tab9' ? items[items.length - 1] : items[index]
-        if (item) this.activate(item.id)
-      }
-      return
-    }
-    switch (cmd as CommandId) {
-      case 'editUrl':
-        // The command bar replaces Peek; edit the Peek page's URL as a real tab.
-        if (this.cur.peek) this.expandPeek()
-        return this.setOverlay({ kind: 'command', target: 'current', editCurrent: true, initial: tab?.wc.getURL() ?? '' })
-      case 'newWindow':
-        return this.openNewWindow()
-      case 'newIncognitoWindow':
-        return void this.openIncognito()
-      case 'closeTab':
-        if (this.cur.peek) return this.closePeek()
-        if (space.activeItemId) this.close(space.activeItemId)
-        return
-      case 'togglePin':
-        if (space.activeItemId) this.togglePin(space.activeItemId)
-        return
-      case 'nextTab':
-      case 'prevTab': {
-        const items = spaceItems(this.state, space)
-        if (!items.length) return
-        const index = items.findIndex((item) => item.id === space.activeItemId)
-        const next = items[(index + (cmd === 'nextTab' ? 1 : -1) + items.length) % items.length]
-        return this.activate(next.id)
-      }
-      case 'switcherNext':
-      case 'switcherPrev': {
-        const ids = new Set(spaceItems(this.state, space).map((item) => item.id))
-        if (!this.cur.switcher) {
-          const order = [...this.mru.filter((id) => ids.has(id)), ...[...ids].filter((id) => !this.mru.includes(id))]
-          if (order.length < 2) return
-          this.cur.switcher = { order, index: cmd === 'switcherNext' ? 1 : order.length - 1 }
-        } else {
-          const count = this.cur.switcher.order.length
-          this.cur.switcher.index = (this.cur.switcher.index + (cmd === 'switcherNext' ? 1 : -1) + count) % count
-        }
-        const switcher = this.cur.switcher
-        this.setOverlay({ kind: 'switcher', order: switcher.order, index: switcher.index })
-        this.cur.switcher = switcher
-        this.letSwitcherSeeRelease()
-        return
-      }
-      case 'findNext':
-      case 'findPrev':
-        this.window.sendToOverlay(IPC.find, { step: cmd === 'findNext' ? 1 : -1 })
-        return
-      case 'duplicate':
-        if (tab) this.newTab(tab.wc.getURL())
-        return
-      case 'focusPage':
-        return void tab?.wc.focus()
-      case 'setDefaultBrowser':
-        return this.makeDefaultBrowser()
-      case 'checkForUpdates':
-        return void this.updater.check(true)
-      case 'installUpdate':
-        return void this.updater.apply()
-      case 'newCanvas':
-        return this.newCanvas()
-      case 'capture':
-        return this.startCapture()
-      case 'whatsNew':
-        return this.openWhatsNew()
-      case 'floatingPlayerDemo':
-        return void this.floatingPlayerDemo()
-    }
-  }
-
-  private tabFor(action: Action): LiveTab | undefined {
-    const paneBarAction = action.type === 'back' || action.type === 'forward' || action.type === 'reload' || action.type === 'stop' || action.type === 'copyUrl'
-    return paneBarAction && action.id ? this.live.get(action.id) : this.activeTab()
-  }
-
-  async dispatch(action: Action): Promise<void> {
-    const tab = this.tabFor(action)
-    const space = this.space
-    switch (action.type) {
-      case 'activate':
-        return this.activate(action.id)
-      case 'close':
-        return this.close(action.id)
-      case 'open':
-        this.setOverlay({ kind: 'none' }, false)
-        return this.open(action.url, action.where, action.splitAt)
-      case 'reopenClosed':
-        return this.reopenClosed()
-      case 'togglePin':
-        return this.togglePin(action.id)
-      case 'addFavorite':
-        return this.addFavorite(action.id)
-      case 'resetToSaved':
-        return this.resetToSaved(action.id)
-      case 'duplicate': {
-        const item = findItem(this.state, action.id)?.item
-        if (item) this.newTab(this.live.get(action.id)?.wc.getURL() || item.url)
-        return
-      }
-      case 'rename': {
-        const item = findItem(this.state, action.id)?.item
-        if (!item) return
-        item.savedTitle = action.title.trim() || undefined
-        return this.changed()
-      }
-      case 'move':
-        return this.move(action.id, action.to)
-      case 'moveToSpace':
-        return this.moveToSpace(action.id, action.spaceId)
-      case 'clearToday':
-        return this.clearToday()
-      case 'unload':
-        return this.unload(action.id)
-      case 'mute': {
-        const muted = this.live.get(action.id)
-        if (muted) muted.wc.setAudioMuted(!muted.wc.isAudioMuted())
-        return this.emitSoon()
-      }
-      case 'media':
-        return this.media.card(action.id, action.op)
-      case 'back':
-      case 'forward':
-      case 'reload':
-      case 'stop':
-      case 'zoom':
-      case 'copyUrl':
-      case 'devtools':
-      case 'find': {
-        if (!tab) return
-        const toast = runPageAction(tab.wc, action)
-        if (toast) this.toast(toast)
-        return action.type === 'zoom' ? this.emitSoon() : undefined
-      }
-      case 'newFolder':
-        space.pinned.unshift({ kind: 'folder', id: newId(), name: action.name || 'New Folder', open: true, children: [] })
-        return this.changed()
-      case 'toggleFolder': {
-        const folder = findFolder(space, action.id)
-        if (folder) folder.open = !folder.open
-        if (folder?.open && folder.live) this.liveFolders.opened(folder.id)
-        return this.changed()
-      }
-      case 'renameFolder': {
-        const folder = findFolder(space, action.id)
-        if (folder) folder.name = action.name.trim() || folder.name
-        return this.changed()
-      }
-      case 'deleteFolder':
-        return this.deleteFolder(space, action.id)
-      case 'saveLiveFolder':
-        return this.saveLiveFolder(space, action.id, action.name, action.source)
-      case 'refreshLiveFolder':
-        return void this.liveFolders.refresh(action.id)
-      case 'switchSpace':
-        return this.switchSpace(action.id)
-      case 'switchSpaceRelative': {
-        const list = this.state.spaces
-        const index = list.findIndex((other) => other.id === space.id)
-        const next = list[index + action.delta]
-        if (next) this.switchSpace(next.id)
-        return
-      }
-      case 'createSpace': {
-        this.setOverlay({ kind: 'none' }, false)
-        const created = this.createSpace(action)
-        this.historySync?.profilesChanged()
-        return created
-      }
-      case 'updateSpace':
-        return this.updateSpace(action)
-      case 'deleteSpace':
-        return this.deleteSpace(action.id)
-      case 'renameProfile': {
-        const profile = this.store.profile(action.id)
-        if (profile) profile.name = action.name
-        this.historySync?.profilesChanged()
-        return this.changed()
-      }
-      case 'splitWith':
-        return this.splitWith(action.id, action.at)
-      case 'splitMenu':
-        return buildSplitMenu(this, action.id)?.popup({ window: this.window.win, x: Math.round(action.x), y: Math.round(action.y) })
-      case 'moveInSplit':
-        return this.moveInSplit(action.id, action.delta)
-      case 'addSplit':
-        if (!splitOf(space.splits, action.id)) return
-        return this.setOverlay({ kind: 'command', target: 'split', splitAt: { target: action.id, side: action.side } })
-      case 'separateFromSplit':
-        return this.separateFromSplit(action.id)
-      case 'flipSplit':
-        return this.flipSplit(action.id)
-      case 'unsplit':
-        return this.unsplit(action.id)
-      case 'placeInSplit':
-        this.setTabDrag(undefined)
-        return this.placeInSplit(action.id, action.target, action.side)
-      case 'tabDrag':
-        return this.setTabDrag(action.id)
-      case 'resizeSplit': {
-        const split = space.splits.find((other) => other.id === action.splitId)
-        const root = split && resizeGroup(split.root, action.path, action.sizes)
-        if (!split || !root) return
-        split.root = root
-        return this.relayout()
-      }
-      case 'toggleSidebar':
-        return this.toggleSidebar()
-      case 'sidebarReveal': {
-        if (this.state.settings.sidebarVisible || this.cur.sidebarReveal === action.show || this.panelInFront()) return
-        this.cur.sidebarReveal = action.show
-        return this.setOverlay(action.show ? { kind: 'sidebar' } : { kind: 'none' }, false)
-      }
-      case 'overlay':
-        return this.setOverlay(action.mode)
-      case 'previewSpaceColors':
-        this.colorPreview = { window: this.cur, spaceId: action.spaceId, color: action.color, color2: action.color2 || undefined }
-        return this.emitSoon()
-      case 'endTour':
-        this.tour = undefined
-        return this.setOverlay({ kind: 'none' })
-      case 'settings':
-        return this.changeSettings(action.patch)
-      case 'recordShortcut':
-        this.recordingShortcut = action.on === true
-        return
-      case 'littleArc':
-        return void this.openLittle(action.url)
-      case 'peek':
-        if (action.op === 'close') return this.closePeek()
-        return this.expandPeek(action.op === 'split')
-      case 'openInChrome':
-        return this.openTabInChrome(action.id ? this.live.get(action.id) : tab, action.id)
-      case 'stopFind':
-        tab?.wc.stopFindInPage('keepSelection')
-        return this.setOverlay({ kind: 'none' })
-      case 'downloadOpen':
-        return this.downloads.open(action.id, action.reveal, this.window.win)
-      case 'sharePick':
-        if (this.sharePicker.answer(action.id, action.sourceId, action.systemAudio === true) && this.window.overlayMode.kind === 'share-picker') this.setOverlay({ kind: 'none' })
-        return
-      case 'downloadsClear':
-        return this.downloads.clearFinished()
-      case 'archiveRestore':
-        return this.restoreArchived(action.id)
-      case 'syncPickFolder':
-        return (this.main ?? this).historySync?.pickFolder()
-      case 'syncICloud':
-        return (this.main ?? this).historySync?.useICloud()
-      case 'syncNearby':
-        return (this.main ?? this).historySync?.setUpNearby()
-      case 'syncCloud':
-        return (this.main ?? this).historySync?.signInToDrive(action.drive)
-      case 'syncServer':
-        return (this.main ?? this).historySync?.setUpServer(action.url, action.username, action.password)
-      case 'syncSignIn':
-        return (this.main ?? this).historySync?.signInAgain()
-      case 'syncConnect':
-        return (this.main ?? this).historySync?.connect(action.password, action.create)
-      case 'syncChangePassword':
-        return (this.main ?? this).historySync?.changePassword(action.password)
-      case 'syncProfile':
-        return (this.main ?? this).historySync?.setProfileSync(action.id, action.on)
-      case 'syncCancel':
-        return (this.main ?? this).historySync?.cancelSetup()
-      case 'syncOff':
-        return (this.main ?? this).historySync?.turnOff()
-      case 'archiveClear':
-        this.state.archive = []
-        return this.changed()
-      case 'import': {
-        if (!action.keepOverlay) this.setOverlay({ kind: 'none' }, false)
-        const summary = await runImport(this, action.source, action.path)
-        this.historySync?.profilesChanged()
-        return summary ? this.toast(summary) : undefined
-      }
-      case 'exportBookmarks':
-        this.setOverlay({ kind: 'none' }, false)
-        return this.exportBookmarks()
-      case 'importChoices': {
-        const summary = await importChoices(this, this.imports.chosen(action.ids))
-        if (summary) this.toast(summary)
-        this.historySync?.profilesChanged()
-        if (this.tour === 'import') this.setOverlay({ kind: 'tour', step: nextStep('import')! }, false)
-        return
-      }
-      case 'relaunchUpdate':
-        return void this.updater.apply(true)
-      case 'command':
-        if (!action.keepOverlay) this.setOverlay({ kind: 'none' }, false)
-        return this.runCommand(action.id)
-      case 'adblockToggleSite':
-        return this.toggleAdblockOn(action.id ? this.live.get(action.id) : tab)
-      case 'sitePermission':
-        if (this.store.profile(action.profileId) && this.profiles.setSitePermission(action.profileId, action.origin, action.key, action.setting)) this.emitSoon()
-        return
-      case 'extensionPin':
-        return this.setExtensionPin(action.profileId, action.extensionId, action.pinned)
-      case 'extensionsPopover': {
-        const origin = this.sidebarOrigin(this.window.win) ?? { x: 0, y: 0 }
-        return this.setOverlay({ kind: 'extensions', profileId: action.profileId, anchor: { ...action.anchor, x: action.anchor.x + origin.x, y: action.anchor.y + origin.y } })
-      }
-      case 'itemMenu':
-        return buildItemMenu(this, action.id)?.popup({ window: this.window.win })
-      case 'folderMenu':
-        return buildFolderMenu(this, action.id)?.popup({ window: this.window.win })
-      case 'canvasMenu':
-        return buildCanvasMenu(this, action.id)?.popup({ window: this.window.win })
-      case 'appMenu':
-        return buildAppMenu(this).popup({ window: this.window.win, x: Math.round(Number(action.x)), y: Math.round(Number(action.y)) })
-      case 'renameCanvas':
-        this.canvases.rename(action.id, String(action.name))
-        return this.changed()
-      case 'hideWhatsNew':
-        this.markWhatsNewSeen()
-        return this.changed()
-      case 'openBoard':
-        return this.openBoard(String(action.spotlight))
-      case 'capture': {
-        const mode = this.window.overlayMode
-        this.setOverlay({ kind: 'none' }, false)
-        const page = this.activeTab()
-        if (mode.kind !== 'capture' || !page || this.incognito) return
-        return this.canvases.capture(page, action.rect, action.to, action.whole)
-      }
-      case 'spaceMenu':
-        return buildSpaceMenu(this, action.id)?.popup({ window: this.window.win })
-      case 'sidebarMenu':
-        return buildSidebarMenu(this).popup({ window: this.window.win })
-      case 'extensionsStore':
-        this.setOverlay({ kind: 'none' }, false)
-        this.newTab('https://chromewebstore.google.com/category/extensions')
-        return
-      case 'removeExtension':
-        return this.extensions.remove(action.profileId, action.id)
-    }
-  }
-
-  private resetToSaved(id: ID): void {
-    const item = findItem(this.state, id)?.item
-    if (!item?.savedUrl) return
-    item.url = item.savedUrl
-    void this.live.get(id)?.load(item.savedUrl)
-    this.activate(id)
-  }
-
-  private unload(id: ID): void {
-    const item = findItem(this.state, id)?.item
-    this.dropLive(id)
-    if (item?.savedUrl) item.url = item.savedUrl
-    if (this.space.activeItemId === id) this.space.activeItemId = this.nextActiveAfter(this.space, id)
-    this.relayout()
-  }
-
-  private deleteFolder(space: Space, id: ID): void {
-    const hit = findInPinned(space.pinned, id)
-    const folder = hit?.list[hit.index]
-    if (!hit || folder?.kind !== 'folder') return
-    if (!folder.live) {
-      hit.list.splice(hit.index, 1, ...folder.children)
-      return this.changed()
-    }
-    hit.list.splice(hit.index, 1)
-    this.forgetPinned(space, folder.children)
-  }
-
-  private updateSpace(action: Extract<Action, { type: 'updateSpace' }>): void {
-    const space = this.store.space(action.id)
-    if (!space) return
-    if (action.name !== undefined) space.name = action.name
-    if (action.emoji !== undefined) space.emoji = action.emoji || undefined
-    if (action.color) space.color = action.color
-    if (action.color2 !== undefined) space.color2 = action.color2 || undefined
-    if (action.appearance !== undefined) space.appearance = action.appearance || undefined
-    if (action.profileId && action.profileId !== space.profileId && this.store.profile(action.profileId)) {
-      for (const item of spaceItems(this.state, space)) this.dropLive(item.id)
-      space.profileId = action.profileId
-      space.splits = []
-      if (space.id === this.space.id && space.activeItemId) return this.activate(space.activeItemId)
-    }
-    this.relayout()
-  }
-
-  private toggleSidebar(): void {
-    const settings = this.state.settings
-    settings.sidebarVisible = !settings.sidebarVisible
-    this.cur.sidebarReveal = false
-    if (this.window.overlayMode.kind === 'sidebar') this.window.setOverlay({ kind: 'none' }, undefined)
-    this.relayout()
-    if (this.tour && this.window.overlayMode.kind === 'none') this.setOverlay({ kind: 'tour', step: this.tour }, false)
-    this.tourEvent('toggleSidebar')
-  }
-
-  private changeSettings(patch: Extract<Action, { type: 'settings' }>['patch']): void {
-    Object.assign(this.state.settings, validSettingsPatch(this.state.settings, patch, isMac))
-    this.adblock.sync(this.state.settings)
-    if (patch.theme) nativeTheme.themeSource = patch.theme
-    if (patch.autoUpdate !== undefined) this.updater.sync()
-    if (patch.sidebarRight !== undefined) for (const other of this.wins) if (other !== this.cur) this.inWin(other, () => this.layout())
-    this.relayout()
-  }
-
-  private async openTabInChrome(tab: LiveTab | undefined, id?: ID): Promise<void> {
-    const url = tab?.wc.getURL() || (id ? findItem(this.state, id)?.item.url : undefined)
-    if (!url) return
-    const ok = await openInChrome(url)
-    this.toast(ok ? 'Opened in Chrome' : 'Chrome was not found on this computer')
-  }
-
-  private restoreArchived(id: ID): void {
-    const entry = this.state.archive.find((archived) => archived.id === id)
-    if (!entry) return
-    this.state.archive = this.state.archive.filter((archived) => archived.id !== id)
-    this.setOverlay({ kind: 'none' }, false)
-    this.newTab(entry.url, { spaceId: this.store.space(entry.spaceId) ? entry.spaceId : undefined })
-  }
-
-  private toggleAdblockOn(tab: LiveTab | undefined): void {
-    const toggled = tab && this.adblock.toggleSite(this.state.settings, tab.wc)
-    if (!toggled) return
-    this.toast(toggled.allowed ? `Ads allowed on ${toggled.host}` : `Blocking ads on ${toggled.host}`)
-    this.changed()
   }
 
   onTabChanged(tab: LiveTab, change: { url?: string; title?: string; favicon?: string; navigated?: boolean }): void {
@@ -2074,7 +1066,7 @@ export class Browser implements TabHost {
     if (this.live.get(tab.itemId) !== tab) return
     this.media.gone(tab.itemId)
     const found = findItem(this.state, tab.itemId)
-    if (found?.loc.kind === 'today') this.close(tab.itemId)
+    if (found?.loc.kind === 'today') this.tabs.close(tab.itemId)
     else {
       this.live.delete(tab.itemId)
       this.layout()
@@ -2103,21 +1095,9 @@ export class Browser implements TabHost {
     const split = splitOf(space.splits, tab.itemId)
     if (split && paneIds(split.root).includes(space.activeItemId ?? '')) {
       space.activeItemId = tab.itemId
-      this.mru = [tab.itemId, ...this.mru.filter((recent) => recent !== tab.itemId)]
+      this.tabs.used(tab.itemId)
       this.changed()
     }
-  }
-
-  private moveCanvasToSpace(id: ID, spaceId: ID): void {
-    const hit = findCanvas(this.state, id)
-    const target = this.store.space(spaceId)
-    if (!hit || !target || hit.space.id === target.id) return
-    this.canvases.moveFiles(id, hit.space.profileId, target.profileId)
-    hit.list.splice(hit.index, 1)
-    target.pinned.push(hit.canvas)
-    if (hit.space.activeItemId === id) hit.space.activeItemId = undefined
-    this.layout()
-    this.changed()
   }
 
   newCanvas(): void {
@@ -2192,7 +1172,7 @@ export class Browser implements TabHost {
   }
 
   archiveLittle(page: Pick<TabItem, 'url' | 'title' | 'favicon'>, spaceId: ID): void {
-    this.archiveClosed(page, spaceId)
+    this.tabs.archiveClosed(page, spaceId)
     this.changed()
     // Little Windows close after the state was written for quitting.
     if (this.quitting) this.store.flush()
@@ -2206,7 +1186,7 @@ export class Browser implements TabHost {
   adoptTab(tab: LiveTab, space: Space): void {
     this.extensions.moveTab(tab, this.window.win)
     tab.host = this
-    this.activate(this.takeInAsTodayTab(tab, space))
+    this.activate(this.tabs.takeInAsTodayTab(tab, space))
     this.focusWindow()
   }
 
@@ -2217,8 +1197,8 @@ export class Browser implements TabHost {
     const space = route && this.store.space(route.spaceId)
     if (!space && this.state.settings.littleArcForExternalLinks) return void this.openLittle(url)
     this.ensureWindow()
-    if (space && space.id !== this.state.activeSpaceId) this.switchSpace(space.id)
-    this.newTab(url)
+    if (space && space.id !== this.state.activeSpaceId) this.spaces.switchSpace(space.id)
+    this.tabs.newTab(url)
     this.focusWindow()
   }
 

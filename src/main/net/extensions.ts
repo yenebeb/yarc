@@ -55,7 +55,7 @@ export class Extensions {
     const ext = new ElectronChromeExtensions({
       session: rt.session,
       createTab: async (details) => {
-        const item = b.newTab(details.url || 'about:blank', { activate: details.active !== false })
+        const item = b.tabs.newTab(details.url || 'about:blank', { activate: details.active !== false })
         const tab = b.liveFor(item)
         return [tab.wc, b.window.win]
       },
@@ -67,7 +67,7 @@ export class Extensions {
       },
       removeTab: (wc) => {
         const id = b.itemIdFor(wc)
-        if (id) b.close(id)
+        if (id) b.tabs.close(id)
       },
       createWindow: async (details) => {
         const url = Array.isArray(details.url) ? details.url[0] : details.url
