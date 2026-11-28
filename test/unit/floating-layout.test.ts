@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { describe, test } from 'node:test'
-import { FLOAT_WIDTH, floatingBounds, videoRatio } from '../../src/main/floating-layout.ts'
+import { FLOAT_WIDTH, floatingBounds, videoRatio } from '../../src/main/features/floating-layout.ts'
 
 const screen = { x: 0, y: 25, width: 1728, height: 1092 }
 const browser = { x: 100, y: 100, width: 1200, height: 800 }

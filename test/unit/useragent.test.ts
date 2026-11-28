@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { browserUserAgent, chromeBrands, clientHintsFor, userAgentFor } from '../../src/main/useragent.ts'
+import { browserUserAgent, chromeBrands, clientHintsFor, userAgentFor } from '../../src/main/core/useragent.ts'
 
 const electron = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) YARC/0.1.17 Chrome/156.0.8078.75 Electron/45.2.1 Safari/537.36'
 const browser = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.8078.75 Electron/45.2.1 Safari/537.36'

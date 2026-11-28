@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, readdirSync, readFileSync, statSync, writeFileS
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, test } from 'node:test'
-import { History } from '../../src/main/history.ts'
+import { History } from '../../src/main/core/history.ts'
 import {
   changePassword,
   createHeader,

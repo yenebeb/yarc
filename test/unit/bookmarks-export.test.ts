@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { bookmarksHtml } from '../../src/main/bookmarks-export.ts'
+import { bookmarksHtml } from '../../src/main/features/bookmarks-export.ts'
 import type { Profile, Space, TabItem } from '../../src/shared/types.ts'
 
 const tab = (url: string, title: string, saved?: Partial<TabItem>): TabItem => ({ id: url, url, title, lastActive: 0, ...saved })

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { describe, test } from 'node:test'
-import { isSecurityUpdate, shouldAsk, startWaiting } from '../../src/main/update-escalation.ts'
+import { isSecurityUpdate, shouldAsk, startWaiting } from '../../src/main/update/update-escalation.ts'
 
 const HOUR = 60 * 60_000
 const DAY = 24 * HOUR

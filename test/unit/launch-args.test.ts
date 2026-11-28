@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { pathToFileURL } from 'node:url'
-import { urlArg } from '../../src/main/launch-args.ts'
+import { urlArg } from '../../src/main/core/launch-args.ts'
 
 const dir = mkdtempSync(join(tmpdir(), 'yarc-launch-'))
 const page = (name: string) => {

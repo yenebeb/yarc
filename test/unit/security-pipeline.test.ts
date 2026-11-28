@@ -222,7 +222,7 @@ describe('A release with unreviewed changes is not signed', () => {
     await reviewed(community)
     await event(community, 'labeled', maintainer, approveLabel)
     mergeAs(community)
-    mergeAs(github.openPull(31, maintainer, { 'src/main/updater.ts': 'export const feed = "releases/latest"\n' }))
+    mergeAs(github.openPull(31, maintainer, { 'src/main/update/updater.ts': 'export const feed = "releases/latest"\n' }))
     mergeAs(github.openPull(32, 'mallory', { 'docs/guide.md': 'How it really works.\n' }))
     assert.deepEqual(check().map((commit) => [commit.risk, commit.problem]), [['medium', undefined], ['high', undefined], ['low', undefined]])
   })

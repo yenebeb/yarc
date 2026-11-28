@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, test } from 'node:test'
 import { arrangeInGrid, freeSpot, isBoardItem, MAX_PLACED, placedSize, placeNext, resized, snapMove, withBox, type BoardItem } from '../../src/shared/canvas.ts'
-import { CanvasFiles, emptyOldTrash } from '../../src/main/canvas-store.ts'
+import { CanvasFiles, emptyOldTrash } from '../../src/main/features/canvas-store.ts'
 import { placeBarBy } from '../../src/renderer/src/canvas-view.ts'
 
 const GAP = 24

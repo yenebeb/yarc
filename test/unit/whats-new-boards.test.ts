@@ -5,8 +5,8 @@ import { describe, test } from 'node:test'
 import { isBoardItem, type BoardItem, type Box } from '../../src/shared/canvas.ts'
 import { SPOTLIGHTS } from '../../src/shared/spotlights.ts'
 
-const BOARDS_FOLDER = join(import.meta.dirname, '../../src/main/boards')
-const LIST_OF_BOARDS = readFileSync(join(import.meta.dirname, '../../src/main/whats-new-boards.ts'), 'utf8')
+const BOARDS_FOLDER = join(import.meta.dirname, '../../src/main/features/boards')
+const LIST_OF_BOARDS = readFileSync(join(import.meta.dirname, '../../src/main/features/whats-new-boards.ts'), 'utf8')
 const RELEASES_PAGE_STILL = 'releases-still'
 const SPOTLIGHT_PICTURE = /^spotlight-(.+)$/
 /** The page area of a window that isn't large, in screen pixels, less the margin a board opens with (`reveal` in canvas-board.ts). */

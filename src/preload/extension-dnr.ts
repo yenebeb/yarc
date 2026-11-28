@@ -1,7 +1,8 @@
 // Electron's own chrome.declarativeNetRequest never loads an extension's static rulesets (most of a blocker's rules),
-// so this one replaces it and asks the main process (src/main/declarative-net-request.ts).
+// so this one replaces it and asks the main process (src/main/net/declarative-net-request.ts).
 // It must run before electron-chrome-extensions' preload, which freezes `chrome`.
 import { contextBridge, ipcRenderer } from 'electron'
+import { PAGE_IPC } from '../shared/ipc'
 
 type Invoke = (method: string, arg: unknown) => Promise<{ value?: unknown; error?: string }>
 
@@ -67,6 +68,6 @@ function install(invoke: Invoke): void {
 }
 
 if (process.type === 'service-worker' || location.href.startsWith('chrome-extension://')) {
-  const invoke: Invoke = (method, arg) => ipcRenderer.invoke('yarc-dnr', method, arg)
+  const invoke: Invoke = (method, arg) => ipcRenderer.invoke(PAGE_IPC.netRules, method, arg)
   contextBridge.executeInMainWorld({ func: install, args: [invoke] })
 }

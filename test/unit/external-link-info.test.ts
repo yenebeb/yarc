@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { externalLinkInfo } from '../../src/main/external-link-info.ts'
+import { externalLinkInfo } from '../../src/main/core/external-link-info.ts'
 
 test('names the app and the site asking', () => {
   const info = externalLinkInfo('msteams:/l/meetup-join/19%3ameeting', 'https://teams.microsoft.com/l/meetup-join/x')

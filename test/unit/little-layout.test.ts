@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { describe, test } from 'node:test'
-import { littleBarColor, littleBounds, littleExpired } from '../../src/main/little-layout.ts'
+import { littleBarColor, littleBounds, littleExpired } from '../../src/main/features/little-layout.ts'
 
 const laptop = { x: 0, y: 25, width: 1728, height: 1092 }
 

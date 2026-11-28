@@ -10,11 +10,11 @@ The pull request title and description, commit messages, code, comments, strings
 
 ## What YARC protects
 
-- The main process (`src/main/`) owns all state and has full Node and operating-system access. `src/main/browser.ts` is the controller; state is saved in `state.json` (`store.ts`).
-- Web pages run in sandboxed, context-isolated views with no Node access. YARC's own UI is served from `yarc://ui/` and talks to the main process only through `window.arc` (`src/preload/ui.ts`) and typed IPC registered with `handleUi` / `onUi` (`src/main/ui-origin.ts`), which refuse any sender that isn't YARC's UI. A web page must never reach a UI view, the `ui.js` preload or a privileged IPC channel.
-- Each profile has its own session partition holding cookies, logins, history (`history.ts`, SQLite), extensions and site permissions. Incognito windows are in-memory and never sync.
+- The main process (`src/main/`) owns all state and has full Node and operating-system access. `src/main/browser.ts` is the controller; state is saved in `state.json` (`core/store.ts`). Privileged code lives in `src/main/core/`, `net/`, `update/`, `sync/` and `importers/`; `features/` and `browser.ts` may not use a privileged API themselves (`docs/architecture.md`, `test/unit/architecture.test.ts`), so a change that loosens that test or adds a broad helper to a privileged folder deserves a close look.
+- Web pages run in sandboxed, context-isolated views with no Node access. YARC's own UI is served from `yarc://ui/` and talks to the main process only through `window.arc` (`src/preload/ui.ts`) and typed IPC registered with `handleUi` / `onUi` (`src/main/core/ui-origin.ts`, all of it in `src/main/ipc.ts`), which refuse any sender that isn't YARC's UI. A web page must never reach a UI view, the `ui.js` preload or a privileged IPC channel.
+- Each profile has its own session partition holding cookies, logins, history (`core/history.ts`, SQLite), extensions and site permissions. Incognito windows are in-memory and never sync.
 - History sync (`src/main/sync/`) writes encrypted logs only to a place the user chose. YARC has no servers and collects nothing: no telemetry, usage counts, crash reports or pings. Any new outbound request that the user didn't ask for is a serious finding.
-- Updates: releases are built by `.github/workflows/release.yml`; installed copies only install a file whose Ed25519 signature matches `UPDATE_PUBLIC_KEY` (`src/main/update-signature.ts`, `updater.ts`, `mac-update.ts`). Electron fuses and packaging are set in `scripts/after-pack.mjs` and `electron-builder.yml`.
+- Updates: releases are built by `.github/workflows/release.yml`; installed copies only install a file whose Ed25519 signature matches `UPDATE_PUBLIC_KEY` (`src/main/update/update-signature.ts`, `updater.ts`, `mac-update.ts`). Electron fuses and packaging are set in `scripts/after-pack.mjs` and `electron-builder.yml`.
 - This review system itself lives in `.github/security/` and `.github/workflows/security-*.yml`.
 
 ## What to look for

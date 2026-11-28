@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { describe, test } from 'node:test'
-import { NOT_NOWS_BEFORE_QUIET, QUIET_FOR, SiteDecisions, type SitePermissionsFile } from '../../src/main/site-permissions.ts'
+import { NOT_NOWS_BEFORE_QUIET, QUIET_FOR, SiteDecisions, type SitePermissionsFile } from '../../src/main/core/site-permissions.ts'
 
 const MEET = 'https://meet.google.com'
 const SLACK = 'https://app.slack.com'

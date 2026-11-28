@@ -7,7 +7,7 @@
 // a bot) who authored one of its PRs, `release:skip` ones included; the release workflow also
 // thanks them on the GitHub release.
 // The release workflow runs it before the build (electron.vite.config.ts bakes it into the app) and
-// uploads it with the release (src/main/updater.ts reads the newest one); without the file, the app
+// uploads it with the release (src/main/update/updater.ts reads the newest one); without the file, the app
 // has an empty changelog.
 //
 //   node scripts/changelog.mjs [out-file]      (default build/changelog.json; needs git tags and `gh`)

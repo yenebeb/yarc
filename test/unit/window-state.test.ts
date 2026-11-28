@@ -1,7 +1,7 @@
 // Several main windows share one sidebar; each shows its own space, tab, splits and sidebar.
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { applyView, captureView, cascade, inAnyView, newView, stateForView, viewFromState } from '../../src/main/window-state.ts'
+import { applyView, captureView, cascade, inAnyView, newView, stateForView, viewFromState } from '../../src/main/features/window-state.ts'
 import type { PersistedState, Split, TabItem } from '../../src/shared/types.ts'
 
 const tab = (id: string): TabItem => ({ id, url: `https://${id}.example`, title: id, lastActive: 0 })

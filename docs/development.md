@@ -41,7 +41,7 @@ The version lives in git tags; `package.json` says `0.0.0-dev` and CI stamps the
 
 Installed copies only see published releases: Windows downloads the update via `latest.yml` and checks the installer's `.sig`, macOS downloads the `-mac.zip` and checks its `.sig`, and Linux gets a notice that links to the new `.AppImage`.
 
-The macOS zips and the Windows installers are signed with an Ed25519 key, and the app only installs an update signed with the key whose public half is `UPDATE_PUBLIC_KEY` in [`src/main/update-signature.ts`](../src/main/update-signature.ts). The private key is the `MAC_UPDATE_SIGNING_KEY` repository secret (named before Windows used it too); without it (or with a key that doesn't match) the macOS and Windows builds fail. To make a new key pair, run `node --experimental-strip-types scripts/sign-update.mts keygen <file>`, put the printed public key in `UPDATE_PUBLIC_KEY`, and the file's contents in the secret. Installed copies only accept updates signed with the key they were built with, so a new key only reaches them through one manual reinstall.
+The macOS zips and the Windows installers are signed with an Ed25519 key, and the app only installs an update signed with the key whose public half is `UPDATE_PUBLIC_KEY` in [`src/main/update/update-signature.ts`](../src/main/update-signature.ts). The private key is the `MAC_UPDATE_SIGNING_KEY` repository secret (named before Windows used it too); without it (or with a key that doesn't match) the macOS and Windows builds fail. To make a new key pair, run `node --experimental-strip-types scripts/sign-update.mts keygen <file>`, put the printed public key in `UPDATE_PUBLIC_KEY`, and the file's contents in the secret. Installed copies only accept updates signed with the key they were built with, so a new key only reaches them through one manual reinstall.
 
 ### Electron security updates
 
@@ -66,27 +66,12 @@ Details and gaps are in [docs/electron-notes.md](electron-notes.md#6-security-up
 ```
 
 - The **main process** owns all state (`src/main/browser.ts`). The UI renderers get a full snapshot whenever something changes, and send back typed actions (`src/shared/actions.ts`).
-- **Several windows** share that state; each has its own space, selected tabs, splits and sidebar visibility (`src/main/window-state.ts`, see `docs/multi-window.md`). A page lives in one window at a time.
+- **Several windows** share that state; each has its own space, selected tabs, splits and sidebar visibility (`src/main/features/window-state.ts`, see `docs/multi-window.md`). A page lives in one window at a time.
 - Every **profile** is an Electron session partition (`persist:profile-<id>`). Each one has its own extension host (`electron-chrome-extensions`, `electron-chrome-web-store`) and its own SQLite history (`node:sqlite`, so there are no native modules).
 - Every **sidebar item** can have a live `WebContentsView`. Pages load lazily and unload when closed or archived, which keeps memory down.
 - **Shortcuts** are caught in `before-input-event` on every web contents and matched on physical key codes, so they work regardless of keyboard layout or which page has focus.
 
-| Path | Contents |
-| --- | --- |
-| `src/main/browser.ts` | Controller: spaces, tabs, splits, archive, shortcuts, actions |
-| `src/main/window.ts` | Window layout and the overlay |
-| `src/main/tab.ts` | A live page attached to a sidebar item |
-| `src/main/profiles.ts` | Sessions, permissions, downloads |
-| `src/main/extensions.ts` | Chrome extension APIs and the Web Store, per profile |
-| `src/main/adblock.ts` | Built-in ad and tracker blocking for every profile |
-| `src/main/little.ts` | Little Windows |
-| `src/main/peek.ts` | Peek: pages from pinned tabs and favorites floating over the current tab |
-| `src/main/canvas.ts`, `canvas-store.ts` | Canvases: their pages, capture, and their files in the profile folder (`docs/canvas.md`) |
-| `src/main/importers/` | Arc, Zen and Chromium importers |
-| `src/main/sync/` | Encrypted history sync through a cloud drive, your own server or a synced folder (`docs/history-sync.md`) |
-| `src/shared/` | State types, actions, keymap, URL helpers (unit tested) |
-| `src/renderer/` | React UI: `index` (sidebar), `overlay` (command bar and panels), `little`, `canvas` (a canvas: a board YARC draws itself) |
-| `docs/` | Research notes: Arc's behavior and shortcuts, Arc's data format, Electron notes |
+Where each of these lives, which folders are security-sensitive and what checks that: [architecture.md](architecture.md).
 
 ## Contributing
 

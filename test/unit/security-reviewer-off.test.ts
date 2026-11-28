@@ -30,7 +30,7 @@ async function event(pull: PullState, action: string, sender: string, label?: st
 const comment = (): string => github.comments.at(-1)?.body ?? ''
 
 describe('With the AI reviewer switched off', () => {
-  const pull = github.openPull(7, 'mallory', { 'src/main/updater.ts': 'export const feed = "elsewhere"\n' })
+  const pull = github.openPull(7, 'mallory', { 'src/main/update/updater.ts': 'export const feed = "elsewhere"\n' })
   const target = { kind: 'pr' as const, pr: 7, head: pull.head, base: github.mainSha }
 
   test('that is how the policy ships, with the reviewer kept ready', () => {
@@ -68,7 +68,7 @@ describe('With the AI reviewer switched off', () => {
     assert.equal(github.lastStatus(pull.head), 'success')
     assert.deepEqual(readLedger(github.origin, (dir) => readJson(dir, prFile(7), EMPTY_PR_LEDGER)).signoffs.map((signoff) => signoff.by), [maintainer])
 
-    github.push(7, { 'src/main/updater.ts': 'export const feed = "somewhere else"\n' })
+    github.push(7, { 'src/main/update/updater.ts': 'export const feed = "somewhere else"\n' })
     await event(pull, 'synchronize', 'mallory')
     assert.equal(github.lastStatus(pull.head), 'pending')
   })

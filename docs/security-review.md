@@ -66,7 +66,7 @@ flowchart LR
 
 1. **Every pull request gets a risk level**, decided by `classify.ts` from the changed files and added lines only (`policy.json` holds the lists). The author, the description and the AI reviewer have no say in it.
    - **Low:** only `README.md`, `docs/*.md` and screenshots, as regular files, at most 40 added lines, with no text addressed to an AI reviewer or agent.
-   - **High:** a sensitive path (workflows, this pipeline, dependencies, build and release scripts, preloads, IPC, updater, sync, cookies, history, permissions, `CLAUDE.md`), or an added line that makes a network request, runs a process, builds code at runtime, hides text, touches web preferences, IPC, sessions or credentials. Also symlinks, executables and unknown binaries.
+   - **High:** a sensitive path (workflows, this pipeline, dependencies, build and release scripts, preloads, the IPC contract, `CLAUDE.md`, and the sensitive tiers of `src/main`: `core/`, `net/`, `update/`, `sync/`, `importers/`, see [architecture.md](architecture.md)), or an added line that makes a network request, runs a process, builds code at runtime, hides text, touches web preferences, IPC, sessions or credentials. Also symlinks, executables and unknown binaries.
    - **Medium:** everything else.
 2. **The `security-gate` status** says what the pull request still needs:
 

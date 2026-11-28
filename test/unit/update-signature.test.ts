@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { createPublicKey, generateKeyPairSync } from 'node:crypto'
 import { test } from 'node:test'
-import { publicKeyOf, signUpdate, UPDATE_PUBLIC_KEY, verifyUpdate } from '../../src/main/update-signature.ts'
+import { publicKeyOf, signUpdate, UPDATE_PUBLIC_KEY, verifyUpdate } from '../../src/main/update/update-signature.ts'
 
 const pair = () => {
   const { privateKey, publicKey } = generateKeyPairSync('ed25519')

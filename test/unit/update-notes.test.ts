@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { parseChangelog, pendingReleases } from '../../src/main/changelog.ts'
+import { parseChangelog, pendingReleases } from '../../src/main/features/changelog.ts'
 
 test('lists every version between the running one and the download, newest first', () => {
   const changelog = {

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { describe, test } from 'node:test'
-import { closeFloating, closed, dismiss, emptyMedia, float, left, minimize, shown } from '../../src/main/media-state.ts'
+import { closeFloating, closed, dismiss, emptyMedia, float, left, minimize, shown } from '../../src/main/features/media-state.ts'
 
 const FLOAT_ON = true
 

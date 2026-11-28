@@ -15,7 +15,7 @@ import {
   type Rule,
   type RuleAction,
   type RuleCondition
-} from '../../src/main/net-rules.ts'
+} from '../../src/main/net/net-rules.ts'
 
 const block: RuleAction = { type: 'block' }
 const allow: RuleAction = { type: 'allow' }

@@ -1,4 +1,4 @@
-// Draws a What's New board (src/main/boards/<spotlight id>.json, docs/whats-new-canvas.md) in the real app and saves a picture,
+// Draws a What's New board (src/main/features/boards/<spotlight id>.json, docs/whats-new-canvas.md) in the real app and saves a picture,
 // so whoever made the board, a person or an AI session, can look at it before it ships.
 // `pnpm build`, then `node scripts/board-preview.mjs <spotlight id> [--save-sizes] [--wait=<ms>]`.
 // `--wait` takes the picture that long after the board is drawn: a board whose picture plays a loop is looked at once near its start and once near its end.
@@ -16,7 +16,7 @@ if (!spotlightId) throw new Error('usage: node scripts/board-preview.mjs <spotli
 const saveSizes = process.argv.includes('--save-sizes')
 const wait = Number(process.argv.find((argument) => argument.startsWith('--wait='))?.slice('--wait='.length) ?? 800)
 const out = join(tmpdir(), 'yarc-board-preview', `${spotlightId}.png`)
-const boardFile = join(ROOT, 'src/main/boards', `${spotlightId}.json`)
+const boardFile = join(ROOT, 'src/main/features/boards', `${spotlightId}.json`)
 const saved = JSON.parse(readFileSync(boardFile, 'utf8'))
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 

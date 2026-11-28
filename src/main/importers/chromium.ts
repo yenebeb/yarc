@@ -4,7 +4,7 @@ import { copyFile, mkdtemp, rm } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
-import type { ImportedVisit } from '../history'
+import type { ImportedVisit } from '../core/history'
 import type { PinnedFolder, PinnedNode } from '../../shared/types'
 
 export interface ChromiumBrowser {

@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { describe, test } from 'node:test'
-import { History } from '../../src/main/history.ts'
+import { History } from '../../src/main/core/history.ts'
 
 const NOW = Date.parse('2026-11-20T12:00:00Z')
 const HOUR = 36e5

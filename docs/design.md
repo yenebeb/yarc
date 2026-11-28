@@ -7,7 +7,7 @@ YARC's look is designed here. It is not measured or traced from another app.
 ## Principles
 
 1. **The space colours the window.** One colour per space, optionally a second for a gradient. Backgrounds, the accent and folder icons are mixed from it in CSS.
-2. **The page is a card.** Web content sits 8px in from the window edge with 8px corners (`PAD` in `src/main/window.ts`, `setBorderRadius(8)` in `src/main/tab.ts`).
+2. **The page is a card.** Web content sits 8px in from the window edge with 8px corners (`PAD` in `src/main/core/window.ts`, `setBorderRadius(8)` in `src/main/core/tab.ts`).
 3. **The sidebar is the browser.** No tab strip, no toolbar above the page.
 4. **Panels float, then leave.** They are drawn in a transparent overlay view that is attached only while something is open.
 5. **macOS first.** Vibrancy and inset traffic lights on the Mac; a 32px caption strip and a solid gradient on Windows and Linux.

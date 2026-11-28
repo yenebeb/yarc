@@ -4,8 +4,6 @@ import {
   dialog,
   nativeTheme,
   screen,
-  shell,
-  WebContentsView,
   type BaseWindow,
   type BrowserWindowConstructorOptions,
   type ContextMenuParams,
@@ -23,7 +21,7 @@ import { join } from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
 import type { Action, DropTarget } from '../shared/actions'
 import { withPin } from '../shared/extension-pins'
-import { IPC, TOAST_MS, type LittleAnchor, type LittleOp } from '../shared/ipc'
+import { IPC, TOAST_MS } from '../shared/ipc'
 import { commandForInput, type CommandId } from '../shared/keymap'
 import { cleanLiveSource, liveFolderName } from '../shared/live-folders'
 import { containsNode, findCanvas, findFolder, findInPinned, findItem, profileOfItem, spaceCanvases, spaceItems, stripKind, walkPinned } from '../shared/tree'
@@ -48,39 +46,39 @@ import { isFloating, nextStep, stepAfter, type TourEvent, type TourStep } from '
 import { routeFor } from '../shared/link-routes'
 import { validSettingsPatch } from '../shared/settings'
 import { hostOf, resolveInput } from '../shared/url'
-import { AdBlock } from './adblock'
-import { bookmarksHtml } from './bookmarks-export'
-import { Canvases } from './canvas'
-import { hasBoard } from './whats-new-boards'
+import { AdBlock } from './net/adblock'
+import { bookmarksHtml } from './features/bookmarks-export'
+import { Canvases } from './features/canvas'
+import { hasBoard } from './features/whats-new-boards'
 import { recentSpotlights, spotlight, SPOTLIGHTS, unseenSpotlights } from '../shared/spotlights'
-import { changesSince, newestVersion, parseChangelog, RECENT_VERSIONS, recentChanges } from './changelog'
-import { openInChrome } from './chrome'
-import { DownloadList } from './download-list'
-import { Extensions } from './extensions'
+import { changesSince, newestVersion, parseChangelog, RECENT_VERSIONS, recentChanges } from './features/changelog'
+import { openInChrome } from './core/chrome'
+import { DownloadList } from './core/download-list'
+import { Extensions } from './net/extensions'
 import { importChoices, ImportScan, runImport } from './importers'
-import { FLOATING_DEMO_URL } from './floating-demo'
-import { LittleWindow } from './little'
-import { LiveFolders } from './live-folders'
-import { logInfo, logProblem, setLogContext } from './log'
-import { Media } from './media'
-import { Mirror, stillOf } from './mirror'
-import { runPageAction } from './page-actions'
-import { Peek, sameSite } from './peek'
-import { buildAppMenu, buildCanvasMenu, buildContextMenu, buildFolderMenu, buildItemMenu, buildSidebarMenu, buildSpaceMenu, buildSplitMenu } from './menus'
-import { Profiles, type ProfileRuntime } from './profiles'
-import { commandBarPlace, overlayRect, peekRects, promptAnchor, trafficLightsAt, type WindowFrame } from './overlay-layout'
-import { PageSwipe, type SwipeTarget } from './page-swipe'
-import { PromptView } from './prompt-view'
-import { search, suggest } from './search'
-import { SharePicker } from './share-picker'
-import { setSwipeStage } from './swipe-nav'
-import { incognitoState, MAX_ARCHIVE, newId, SPACE_COLORS, Store } from './store'
+import { FLOATING_DEMO_URL } from './features/floating-demo'
+import { LittleWindow } from './features/little'
+import { LiveFolders } from './features/live-folders'
+import { logInfo, logProblem, setLogContext } from './core/log'
+import { Media } from './features/media'
+import { Mirror, stillOf } from './features/mirror'
+import { runPageAction } from './features/page-actions'
+import { Peek, sameSite } from './features/peek'
+import { buildAppMenu, buildCanvasMenu, buildContextMenu, buildFolderMenu, buildItemMenu, buildSidebarMenu, buildSpaceMenu, buildSplitMenu } from './features/menus'
+import { Profiles, type ProfileRuntime } from './core/profiles'
+import { commandBarPlace, overlayRect, peekRects, promptAnchor, trafficLightsAt, type WindowFrame } from './features/overlay-layout'
+import { PageSwipe, type SwipeTarget } from './features/page-swipe'
+import { PromptView } from './core/prompt-view'
+import { SharePicker } from './core/share-picker'
+import { setSwipeStage } from './core/swipe-nav'
+import { incognitoState, MAX_ARCHIVE, newId, SPACE_COLORS, Store } from './core/store'
 import { HistorySync } from './sync'
-import { LiveTab, type OpenDisposition, type TabHost } from './tab'
-import { handleUi, onUi } from './ui-origin'
-import { Updater } from './updater'
-import { MainWindow, PAD, type ViewSlot } from './window'
-import { applyView, captureView, cascade, inAnyView, newView, stateForView, viewFromState } from './window-state'
+import { adoptedTabView, LiveTab, type OpenDisposition, type TabHost } from './core/tab'
+import { becomeDefaultBrowser } from './core/default-browser'
+import { registerIpc } from './ipc'
+import { Updater } from './update/updater'
+import { MainWindow, PAD, type ViewSlot } from './core/window'
+import { applyView, captureView, cascade, inAnyView, newView, stateForView, viewFromState } from './features/window-state'
 
 const isMac = process.platform === 'darwin'
 
@@ -280,7 +278,11 @@ export class Browser implements TabHost {
   start(): void {
     Browser.all.add(this)
     if (Browser.all.size === 1) {
-      this.registerIpc()
+      registerIpc(Browser.all)
+      setSwipeStage({
+        show: (page, step, offset, progress) => [...Browser.all].some((browser) => browser.swipe.show(page, step, offset, progress)),
+        hide: (page) => Browser.all.forEach((browser) => browser.swipe.hide(page))
+      })
       setLogContext(() => [...Browser.all].map((browser) => browser.describeWindows()).join('; '))
     }
     this.store.beforeWrite = () => this.captureCurrent()
@@ -627,7 +629,7 @@ export class Browser implements TabHost {
 
   private onProfileCreated(runtime: ProfileRuntime): void {
     this.downloads.watch(runtime.session, runtime.id)
-    runtime.session.setDisplayMediaRequestHandler((request, reply) => void this.sharePicker.pick(request, reply), { useSystemPicker: true })
+    this.sharePicker.answerFor(runtime.session)
     this.adblock.attach(runtime.session)
     if (!this.incognito) void this.extensions.setup(runtime)
   }
@@ -2160,10 +2162,7 @@ export class Browser implements TabHost {
     space.today.unshift(item)
     let tab: LiveTab
     if (options) {
-      const guest = (options as { webContents?: WebContents }).webContents
-      const view = new WebContentsView({ webContents: guest, webPreferences: options.webPreferences })
-      view.setBackgroundColor('#ffffff')
-      tab = new LiveTab(this, item.id, opener.profileId, opener.session, undefined, view)
+      tab = new LiveTab(this, item.id, opener.profileId, opener.session, undefined, adoptedTabView(options))
     } else {
       tab = new LiveTab(this, item.id, opener.profileId, opener.session, url)
     }
@@ -2235,64 +2234,15 @@ export class Browser implements TabHost {
     return this.openLittles().some((little) => little.win.webContents === wc)
   }
 
-  private registerIpc(): void {
-    const browserOf = (event: { sender: WebContents }): Browser => {
-      for (const browser of Browser.all) {
-        const window = browser.winFor(event.sender)
-        if (window) {
-          browser.use(window)
-          return browser
-        }
-        if (browser.ownsLittle(event.sender)) return browser
-      }
-      throw new Error('IPC from a view no window owns')
-    }
-    handleUi(IPC.action, (event, action: Action) => browserOf(event).dispatch(action))
-    setSwipeStage({
-      show: (page, step, offset, progress) => [...Browser.all].some((browser) => browser.swipe.show(page, step, offset, progress)),
-      hide: (page) => Browser.all.forEach((browser) => browser.swipe.hide(page))
-    })
-    handleUi(IPC.getState, (event) => browserOf(event).snapshot())
-    handleUi(IPC.getOverlay, (event) => browserOf(event).window.overlayMode)
-    handleUi(IPC.search, (event, query: string) => search(browserOf(event), String(query)))
-    handleUi(IPC.suggest, (event, query: string) => suggest(browserOf(event), String(query)))
-    handleUi(IPC.history, (event, query: string, offset: number) => {
-      const browser = browserOf(event)
-      return browser.profiles.get(browser.space.profileId).history.recent(200, Math.max(0, Math.floor(Number(offset) || 0)), String(query ?? ''))
-    })
-    handleUi(IPC.historyDelete, (event, url: string) => {
-      const browser = browserOf(event)
-      return browser.profiles.get(browser.space.profileId).history.deleteUrl(String(url))
-    })
-    handleUi(IPC.focus, (event) => event.sender.focus())
-    onUi(IPC.downloadDrag, (event, id: string) => browserOf(event).downloads.drag(String(id), event.sender))
-    handleUi(IPC.capturePick, (event, x: number, y: number, depth: number) => {
-      const browser = browserOf(event)
-      const tab = browser.activeTab()
-      return tab && browser.window.overlayMode.kind === 'capture' ? browser.canvases.pick(tab, x, y, depth) : undefined
-    })
-    Canvases.registerIpc((wc) => {
-      for (const browser of Browser.all) {
-        const page = browser.canvases.pageOf(wc)
-        if (page) return { canvases: browser.canvases, page }
-      }
-      return undefined
-    })
-    handleUi(IPC.littleOp, (event, op: LittleOp, at?: LittleAnchor) => {
-      for (const little of browserOf(event).openLittles()) if (little.win.webContents === event.sender) return little.op(op, at)
-    })
-
+  /** Whether an IPC sender is one of this controller's views; its window becomes the current one. */
+  takes(sender: WebContents): boolean {
+    const window = this.winFor(sender)
+    if (window) this.use(window)
+    return !!window || this.ownsLittle(sender)
   }
 
   makeDefaultBrowser(): void {
-    // Windows doesn't let apps claim the default themselves.
-    if (process.platform === 'win32') {
-      void shell.openExternal('ms-settings:defaultapps?registeredAppUser=YARC')
-      if (!app.isPackaged) this.toast('Install YARC first, then pick it in Default apps')
-      return
-    }
-    app.setAsDefaultProtocolClient('http')
-    app.setAsDefaultProtocolClient('https')
+    if (!becomeDefaultBrowser() && !app.isPackaged) this.toast('Install YARC first, then pick it in Default apps')
   }
 
   private quitting = false

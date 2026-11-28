@@ -8,7 +8,7 @@ import {
   releaseAssetUrl,
   windowsInstallerName,
   type GithubRelease
-} from '../../src/main/release.ts'
+} from '../../src/main/update/release.ts'
 
 test('compareVersions orders release versions numerically', () => {
   assert.equal(compareVersions('0.1.10', '0.1.9'), 1)

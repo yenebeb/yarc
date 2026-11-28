@@ -29,7 +29,7 @@ export interface PinnedFolder {
   name: string
   open: boolean
   children: PinnedNode[]
-  /** Set on a live folder, whose children come from it (src/main/live-folders.ts). */
+  /** Set on a live folder, whose children come from it (src/main/features/live-folders.ts). */
   live?: LiveSource
   /** Why the last refresh failed; cleared by the next one that works. */
   liveError?: string
@@ -38,7 +38,7 @@ export interface PinnedFolder {
 /** `query` uses GitHub's own search syntax, e.g. `is:pr is:open author:@me`. */
 export type LiveSource = { kind: 'github'; query: string } | { kind: 'feed'; url: string }
 
-/** Its contents are files in its profile's folder (src/main/canvas-store.ts), not in state.json. */
+/** Its contents are files in its profile's folder (src/main/features/canvas-store.ts), not in state.json. */
 export interface PinnedCanvas {
   kind: 'canvas'
   /** Also the name of its folder under Profiles/<profile>/Canvases/. */
@@ -338,7 +338,7 @@ export type OverlayMode =
   | { kind: 'split-drop' }
   | { kind: 'tour'; step: TourStep }
   /** Spotlight cards first, then the releases since the user's last version, newest first. */
-  | { kind: 'whats-new'; releases: ReleaseNotes[]; spotlights: string[]; /** The spotlights with a board to try the feature on (src/main/whats-new-boards.ts). */ boards: string[] }
+  | { kind: 'whats-new'; releases: ReleaseNotes[]; spotlights: string[]; /** The spotlights with a board to try the feature on (src/main/features/whats-new-boards.ts). */ boards: string[] }
   | { kind: 'update' }
   /** `page`: where the active page sits in the overlay, which covers the content area. */
   | { kind: 'capture'; page: Rect }

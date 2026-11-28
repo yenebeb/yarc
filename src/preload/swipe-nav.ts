@@ -1,5 +1,6 @@
 // Chromium's two-finger history swipe is Chrome's code, not Electron's: report the page's sideways scrolls to main, which slides the page and decides when the fingers lift.
 import { ipcRenderer } from 'electron'
+import { PAGE_IPC } from '../shared/ipc'
 
 /** Main says when the fingers lift; without that, a pause this long starts a new gesture. */
 const LOST_END_MS = 3000
@@ -38,7 +39,7 @@ let gesture = newGesture(performance.now(), true, MOMENTUM_GAP_MS)
 
 if (window === window.top) {
   addEventListener('wheel', onWheel, { passive: true })
-  ipcRenderer.on('yarc:swipe-end', () => {
+  ipcRenderer.on(PAGE_IPC.swipeEnd, () => {
     gesture.over = true
   })
 }
@@ -73,11 +74,11 @@ function report(g: Gesture): void {
   const dx = g.step === 'back' ? -g.x : g.x
   if (!g.reported && dx <= 0) return
   g.reported = true
-  ipcRenderer.send('yarc:swipe', { id: g.id, step: g.step, dx, cancelled: false })
+  ipcRenderer.send(PAGE_IPC.swipe, { id: g.id, step: g.step, dx, cancelled: false })
 }
 
 function cancel(g: Gesture): void {
-  if (g.reported && g.step) ipcRenderer.send('yarc:swipe', { id: g.id, step: g.step, dx: 0, cancelled: true })
+  if (g.reported && g.step) ipcRenderer.send(PAGE_IPC.swipe, { id: g.id, step: g.step, dx: 0, cancelled: true })
   g.step = undefined
 }
 

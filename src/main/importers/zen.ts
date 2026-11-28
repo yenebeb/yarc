@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { basename, join } from 'node:path'
-import type { ImportedVisit } from '../history'
+import type { ImportedVisit } from '../core/history'
 import { readDatabaseCopy } from './chromium'
 import { parseContainers, parsePrefs, parseProfilesIni, readMozLz4 } from './zen-session'
 

@@ -68,7 +68,7 @@ export function fakeGitHub(): FakeGitHub {
     'README.md': '# App\n',
     'docs/guide.md': 'How it works.\n',
     'src/renderer/src/Sidebar.tsx': 'export const width = 240\n',
-    'src/main/updater.ts': 'export const feed = "releases"\n',
+    'src/main/update/updater.ts': 'export const feed = "releases"\n',
     '.github/workflows/ci.yml': 'name: ci\n'
   })
   git(work, 'push', '--quiet', 'origin', 'main')

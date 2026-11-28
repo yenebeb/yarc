@@ -44,12 +44,12 @@ describe('Risk comes from the changed files alone', () => {
       'electron-builder.yml',
       'build/entitlements.mac.plist',
       'src/preload/ui.ts',
-      'src/main/ui-origin.ts',
-      'src/main/update-signature.ts',
-      'src/main/mac-update.ts',
+      'src/main/core/ui-origin.ts',
+      'src/main/update/update-signature.ts',
+      'src/main/update/mac-update.ts',
       'src/main/sync/crypto.ts',
-      'src/main/session-cookies.ts',
-      'src/main/history.ts',
+      'src/main/core/session-cookies.ts',
+      'src/main/core/history.ts',
       'CLAUDE.md'
     ]) {
       assert.equal(risk(file(path, ['// tidy up'])), 'high', path)
@@ -94,7 +94,7 @@ describe('A sensitive change disguised as a harmless one', () => {
   })
 
   test('markdown outside the allowlist, or nested where a tool might read it', () => {
-    assert.notEqual(risk(file('src/main/boards/readme.md')), 'low')
+    assert.notEqual(risk(file('src/main/features/boards/readme.md')), 'low')
     assert.notEqual(risk(file('docs/fixtures/StorableSidebar.sample.json')), 'low')
     assert.equal(risk(file('.github/pull_request_template.md')), 'high')
   })
@@ -125,14 +125,14 @@ describe('Reading a change from git', () => {
     const head = github.commit('feature', {
       'docs/guide.md': { symlink: '../../.ssh/id_ed25519' },
       'README.md': '# App\nNew line.\n',
-      'src/main/updater.ts': null,
-      'src/main/feed.ts': 'export const feed = "releases"\n',
+      'src/main/update/updater.ts': null,
+      'src/main/update/feed.ts': 'export const feed = "releases"\n',
       'logo.bin': '\0\u0001\u0002binary'
     })
     const files = new Map(changedFiles(github.work, github.mainSha, head).map((changed) => [changed.path, changed]))
     assert.equal(files.get('docs/guide.md')?.mode, '120000')
     assert.deepEqual(files.get('README.md')?.addedLines, ['New line.'])
-    assert.equal(files.get('src/main/feed.ts')?.previousPath, 'src/main/updater.ts')
+    assert.equal(files.get('src/main/update/feed.ts')?.previousPath, 'src/main/update/updater.ts')
     assert.equal(files.get('logo.bin')?.binary, true)
     assert.equal(classify(policy, [...files.values()]).risk, 'high')
     assert.equal(git(github.work, 'rev-parse', 'HEAD'), head)

@@ -1,4 +1,4 @@
-// Signs the update files installed copies check before installing (src/main/update-signature.ts):
+// Signs the update files installed copies check before installing (src/main/update/update-signature.ts):
 // the macOS zips and the Windows installers.
 //
 //   node --experimental-strip-types scripts/sign-update.mts keygen <private-key-file>
@@ -11,7 +11,7 @@
 import { generateKeyPairSync } from 'node:crypto'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { basename } from 'node:path'
-import { publicKeyOf, signUpdate, UPDATE_PUBLIC_KEY } from '../src/main/update-signature.ts'
+import { publicKeyOf, signUpdate, UPDATE_PUBLIC_KEY } from '../src/main/update/update-signature.ts'
 
 const args = process.argv.slice(2)
 
@@ -28,7 +28,7 @@ if (args[0] === 'keygen') {
   if (!key) throw new Error('MAC_UPDATE_SIGNING_KEY is not set: the repository secret is missing')
   // Installed apps only accept files signed with the key matching the one they were built with.
   if (publicKeyOf(key).trim() !== UPDATE_PUBLIC_KEY.trim()) {
-    throw new Error("MAC_UPDATE_SIGNING_KEY doesn't match UPDATE_PUBLIC_KEY in src/main/update-signature.ts")
+    throw new Error("MAC_UPDATE_SIGNING_KEY doesn't match UPDATE_PUBLIC_KEY in src/main/update/update-signature.ts")
   }
   if (args.length === 0) throw new Error('No files to sign')
   for (const file of args) {

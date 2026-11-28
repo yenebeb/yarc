@@ -3,7 +3,7 @@ import { existsSync, mkdtempSync, readFileSync, statSync, writeFileSync } from '
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, test } from 'node:test'
-import { LogFile, logError, logProblem, setLogContext, startLog } from '../../src/main/log.ts'
+import { LogFile, logError, logProblem, setLogContext, startLog } from '../../src/main/core/log.ts'
 
 const noon = () => new Date('2026-11-20T12:00:00.000Z')
 const freshFile = () => join(mkdtempSync(join(tmpdir(), 'yarc-log-')), 'logs', 'main.log')

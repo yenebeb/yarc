@@ -1,8 +1,8 @@
 // The command bar (⌘T): which rows it shows for what was typed, and in which order, like Arc.
 import assert from 'node:assert/strict'
 import { describe, test } from 'node:test'
-import { History } from '../../src/main/history.ts'
-import { arrange, historyCandidates, searchedFor, type Candidate } from '../../src/main/search-rank.ts'
+import { History } from '../../src/main/core/history.ts'
+import { arrange, historyCandidates, searchedFor, type Candidate } from '../../src/main/features/search-rank.ts'
 import type { SearchResult } from '../../src/shared/types.ts'
 
 const NOW = Date.parse('2026-11-20T12:00:00Z')

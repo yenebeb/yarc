@@ -232,14 +232,14 @@ jobs:
           # sets identity "-" (ad-hoc), which is used regardless of this flag.
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
       # Installed copies read it to tell an update with a new Electron (Chromium security fixes,
-      # worth a sooner restart prompt) from a normal one: src/main/update-escalation.ts.
+      # worth a sooner restart prompt) from a normal one: src/main/update/update-escalation.ts.
       - name: Write release.json
         if: runner.os == 'Linux'
         # A block scalar: on one line, YAML reads the ": " inside the script as a mapping and
         # rejects the whole workflow, so no job runs at all.
         run: |
           node -e 'require("fs").writeFileSync("release/release.json", JSON.stringify({ electron: require("electron/package.json").version }) + "\n")'
-      # Installed copies list what a downloaded update brings from it (src/main/changelog.ts).
+      # Installed copies list what a downloaded update brings from it (src/main/features/changelog.ts).
       - name: Add the changelog to the release
         if: runner.os == 'Linux'
         run: if [ -f build/changelog.json ]; then cp build/changelog.json release/changelog.json; fi
@@ -333,7 +333,7 @@ jobs:
       head: ${{ needs.version.outputs.sha }}
       base: ${{ needs.security-verify.outputs.base }}
 
-  # Signs what installed copies check before they update (src/main/update-signature.ts): the macOS
+  # Signs what installed copies check before they update (src/main/update/update-signature.ts): the macOS
   # update zips (mac-update.ts) and the Windows installers (updater.ts). No dependencies, no
   # build: the repository's own script and Node's crypto. In the release-signing environment, so
   # the key can live there (Settings > Environments, deployment branch main) instead of in a

@@ -2,11 +2,11 @@
 
 Status (2026-11-21): phase 1 (MVP) is built on our own board (section 2), released in v0.2.0, and was tried in the running app through `YARC_TEST` (captures, Add Image, the Send To list, drawing a rectangle and typing a text with input events, rename, saving); not yet with a real keyboard and trackpad. Phase 2a, the live view (section 4.1), is built; the rest of phase 2 (refresh, anchoring, the memory guard) and more export formats (phase 3) are not started. This doc answers a Windows user who asked for Arc's Easels, which only ever shipped on macOS.
 
-**What phase 1 has** (`src/main/canvas.ts`, `src/main/canvas-store.ts`, `src/renderer/src/canvas.tsx`): canvases as pinned sidebar items (`PinnedCanvas`), shown in the content area by `canvas.html`, a board YARC draws itself (section 2); files per profile with the inbox and trash below; ⌘⇧2 capture with hover-to-pick or drag and a Send To list; Add Image to Canvas; captures as cards whose footer opens the page in Peek; Arrange in Grid; a new canvas opens with its title in the middle and a hint under it, while it holds nothing else, naming ⌘⇧2, Add Image to Canvas and paste or drop (no tutorial or example canvas); PNG export and copy; rename, move to space, delete to trash. The title follows a sidebar rename while it still reads the old name. A focused canvas keeps ⌘D (duplicate) and ⌘± / ⌘0 (zoom) for itself.
+**What phase 1 has** (`src/main/features/canvas.ts`, `src/main/features/canvas-store.ts`, `src/renderer/src/canvas.tsx`): canvases as pinned sidebar items (`PinnedCanvas`), shown in the content area by `canvas.html`, a board YARC draws itself (section 2); files per profile with the inbox and trash below; ⌘⇧2 capture with hover-to-pick or drag and a Send To list; Add Image to Canvas; captures as cards whose footer opens the page in Peek; Arrange in Grid; a new canvas opens with its title in the middle and a hint under it, while it holds nothing else, naming ⌘⇧2, Add Image to Canvas and paste or drop (no tutorial or example canvas); PNG export and copy; rename, move to space, delete to trash. The title follows a sidebar rename while it still reads the old name. A focused canvas keeps ⌘D (duplicate) and ⌘± / ⌘0 (zoom) for itself.
 
 **Built differently from below:** main never writes board items. A capture is stored as an image plus an entry in the canvas's `inbox.json`; the canvas page places inbox items when it opens (or at once, if open) and saves. Saving never deletes an image that's still in the inbox.
 
-**What phase 2a has** (`src/main/capture-live.ts`): ▶ in a capture card's footer (cards with capture geometry only) plays the real page in the card's picture box, ⏸ goes back to the still; saved as `CardItem.live`, so a live card plays again when its canvas opens. Section 4.1 says what's built and what's left. Tried in the running app through `YARC_TEST` on a local test page and on vclock.com (the live card matches the still and keeps ticking; zoom, a card half off the board, a click on a link opening Peek, switching to a tab and back, pause); not with a real mouse and trackpad.
+**What phase 2a has** (`src/main/features/capture-live.ts`): ▶ in a capture card's footer (cards with capture geometry only) plays the real page in the card's picture box, ⏸ goes back to the still; saved as `CardItem.live`, so a live card plays again when its canvas opens. Section 4.1 says what's built and what's left. Tried in the running app through `YARC_TEST` on a local test page and on vclock.com (the live card matches the still and keeps ticking; zoom, a card half off the board, a click on a link opening Peek, switching to a tab and back, pause); not with a real mouse and trackpad.
 
 **Not in phase 1:** canvases in the command bar's search results, a still of a canvas shown in a second window (the other window shows nothing there), canvases in split view, an undo toast for Delete.
 
@@ -76,11 +76,11 @@ Behaviours to check against Arc when testing: a capture lands next to the previo
 
 ## 3. Region capture
 
-YARC already captures pages: `webContents.capturePage()` in `Browser.lend` and the frame subscription in `Mirror` (`src/main/mirror.ts`), with `stillOf` turning a `NativeImage` into a JPEG data URL capped at 1600 px wide. `Tab.sampleBarColor` captures a 2 px strip with `capturePage({ x, y, width, height })`. A capture is the same call with the rectangle the user drew.
+YARC already captures pages: `webContents.capturePage()` in `Browser.lend` and the frame subscription in `Mirror` (`src/main/features/mirror.ts`), with `stillOf` turning a `NativeImage` into a JPEG data URL capped at 1600 px wide. `Tab.sampleBarColor` captures a 2 px strip with `capturePage({ x, y, width, height })`. A capture is the same call with the rectangle the user drew.
 
 **Flow:**
 1. ⇧⌘2 / Ctrl+Shift+2 (a new `keymap.ts` entry), the command bar's "Capture", or a sidebar canvas's camera button.
-2. The overlay view (already above the page, `src/main/window.ts`) opens a new overlay kind, `{ kind: 'capture' }` and the page dims. Escape cancels. Two ways to pick, in the same mode:
+2. The overlay view (already above the page, `src/main/core/window.ts`) opens a new overlay kind, `{ kind: 'capture' }` and the page dims. Escape cancels. Two ways to pick, in the same mode:
    - **Hover and click** (the default, from 1.1): the element under the pointer is outlined, and a click captures its box. The overlay sits on top, so the page gets no mouse events; main asks the page (an isolated-world script, throttled to a frame) for `document.elementsFromPoint(x, y)` and outlines the first image, video, canvas, figure or element with a visible box of a sensible size. Scroll wheel / ↑↓ go to the parent or child element.
    - **Drag** a free rectangle, as in Arc.
 
@@ -147,7 +147,7 @@ Unknowns for the spike: whether `enableDeviceEmulation` with `viewSize` keeps th
 4. Find the region (4.3), scroll it into view in the hidden page, and `capturePage(rect)`.
 5. Replace the capture's image file, keep the old one until the new one is written, update `refreshedAt`. Destroy the view.
 
-Refresh views live in a separate, small class (`src/main/capture-refresher.ts`) with a queue: at most 2 loads at once, 20 s timeout each. Live views (4.1) are another class, `src/main/capture-live.ts`; both share the guards in 4.4.
+Refresh views live in a separate, small class (`src/main/capture-refresher.ts`) with a queue: at most 2 loads at once, 20 s timeout each. Live views (4.1) are another class, `src/main/features/capture-live.ts`; both share the guards in 4.4.
 
 ### 4.3 Anchoring: coordinates or a CSS selector
 

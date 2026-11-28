@@ -13,12 +13,13 @@ export default defineConfig({
     build: {
       // Bundled so only the code we use ships; the rest stay in node_modules.
       externalizeDeps: { exclude: ['tldts-experimental', '@ghostery/adblocker-electron'] },
-      rollupOptions: { input: { index: resolve('src/main/index.ts'), 'adblock-build': resolve('src/main/adblock-build.ts') } }
+      rollupOptions: { input: { index: resolve('src/main/index.ts'), 'adblock-build': resolve('src/main/net/adblock-build.ts') } }
     }
   },
   preload: {
     build: {
-      // Sandboxed preloads can only require('electron'): bundle the rest.
+      // Sandboxed preloads can only require('electron'): bundle the rest, and no chunk shared between them.
+      isolatedEntries: true,
       externalizeDeps: { exclude: ['electron-chrome-extensions'] },
       rollupOptions: { input: { ui: resolve('src/preload/ui.ts'), 'adblock-scriptlets': resolve('src/preload/adblock-scriptlets.ts'), 'extension-browser': resolve('src/preload/extension-browser.ts'), 'extension-dnr': resolve('src/preload/extension-dnr.ts'), 'swipe-nav': resolve('src/preload/swipe-nav.ts') } }
     }

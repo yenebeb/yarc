@@ -4,7 +4,7 @@ import { mkdirSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { readdir, readFile, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { SyncRecord } from '../../shared/sync'
-import type { History } from '../history'
+import type { History } from '../core/history'
 import { currentKey, parseHeader, sealWith, SyncCryptoError, unsealWith, type Keyring, type SyncHeader } from './crypto.ts'
 import { chunkContext, compactChunks, decodeChunk, encodeChunk, planApply, unappliedRecords, type Chunk } from './log.ts'
 

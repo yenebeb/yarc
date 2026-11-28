@@ -185,7 +185,7 @@ next to the bundle. A missing preload logs `Preload file not found at …`.
   `getEnabledRulesets()` returns `[]` and manifest rulesets never apply (tested 2026-11-22). So MV3 blockers
   such as **uBlock Origin Lite** install but barely block. YARC replaces it: `src/preload/extension-dnr.ts`
   overwrites the API (registered before the library's preload, which freezes `chrome`, and moving rules out
-  of Electron's store once) and `src/main/declarative-net-request.ts` applies the rules in the request
+  of Electron's store once) and `src/main/net/declarative-net-request.ts` applies the rules in the request
   listeners the built-in Ghostery blocker shares. The web store also refuses MV2 by default
   (`minimumManifestVersion: 3`). Note that any
   **Electron `session.webRequest` listener takes precedence over `chrome.webRequest`** for that
@@ -371,7 +371,7 @@ The header alone is not enough. With a Chrome-shaped request header but `Electro
 `navigator.userAgent`, the web app at `/v2/` never gets past its loading screen. With both
 Chrome-shaped, "Continue on this browser" reaches the pre-join screen (name, camera, microphone).
 
-So YARC gives the hosts in `CHROME_UA_HOSTS` (`src/main/useragent.ts`: teams.microsoft.com,
+So YARC gives the hosts in `CHROME_UA_HOSTS` (`src/main/core/useragent.ts`: teams.microsoft.com,
 teams.live.com, teams.cloud.microsoft) the UA without `Electron/`, and everything else keeps
 Electron's:
 
@@ -379,7 +379,7 @@ Electron's:
   `src/main/index.ts`. The committed page's `navigator.userAgent` follows it, but the request that
   started the navigation was already sent with the old UA, and redirects keep it.
 - So `session.webRequest.onBeforeSendHeaders`, filtered to those hosts, rewrites the header too
-  (`src/main/profiles.ts`). This is the only `onBeforeSendHeaders` listener: none of the
+  (`src/main/core/profiles.ts`). This is the only `onBeforeSendHeaders` listener: none of the
   dependencies register one.
 
 Leaving Teams switches back to Electron's UA for the next page. The first request off Teams still
@@ -394,7 +394,7 @@ opens in the webContents Electron makes for `window.open`. `did-start-navigation
 navigations whose entry is marked as overriding: `loadURL` marks it, later navigations in the tab
 inherit it, and a new window's first navigation, which the renderer starts, has no entry to inherit
 from. Signed in to Teams, that tab stays on the `/v2/` loading screen (initials avatar, no content).
-So `setWindowOpenHandler` (`src/main/tab.ts`) denies tabs to hosts that need another UA and opens
+So `setWindowOpenHandler` (`src/main/core/tab.ts`) denies tabs to hosts that need another UA and opens
 them in a new tab with `loadURL`. Sized popups (`new-window` with features) are left alone, because
 they need `window.opener`.
 
@@ -704,14 +704,14 @@ are what catch them.
    rule), so an Electron bump doesn't wait for the daily release. The label also gets it released
    by the next merge if a newer run replaces that pending one. The release builds Windows, macOS and Linux and publishes once all three pass. The Linux job also
    uploads `release.json` (`{ "electron": "<version>" }`).
-6. **Users**: installed copies check GitHub every hour (`CHECK_EVERY` in `src/main/updater.ts`).
+6. **Users**: installed copies check GitHub every hour (`CHECK_EVERY` in `src/main/update/updater.ts`).
    - Windows downloads the update in the background (electron-updater, `latest.yml`), checks the
-     installer's Ed25519 `.sig` (`verifyInstaller` in `src/main/update-signature.ts`, same key as macOS) and installs it
+     installer's Ed25519 `.sig` (`verifyInstaller` in `src/main/update/update-signature.ts`, same key as macOS) and installs it
      on the next quit; an installer that fails the check is never offered or installed. Meanwhile the sidebar shows a *Restart to Update* pill (also in the
      command bar and menu). The relaunch card (listing what's new) only opens by itself once the
      update has waited without a restart: 1 day when its `release.json` names a different
      Electron than `process.versions.electron`, else 7 days (Chrome's escalation); *Later* keeps
-     it away a day (`src/main/update-escalation.ts`). The
+     it away a day (`src/main/update/update-escalation.ts`). The
      start of the wait is kept in `state.json` (`waitingUpdate`), so a restart that didn't install
      doesn't reset it. While an update is ready, no newer release is downloaded, so a newer one
      never causes a second notice; it arrives with the next check after the restart.
@@ -733,7 +733,7 @@ Gaps:
 Squirrel.Mac (electron-updater's `MacUpdater`) checks that the new app satisfies the running
 app's designated requirement. An ad-hoc signature's requirement is its own cdhash
 (`codesign -d -r-` prints `designated => cdhash H"…"`), which changes with every build, so
-Squirrel.Mac refuses every update. `src/main/mac-update.ts` does the job itself:
+Squirrel.Mac refuses every update. `src/main/update/mac-update.ts` does the job itself:
 
 1. Poll `releases/latest` (as before); pick `YARC-<version>-<arch>-mac.zip` and its `.sig`
    (`pickMacUpdate` in `release.ts`). electron-builder's `zip` mac target keeps the framework
@@ -954,7 +954,7 @@ doesn't change between launches, and incognito's `dispose()` clears only its own
 partitions. The persistent cookie lost on `SIGKILL` is Chromium's own write delay (it flushes the
 Cookies database about every 30 s and at a normal quit); Chrome does the same.
 
-**Fix (`src/main/session-cookies.ts`):** per profile, a mirror of the session cookies kept from
+**Fix (`src/main/core/session-cookies.ts`):** per profile, a mirror of the session cookies kept from
 `session.cookies` `changed` events, written to `Profiles/<id>/session-cookies.json` (mode 600)
 2 s after a change and at quit (`Profiles.closeAll()`, synchronous, from `before-quit`). At launch
 `Browser.restoreSessions()` sets them again with `cookies.set` before `start()` opens any window

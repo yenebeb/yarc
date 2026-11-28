@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { describe, test } from 'node:test'
-import { DownloadBurst, isDangerous } from '../../src/main/downloads.ts'
+import { DownloadBurst, isDangerous } from '../../src/main/core/downloads.ts'
 
 describe('which downloads ask before they open', () => {
   test('programs and scripts ask, whatever the case of the extension', () => {

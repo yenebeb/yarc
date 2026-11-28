@@ -3,7 +3,7 @@
 #
 #   npm run dist:win   -> release/YARC-Setup-<version>-x64.exe and -arm64.exe
 #   npm run dist:mac   -> release/YARC-<version>-arm64.dmg and -x64.dmg, plus the -mac.zip
-#                         self-updates (see src/main/mac-update.ts)                (must run on macOS)
+#                         self-updates (see src/main/update/mac-update.ts)                (must run on macOS)
 #   npm run dist:linux -> release/YARC-<version>-<arch>.AppImage    (run on Linux)
 # The app was called Arc Shell. The appId stays, so Windows updates it in place and macOS keeps
 # its permissions and default-browser choice.
@@ -76,7 +76,7 @@ mac:
   target:
     - target: dmg
       arch: [arm64, x64]
-    # What installed copies update themselves from (src/main/mac-update.ts); CI signs each one.
+    # What installed copies update themselves from (src/main/update/mac-update.ts); CI signs each one.
     - target: zip
       arch: [arm64, x64]
   artifactName: YARC-${version}-${arch}-mac.${ext} # the zips; dmg.artifactName names the DMGs

@@ -47,6 +47,16 @@ export const IPC = {
   swipe: 'arc:swipe'
 } as const
 
+/** What web pages and extensions can send on (src/main/core/page-ipc.ts); Ghostery's preload fixes the names of its two. */
+export const PAGE_IPC = {
+  swipe: 'yarc:swipe',
+  swipeEnd: 'yarc:swipe-end',
+  adblockScriptlets: 'yarc:adblock-scriptlets',
+  cosmeticFilters: '@ghostery/adblocker/inject-cosmetic-filters',
+  mutationObserverEnabled: '@ghostery/adblocker/is-mutation-observer-enabled',
+  netRules: 'yarc-dnr'
+} as const
+
 export interface EditRequest {
   kind: 'rename' | 'renameFolder' | 'renameCanvas'
   id: string

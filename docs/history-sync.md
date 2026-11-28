@@ -5,7 +5,7 @@ Google Drive, OneDrive or Dropbox (YARC signs in to them), iCloud Drive or any o
 another app syncs, their own WebDAV server, or directly between computers on the same network.
 There is no YARC server, account or telemetry: the maintainers never hold or see anyone's data,
 and wherever the files are kept only ever sees encrypted files. Code: `src/main/sync/` (crypto,
-log format, engine, the stores, Electron controller), `src/main/history.ts` (merge rules),
+log format, engine, the stores, Electron controller), `src/main/core/history.ts` (merge rules),
 `src/shared/sync.ts` (record types and what they expose). Tests: `test/unit/sync.test.ts`,
 `test/unit/sync-remote.test.ts`.
 

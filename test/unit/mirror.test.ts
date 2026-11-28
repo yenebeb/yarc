@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { describe, test } from 'node:test'
 import type { NativeImage, WebContents } from 'electron'
-import { Mirror } from '../../src/main/mirror.ts'
+import { Mirror } from '../../src/main/features/mirror.ts'
 
 /** A page's frame, labelled so the test can tell which one was sent. */
 const frame = (label: string) =>

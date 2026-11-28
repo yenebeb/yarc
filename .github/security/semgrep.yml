@@ -2,7 +2,7 @@ rules:
   - id: yarc-ipc-outside-ui-guard
     languages: [typescript]
     severity: ERROR
-    message: Register IPC with handleUi/onUi (src/main/ui-origin.ts), which refuse senders that aren't YARC's own UI. A bare ipcMain handler answers any web page that can reach the channel.
+    message: Register IPC with handleUi/onUi (src/main/core/ui-origin.ts, called from src/main/ipc.ts), which refuse senders that aren't YARC's own UI. A bare ipcMain handler answers any web page that can reach the channel.
     patterns:
       - pattern-either:
           - pattern: ipcMain.handle(...)
@@ -11,10 +11,8 @@ rules:
           - pattern: ipcMain.handleOnce(...)
     paths:
       exclude:
-        - "/src/main/ui-origin.ts"
-        - "/src/main/adblock.ts"
-        - "/src/main/declarative-net-request.ts"
-        - "/src/main/swipe-nav.ts"
+        - "/src/main/core/ui-origin.ts"
+        - "/src/main/core/page-ipc.ts"
 
   - id: yarc-weakened-web-preferences
     languages: [typescript]
@@ -54,7 +52,7 @@ rules:
   - id: yarc-certificate-errors-accepted
     languages: [typescript]
     severity: ERROR
-    message: Accepting a certificate error lets anyone on the network read and change the page. Client certificates are chosen in src/main/client-certificates.ts; server errors are never waved through.
+    message: Accepting a certificate error lets anyone on the network read and change the page. Client certificates are chosen in src/main/core/client-certificates.ts; server errors are never waved through.
     pattern-either:
       - pattern: $SESSION.setCertificateVerifyProc(...)
       - pattern: $APP.on('certificate-error', ...)
@@ -69,6 +67,6 @@ rules:
       - pattern: $SESSION.cookies.flushStore(...)
     paths:
       exclude:
-        - "/src/main/session-cookies.ts"
-        - "/src/main/profiles.ts"
+        - "/src/main/core/session-cookies.ts"
+        - "/src/main/core/profiles.ts"
         - "/src/main/importers/**"

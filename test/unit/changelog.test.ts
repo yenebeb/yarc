@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { describe, test } from 'node:test'
-import { changesSince, recentChanges, startupScreen, type Changelog } from '../../src/main/changelog.ts'
+import { changesSince, recentChanges, startupScreen, type Changelog } from '../../src/main/features/changelog.ts'
 
 // 0.1.11 only had Dependabot bumps, so it has no entry; 0.1.12 has an empty one.
 const changelog: Changelog = {

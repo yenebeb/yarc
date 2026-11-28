@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { describe, test } from 'node:test'
-import { PermissionQueue } from '../../src/main/permission-queue.ts'
-import { SiteDecisions } from '../../src/main/site-permissions.ts'
+import { PermissionQueue } from '../../src/main/core/permission-queue.ts'
+import { SiteDecisions } from '../../src/main/core/site-permissions.ts'
 import { promptText, siteName } from '../../src/shared/permissions.ts'
 
 const MEET = 'https://meet.google.com'

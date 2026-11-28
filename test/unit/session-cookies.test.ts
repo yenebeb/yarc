@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, test } from 'node:test'
 import type { Cookie, CookiesSetDetails, Session } from 'electron'
-import { decodeCookies, encodeCookies, SessionCookieJar, SessionCookies, setDetailsFor, type Cipher } from '../../src/main/session-cookies.ts'
+import { decodeCookies, encodeCookies, SessionCookieJar, SessionCookies, setDetailsFor, type Cipher } from '../../src/main/core/session-cookies.ts'
 
 /** Microsoft's sign-in cookie: no expiry, so Electron drops it at quit. */
 const signIn: Cookie = { name: 'ESTSAUTH', value: 'token-1', domain: '.login.microsoftonline.com', path: '/', hostOnly: false, secure: true, httpOnly: true, session: true, sameSite: 'no_restriction' }

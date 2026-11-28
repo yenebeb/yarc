@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { describe, test } from 'node:test'
-import { feedLinkInHtml, githubSearchUrl, LIVE_LIMIT, looksLikeHtml, mergeLive, parseFeed, parseGitHubSearch, type LiveEntry } from '../../src/main/live-sources.ts'
+import { feedLinkInHtml, githubSearchUrl, LIVE_LIMIT, looksLikeHtml, mergeLive, parseFeed, parseGitHubSearch, type LiveEntry } from '../../src/main/features/live-sources.ts'
 import { cleanLiveSource, githubPreset, githubQuery, liveFolderName, repoName } from '../../src/shared/live-folders.ts'
 import type { PinnedNode, PinnedTab } from '../../src/shared/types.ts'
 
