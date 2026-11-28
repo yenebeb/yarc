@@ -1,6 +1,7 @@
 // The layers of docs/architecture.md, checked. A failure names the file and the rule; the fix is to move the code, not to add an exception.
 import assert from 'node:assert/strict'
 import { globSync, readFileSync } from 'node:fs'
+import { isBuiltin } from 'node:module'
 import { dirname, join, normalize } from 'node:path'
 import { test } from 'node:test'
 
@@ -57,7 +58,7 @@ test('each process imports only its own code and shared', () => {
 test('shared runs anywhere: no Electron, no Node, nothing outside shared', () => {
   const strays = sources('src/shared').flatMap((file) =>
     importsOf(file)
-      .filter((specifier) => specifier === 'electron' || specifier.startsWith('node:') || (specifier.startsWith('.') && !targetOf(file, specifier).startsWith('src/shared/')))
+      .filter((specifier) => specifier === 'electron' || isBuiltin(specifier) || (specifier.startsWith('.') && !targetOf(file, specifier).startsWith('src/shared/')))
       .map((specifier) => `${file} imports ${specifier}`)
   )
   assert.deepEqual(strays, [])

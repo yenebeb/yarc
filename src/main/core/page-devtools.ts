@@ -25,12 +25,13 @@ export async function wholePage(wc: WebContents): Promise<{ png: Buffer; width: 
   }
 }
 
-/** `metrics`: the parameters of Emulation.setDeviceMetricsOverride. */
-export function emulateDeviceMetrics(wc: WebContents, metrics: object): void {
+/** `metrics`: the parameters of Emulation.setDeviceMetricsOverride. False when the debugger couldn't attach. */
+export function emulateDeviceMetrics(wc: WebContents, metrics: object): boolean {
   try {
     if (!wc.debugger.isAttached()) wc.debugger.attach('1.3')
   } catch {
-    return
+    return false
   }
   wc.debugger.sendCommand('Emulation.setDeviceMetricsOverride', metrics).catch(() => {})
+  return true
 }

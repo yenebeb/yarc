@@ -125,7 +125,7 @@ export class LiveCapture {
     const key = JSON.stringify(metrics)
     if (key === this.emulated) return
     this.emulated = key
-    emulateDeviceMetrics(this.wc, metrics)
+    if (!emulateDeviceMetrics(this.wc, metrics)) return
     void this.wc.setVisualZoomLevelLimits(1, 1)
   }
 
